@@ -60,12 +60,12 @@ class Participant_Form
 		add_action('wp_ajax_ak_remove_participant',        [$this, 'ajax_remove_participant']);
 		add_action('wp_ajax_nopriv_ak_remove_participant', [$this, 'ajax_remove_participant']);
 
-		// Hide set products from catalog, shortcodes, widgets, searches, queries, and related products
+		// Hide set products from catalog, shortcodes, widgets, searches, empty cart, queries, and related products
 		add_filter('woocommerce_product_is_visible',            [$this, 'hide_set_products_from_catalog'],           10, 2);
 		add_action('woocommerce_product_query',                 [$this, 'exclude_set_products_from_wc_query'],       10, 1);
 		add_filter('woocommerce_shortcode_products_query',      [$this, 'exclude_set_products_from_shortcode_query'],  10, 3);
 		add_filter('woocommerce_products_widget_query_args',    [$this, 'exclude_set_products_from_widget_query'],     10, 1);
-		add_action('pre_get_posts',                             [$this, 'exclude_set_products_from_search'],         10, 1);
+		add_action('pre_get_posts',                             [$this, 'exclude_set_products_from_all_frontend_queries'], 10, 1);
 		add_filter('woocommerce_related_products',              [$this, 'exclude_set_products_from_related'],        10, 3);
 
 		// Prevent single product access
@@ -712,18 +712,30 @@ class Participant_Form
 	}
 
 	/**
-	 * Exclude Set products from main site search queries.
+	 * Exclude Set products from ALL frontend WP_Query calls
+	 * (archives, search, empty cart recommendations, widgets, Gutenberg blocks).
 	 */
-	public function exclude_set_products_from_search(\WP_Query $q): void
+	public function exclude_set_products_from_all_frontend_queries(\WP_Query $q): void
 	{
-		if (is_admin() || ! $q->is_main_query() || ! $q->is_search()) {
+		if (is_admin()) {
 			return;
 		}
 
-		$set_pids = $this->validator->get_all_set_product_ids();
-		if (! empty($set_pids)) {
-			$existing = (array) ($q->get('post__not_in') ?: []);
-			$q->set('post__not_in', array_unique(array_merge($existing, $set_pids)));
+		$post_type = $q->get('post_type');
+		$is_product_query = false;
+
+		if ($post_type === 'product') {
+			$is_product_query = true;
+		} elseif (is_array($post_type) && in_array('product', $post_type, true)) {
+			$is_product_query = true;
+		}
+
+		if ($is_product_query) {
+			$set_pids = $this->validator->get_all_set_product_ids();
+			if (! empty($set_pids)) {
+				$existing = (array) ($q->get('post__not_in') ?: []);
+				$q->set('post__not_in', array_values(array_unique(array_merge($existing, $set_pids))));
+			}
 		}
 	}
 
