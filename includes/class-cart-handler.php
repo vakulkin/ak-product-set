@@ -41,7 +41,7 @@ class Cart_Handler
 
 	public function register_hooks(): void
 	{
-		// Validation & tracking.
+		// Validation & tracking
 		add_filter('woocommerce_add_to_cart_validation',   [$this, 'validate_add_to_cart'],       10, 6);
 		add_action('woocommerce_cart_loaded_from_session', [$this, 'clean_invalid_session_items'], 10, 1);
 		add_action('woocommerce_add_to_cart',              [$this, 'track_active_set'],           10, 6);

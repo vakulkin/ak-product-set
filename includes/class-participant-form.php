@@ -60,13 +60,16 @@ class Participant_Form
 		add_action('wp_ajax_ak_remove_participant',        [$this, 'ajax_remove_participant']);
 		add_action('wp_ajax_nopriv_ak_remove_participant', [$this, 'ajax_remove_participant']);
 
-		// Hide set products from catalog, shortcodes, widgets, searches, empty cart, queries, and related products
-		add_filter('woocommerce_product_is_visible',            [$this, 'hide_set_products_from_catalog'],           10, 2);
-		add_action('woocommerce_product_query',                 [$this, 'exclude_set_products_from_wc_query'],       10, 1);
-		add_filter('woocommerce_shortcode_products_query',      [$this, 'exclude_set_products_from_shortcode_query'],  10, 3);
-		add_filter('woocommerce_products_widget_query_args',    [$this, 'exclude_set_products_from_widget_query'],     10, 1);
-		add_action('pre_get_posts',                             [$this, 'exclude_set_products_from_all_frontend_queries'], 10, 1);
-		add_filter('woocommerce_related_products',              [$this, 'exclude_set_products_from_related'],        10, 3);
+		// Hide set products from catalog, shortcodes, widgets, blocks, REST API, empty cart, and search
+		add_filter('woocommerce_product_is_visible',                     [$this, 'hide_set_products_from_catalog'],             10, 2);
+		add_action('woocommerce_product_query',                          [$this, 'exclude_set_products_from_wc_query'],         10, 1);
+		add_filter('woocommerce_shortcode_products_query',               [$this, 'exclude_set_products_from_shortcode_query'],    10, 3);
+		add_filter('woocommerce_products_widget_query_args',             [$this, 'exclude_set_products_from_widget_query'],     10, 1);
+		add_filter('woocommerce_product_data_store_cpt_get_products_query', [$this, 'exclude_set_products_from_data_store_query'], 10, 3);
+		add_filter('woocommerce_rest_product_object_query',             [$this, 'exclude_set_products_from_rest_query'],       10, 2);
+		add_filter('posts_where',                                        [$this, 'exclude_set_products_from_sql_where'],        10, 2);
+		add_action('pre_get_posts',                                      [$this, 'exclude_set_products_from_all_frontend_queries'], 10, 1);
+		add_filter('woocommerce_related_products',                       [$this, 'exclude_set_products_from_related'],          10, 3);
 
 		// Prevent single product access
 		add_action('template_redirect', [$this, 'redirect_single_set_product']);
@@ -767,6 +770,62 @@ class Participant_Form
 			$query_args['post__not_in'] = array_values(array_unique(array_merge($existing, $set_pids)));
 		}
 		return $query_args;
+	}
+
+	/**
+	 * Low-level SQL filter for WP_Query: enforces AND ID NOT IN (...) for product queries.
+	 */
+	public function exclude_set_products_from_sql_where(string $where, \WP_Query $q): string
+	{
+		if (is_admin()) {
+			return $where;
+		}
+
+		$post_type = $q->get('post_type');
+		$is_product_query = false;
+
+		if ($post_type === 'product') {
+			$is_product_query = true;
+		} elseif (is_array($post_type) && in_array('product', $post_type, true)) {
+			$is_product_query = true;
+		}
+
+		if ($is_product_query) {
+			$set_pids = $this->validator->get_all_set_product_ids();
+			if (! empty($set_pids)) {
+				global $wpdb;
+				$id_list = implode(',', array_map('intval', $set_pids));
+				$where .= " AND {$wpdb->posts}.ID NOT IN ({$id_list})";
+			}
+		}
+
+		return $where;
+	}
+
+	/**
+	 * Exclude Set products from wc_get_products() data store queries.
+	 */
+	public function exclude_set_products_from_data_store_query(array $wp_query_args, array $query_vars, $data_store): array
+	{
+		$set_pids = $this->validator->get_all_set_product_ids();
+		if (! empty($set_pids)) {
+			$existing = (array) ($wp_query_args['post__not_in'] ?? []);
+			$wp_query_args['post__not_in'] = array_values(array_unique(array_merge($existing, $set_pids)));
+		}
+		return $wp_query_args;
+	}
+
+	/**
+	 * Exclude Set products from WooCommerce REST API & Store API product queries.
+	 */
+	public function exclude_set_products_from_rest_query(array $args, \WP_REST_Request $request): array
+	{
+		$set_pids = $this->validator->get_all_set_product_ids();
+		if (! empty($set_pids)) {
+			$existing = (array) ($args['post__not_in'] ?? []);
+			$args['post__not_in'] = array_values(array_unique(array_merge($existing, $set_pids)));
+		}
+		return $args;
 	}
 
 	/**
