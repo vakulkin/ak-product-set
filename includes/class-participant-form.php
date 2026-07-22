@@ -484,13 +484,19 @@ class Participant_Form
 			];
 		}
 
+		$set_items = $this->get_participants_for_set($set_id);
+		$set_total = 0.0;
+		foreach ($set_items as $item) {
+			$set_total += (float) $item['data']->get_price();
+		}
+
 		wp_send_json_success([
 			'list_html'         => $sections_data[$product_id]['list_html'] ?? '',
 			'is_exhausted'      => $sections_data[$product_id]['is_exhausted'] ?? false,
 			'cart_count'        => $sections_data[$product_id]['cart_count'] ?? 0,
 			'sections_data'     => $sections_data,
-			'global_cart_total' => wc_price(WC()->cart->get_total('edit')),
-			'is_cart_empty'     => WC()->cart->is_empty(),
+			'global_cart_total' => wc_price($set_total),
+			'is_cart_empty'     => empty($set_items),
 		]);
 	}
 
@@ -543,13 +549,19 @@ class Participant_Form
 			];
 		}
 
+		$set_items = $this->get_participants_for_set($set_id);
+		$set_total = 0.0;
+		foreach ($set_items as $item) {
+			$set_total += (float) $item['data']->get_price();
+		}
+
 		wp_send_json_success([
 			'list_html'         => $sections_data[$product_id]['list_html'] ?? '',
 			'is_exhausted'      => $sections_data[$product_id]['is_exhausted'] ?? false,
 			'cart_count'        => $sections_data[$product_id]['cart_count'] ?? 0,
 			'sections_data'     => $sections_data,
-			'global_cart_total' => wc_price(WC()->cart->get_total('edit')),
-			'is_cart_empty'     => WC()->cart->is_empty(),
+			'global_cart_total' => wc_price($set_total),
+			'is_cart_empty'     => empty($set_items),
 		]);
 	}
 
@@ -581,6 +593,31 @@ class Participant_Form
 		}
 
 		return $participants;
+	}
+
+	/**
+	 * Get all cart items for a specific Set ID that have participant data.
+	 *
+	 * @param int $set_id Set post ID.
+	 * @return array<string, mixed[]> Keyed by cart item key.
+	 */
+	public function get_participants_for_set(int $set_id): array
+	{
+		$items = [];
+		if (! WC()->cart || ! WC()->session) {
+			return $items;
+		}
+
+		foreach (WC()->cart->get_cart() as $key => $item) {
+			if (
+				(int) ($item['_ak_set_id'] ?? 0) === $set_id
+				&& isset($item['_ak_participant_data'])
+			) {
+				$items[$key] = $item;
+			}
+		}
+
+		return $items;
 	}
 
 	/**
@@ -834,14 +871,21 @@ class Participant_Form
 
 		// Floating Cart Total Bar
 		$cart = WC()->cart;
-		$is_empty = (!$cart || $cart->is_empty());
-		$cart_total = $cart ? $cart->get_total() : wc_price(0);
+		$set_items = $this->get_participants_for_set($set_id);
+		$is_set_cart_empty = empty($set_items);
 
-		echo '<div class="ak-floating-cart-bar' . ($is_empty ? ' ak-hidden' : '') . '">';
+		$set_cart_total = 0.0;
+		if ($cart) {
+			foreach ($set_items as $item) {
+				$set_cart_total += (float) $item['data']->get_price();
+			}
+		}
+
+		echo '<div class="ak-floating-cart-bar' . ($is_set_cart_empty ? ' ak-hidden' : '') . '">';
 		echo '<div class="ak-floating-cart-inner">';
 		echo '<div class="ak-floating-cart-total">';
 		echo '<strong>' . esc_html__('Suma koszyka:', 'ak-product-set') . '</strong> ';
-		echo '<span class="ak-global-cart-total-value">' . $cart_total . '</span>';
+		echo '<span class="ak-global-cart-total-value">' . wc_price($set_cart_total) . '</span>';
 		echo '</div>';
 		echo '<a href="' . esc_url(wc_get_checkout_url()) . '" class="button alt ak-btn-checkout">' . esc_html__('Przejdź do kasy', 'ak-product-set') . '</a>';
 		echo '</div></div>';

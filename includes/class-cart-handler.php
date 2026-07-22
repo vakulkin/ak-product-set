@@ -41,11 +41,12 @@ class Cart_Handler
 
 	public function register_hooks(): void
 	{
-		// Validation.
-		add_filter('woocommerce_add_to_cart_validation',    [$this, 'validate_add_to_cart'],       10, 6);
-		add_action('woocommerce_cart_loaded_from_session',  [$this, 'clean_invalid_session_items'], 10, 1);
+		// Validation & tracking.
+		add_filter('woocommerce_add_to_cart_validation',   [$this, 'validate_add_to_cart'],       10, 6);
+		add_action('woocommerce_cart_loaded_from_session', [$this, 'clean_invalid_session_items'], 10, 1);
+		add_action('woocommerce_add_to_cart',              [$this, 'track_active_set'],           10, 6);
 
-		// Pricing engine.
+		// Pricing engine & cart isolation in the safest hook.
 		add_action('woocommerce_before_calculate_totals', [$this, 'calculate_prices'], 10, 1);
 
 		// Cart display.
@@ -56,7 +57,7 @@ class Cart_Handler
 	}
 
 	// -------------------------------------------------------------------------
-	// 1. Validation
+	// 1. Validation & Tracking
 	// -------------------------------------------------------------------------
 
 	/**
@@ -73,10 +74,10 @@ class Cart_Handler
 	public function validate_add_to_cart(
 		bool  $passed,
 		int   $product_id,
-		int   $_quantity,
-		int   $_variation_id,
-		array $_variations,
-		array $cart_item_data
+		int   $_quantity = 1,
+		int   $_variation_id = 0,
+		array $_variations = [],
+		array $cart_item_data = []
 	): bool {
 		if (! $this->validator->is_set_product($product_id)) {
 			return $passed;
@@ -109,7 +110,6 @@ class Cart_Handler
 		$to_remove = [];
 
 		foreach ($cart->cart_contents as $key => $item) {
-			// Only care about Set products (keyed by _ak_set_id presence).
 			if (empty($item['_ak_set_id'])) {
 				continue;
 			}
@@ -123,20 +123,45 @@ class Cart_Handler
 		}
 	}
 
+	/**
+	 * Track the Set ID of the most recently added product in session.
+	 *
+	 * @param string $_cart_item_key Cart item key.
+	 * @param int    $product_id     Product ID.
+	 * @param int    $_quantity      Quantity.
+	 * @param int    $_variation_id  Variation ID.
+	 * @param array  $_variation     Variation data.
+	 * @param array  $cart_item_data Custom cart item data.
+	 */
+	public function track_active_set(
+		string $_cart_item_key,
+		int    $product_id,
+		int    $_quantity = 1,
+		int    $_variation_id = 0,
+		array  $_variation = [],
+		array  $cart_item_data = []
+	): void {
+		if (WC()->session) {
+			$set_id = (int) ($cart_item_data['_ak_set_id'] ?? 0);
+			if (! $set_id && $this->validator->is_set_product($product_id)) {
+				$set_id = (int) ($this->validator->get_primary_set($product_id) ?: 0);
+			}
+			WC()->session->set('ak_last_added_set_id', $set_id);
+		}
+	}
+
 	// -------------------------------------------------------------------------
-	// 2. Pricing engine
+	// 2. Pricing engine & Cart Isolation
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Main pricing engine. Runs on every cart recalculation.
+	 * Main pricing engine, session cleanup & cart isolation.
+	 * Hooked into woocommerce_before_calculate_totals.
 	 *
-	 * Algorithm (per set → per product):
-	 *  1. Q_items = # unique product IDs from this Set in cart (min 1)
-	 *  2. For each product: Q_people = # cart items for that product
-	 *  3. group_tier: 'ind' (1-4), 'g5' (5-9), 'g10' (10+)
-	 *  4. round: 1 if today ≤ round_1_end_date, 2 if ≤ round_2_end_date, else 3
-	 *  5. Resolve unit_price with 3-level fallback chain
-	 *  6. Apply via set_price() to each cart item for that product
+	 * Performs:
+	 *  1. Session data integrity: removes corrupted Set items missing participant data.
+	 *  2. Cart isolation: ensures cart contains ONLY items from a single Set or regular products.
+	 *  3. Dynamic tiered price calculation based on min_people, package size, and active round.
 	 *
 	 * @param \WC_Cart $cart The cart object passed by the hook.
 	 */
@@ -146,9 +171,51 @@ class Cart_Handler
 			return;
 		}
 
-		// Group cart items by set_id → product_id → [key => item].
-		$sets_data = []; // [ set_id => [ product_id => [ key => item ] ] ]
+		if (! $cart || $cart->is_empty()) {
+			return;
+		}
 
+		// 1. Session integrity check — remove corrupted Set items missing participant name
+		foreach ($cart->get_cart() as $key => $item) {
+			if (! empty($item['_ak_set_id']) && empty($item['_ak_participant_data']['name'])) {
+				unset($cart->cart_contents[$key]);
+			}
+		}
+
+		// 2. Enforce Cart Isolation before calculating totals
+		$last_added_set_id = WC()->session ? (int) WC()->session->get('ak_last_added_set_id', 0) : 0;
+
+		$cart_set_ids = [];
+		foreach ($cart->get_cart() as $key => $item) {
+			$sid = (int) ($item['_ak_set_id'] ?? 0);
+			if ($sid > 0) {
+				$cart_set_ids[$sid] = true;
+			}
+		}
+
+		if (! empty($cart_set_ids)) {
+			if ($last_added_set_id === 0) {
+				foreach ($cart->get_cart() as $key => $item) {
+					if (! empty($item['_ak_set_id'])) {
+						unset($cart->cart_contents[$key]);
+					}
+				}
+			} else {
+				$active_set_id = isset($cart_set_ids[$last_added_set_id])
+					? $last_added_set_id
+					: (int) array_key_first($cart_set_ids);
+
+				foreach ($cart->get_cart() as $key => $item) {
+					$item_set_id = (int) ($item['_ak_set_id'] ?? 0);
+					if ($item_set_id !== $active_set_id) {
+						unset($cart->cart_contents[$key]);
+					}
+				}
+			}
+		}
+
+		// 3. Perform pricing engine calculations for the remaining active set
+		$sets_data = [];
 		foreach ($cart->get_cart() as $key => $item) {
 			$set_id = (int) ($item['_ak_set_id'] ?? 0);
 			if (! $set_id) {
@@ -156,9 +223,9 @@ class Cart_Handler
 			}
 			$product_id = (int) $item['product_id'];
 
-			$sets_data[$set_id]                         ??= [];
-			$sets_data[$set_id][$product_id]          ??= [];
-			$sets_data[$set_id][$product_id][$key]   = $item;
+			$sets_data[$set_id]                       ??= [];
+			$sets_data[$set_id][$product_id]        ??= [];
+			$sets_data[$set_id][$product_id][$key] = $item;
 		}
 
 		if (empty($sets_data)) {
@@ -170,7 +237,6 @@ class Cart_Handler
 		foreach ($sets_data as $set_id => $products_in_set) {
 			$q_items = max(1, count($products_in_set));
 
-			// Calculate minimum participant count across all products (weekends) in this set.
 			$min_people = null;
 			foreach ($products_in_set as $product_id => $items_for_product) {
 				$count = count($items_for_product);
@@ -194,21 +260,15 @@ class Cart_Handler
 			);
 
 			if ($unit_price <= 0.0) {
-				// Fallback: let WooCommerce keep the default price.
 				continue;
 			}
 
 			foreach ($products_in_set as $product_id => $items_for_product) {
 				foreach ($items_for_product as $key => $item) {
-					// set_price() modifies the WC_Product object for this request.
 					$item['data']->set_price($unit_price);
-
-					// Persist applied price to cart session so Order_Handler can read it.
 					$cart->cart_contents[$key]['_ak_applied_price'] = $unit_price;
 					$cart->cart_contents[$key]['_ak_price_rule']    = $matched_rule;
-
-					// Cache for display filters.
-					$this->computed_prices[$key] = $unit_price;
+					$this->computed_prices[$key]                    = $unit_price;
 				}
 			}
 		}
