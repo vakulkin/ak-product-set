@@ -323,6 +323,13 @@
             if (form) form.classList.remove('ak-hidden');
             if (exhaustedEl) exhaustedEl.classList.add('ak-hidden');
           }
+
+          if (typeof sectionData.available_stock !== 'undefined' && sectionData.available_stock !== null) {
+            var stockValEl = targetSection.querySelector('.ak-stock-chip-val');
+            if (stockValEl) {
+              stockValEl.textContent = sectionData.available_stock;
+            }
+          }
         });
       } else {
         // Replace participant list HTML.

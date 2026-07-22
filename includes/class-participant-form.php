@@ -475,10 +475,12 @@ class Participant_Form
 			$sq = $p ? $p->get_stock_quantity() : null;
 			$participants = $this->get_participants_for_product($pid);
 			$count = count($participants);
+			$available = ($sq !== null) ? max(0, (int) $sq - $count) : null;
 			$sections_data[$pid] = [
-				'list_html'    => $this->get_participant_list_html($participants),
-				'is_exhausted' => ($sq !== null && $count >= (int) $sq),
-				'cart_count'   => $count,
+				'list_html'       => $this->get_participant_list_html($participants),
+				'is_exhausted'    => ($sq !== null && $count >= (int) $sq),
+				'cart_count'      => $count,
+				'available_stock' => $available,
 			];
 		}
 
@@ -532,10 +534,12 @@ class Participant_Form
 			$sq = $p ? $p->get_stock_quantity() : null;
 			$participants = $this->get_participants_for_product($pid);
 			$count = count($participants);
+			$available = ($sq !== null) ? max(0, (int) $sq - $count) : null;
 			$sections_data[$pid] = [
-				'list_html'    => $this->get_participant_list_html($participants),
-				'is_exhausted' => ($sq !== null && $count >= (int) $sq),
-				'cart_count'   => $count,
+				'list_html'       => $this->get_participant_list_html($participants),
+				'is_exhausted'    => ($sq !== null && $count >= (int) $sq),
+				'cart_count'      => $count,
+				'available_stock' => $available,
 			];
 		}
 
@@ -798,7 +802,11 @@ class Participant_Form
 			$recr_end_dt    = $format_dt(get_field('ak_recruitment_end_datetime', $pid));
 			$location       = get_field('ak_event_location', $pid);
 
-			if ($event_start_dt || $event_end_dt || $recr_start_dt || $recr_end_dt || $location) {
+			$participants = $this->get_participants_for_product($pid);
+			$stock_qty    = $product->get_stock_quantity();
+			$available    = ($stock_qty !== null) ? max(0, (int) $stock_qty - count($participants)) : null;
+
+			if ($event_start_dt || $event_end_dt || $recr_start_dt || $recr_end_dt || $location || $available !== null) {
 				echo '<div class="ak-event-meta-info" style="margin: 0 0 24px 0; display: flex; flex-wrap: wrap; gap: 8px;">';
 				$chip_style = 'padding: 6px 14px; background: #f8fafc; border-radius: 20px; font-size: 11px; color: #475569; border: 1px solid #e2e8f0; display: inline-flex; align-items: center; white-space: nowrap;';
 				$strong_style = 'color: #0f172a; margin-right: 6px; font-weight: 600;';
@@ -807,6 +815,10 @@ class Participant_Form
 				if ($recr_start_dt)  echo '<div class="ak-meta-chip" style="' . $chip_style . '"><strong style="' . $strong_style . '">' . esc_html__('Otwarcie rekrutacji:', 'ak-product-set') . '</strong> ' . esc_html($recr_start_dt) . '</div>';
 				if ($recr_end_dt)    echo '<div class="ak-meta-chip" style="' . $chip_style . '"><strong style="' . $strong_style . '">' . esc_html__('Zakończenie rekrutacji:', 'ak-product-set') . '</strong> ' . esc_html($recr_end_dt) . '</div>';
 				if ($location)       echo '<div class="ak-meta-chip" style="' . $chip_style . ' white-space: normal;"><strong style="' . $strong_style . '">' . esc_html__('Lokalizacja:', 'ak-product-set') . '</strong> ' . esc_html($location) . '</div>';
+				if ($available !== null) {
+					$stock_chip_style = $chip_style . ' background: #f0fdf4; border-color: #bbf7d0; color: #166534;';
+					echo '<div class="ak-meta-chip ak-stock-chip" style="' . $stock_chip_style . '"><strong style="color: #15803d; margin-right: 6px; font-weight: 700;">' . esc_html__('Wolne miejsca:', 'ak-product-set') . '</strong> <span class="ak-stock-chip-val">' . esc_html((string) $available) . '</span></div>';
+				}
 				echo '</div>';
 			}
 
