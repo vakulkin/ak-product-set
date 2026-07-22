@@ -172,6 +172,7 @@
 .ak-box-image img {
   width: 100%;
   height: 100%;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
   display: block;
 }
@@ -213,16 +214,85 @@
 }
 
 @media (max-width: 640px) {
+  .ak-product-set-section {
+    margin: 16px 0;
+  }
+
   .ak-box-card {
-    padding: 24px;
+    padding: 16px;
+    margin-bottom: 20px;
+    border-radius: 12px;
   }
+
   .ak-box-header {
-    flex-direction: column;
-    gap: 16px;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 16px;
   }
+
   .ak-box-image {
-    width: 100%;
-    height: 180px;
+    width: 100px;
+    height: 100px;
+    aspect-ratio: 1 / 1;
+    flex-shrink: 0;
+    border-radius: 10px;
+  }
+
+  .ak-box-title {
+    font-size: 1.2rem;
+    margin-bottom: 8px;
+  }
+
+  .ak-box-desc {
+    font-size: 0.875rem;
+  }
+
+  .ak-event-meta-info {
+    margin-bottom: 16px !important;
+    gap: 6px !important;
+  }
+
+  .ak-meta-chip {
+    padding: 4px 10px !important;
+    font-size: 10px !important;
+  }
+
+  .ak-pricing-table-wrapper {
+    padding: 14px;
+    margin-bottom: 20px;
+    border-radius: 12px;
+  }
+
+  .ak-pricing-table-title {
+    font-size: 1.1rem;
+    margin-bottom: 14px;
+  }
+
+  .ak-round-block {
+    padding: 12px;
+    margin-bottom: 14px;
+    border-radius: 10px;
+  }
+
+  .ak-pt-table th,
+  .ak-pt-table td {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .ak-participant-item {
+    padding: 12px 14px;
+    border-radius: 10px;
+  }
+
+  .ak-participant-list {
+    margin-bottom: 16px;
+  }
+
+  .ak-form-wrapper {
+    margin-top: 12px;
+    padding-top: 16px;
   }
 }
 

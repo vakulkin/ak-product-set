@@ -60,11 +60,13 @@ class Participant_Form
 		add_action('wp_ajax_ak_remove_participant',        [$this, 'ajax_remove_participant']);
 		add_action('wp_ajax_nopriv_ak_remove_participant', [$this, 'ajax_remove_participant']);
 
-		// Hide set products from catalog, searches, queries, and related products
-		add_filter('woocommerce_product_is_visible',  [$this, 'hide_set_products_from_catalog'], 10, 2);
-		add_action('woocommerce_product_query',       [$this, 'exclude_set_products_from_wc_query'], 10, 1);
-		add_action('pre_get_posts',                   [$this, 'exclude_set_products_from_search'], 10, 1);
-		add_filter('woocommerce_related_products',    [$this, 'exclude_set_products_from_related'], 10, 3);
+		// Hide set products from catalog, shortcodes, widgets, searches, queries, and related products
+		add_filter('woocommerce_product_is_visible',            [$this, 'hide_set_products_from_catalog'],           10, 2);
+		add_action('woocommerce_product_query',                 [$this, 'exclude_set_products_from_wc_query'],       10, 1);
+		add_filter('woocommerce_shortcode_products_query',      [$this, 'exclude_set_products_from_shortcode_query'],  10, 3);
+		add_filter('woocommerce_products_widget_query_args',    [$this, 'exclude_set_products_from_widget_query'],     10, 1);
+		add_action('pre_get_posts',                             [$this, 'exclude_set_products_from_search'],         10, 1);
+		add_filter('woocommerce_related_products',              [$this, 'exclude_set_products_from_related'],        10, 3);
 
 		// Prevent single product access
 		add_action('template_redirect', [$this, 'redirect_single_set_product']);
@@ -735,6 +737,40 @@ class Participant_Form
 			return $related_posts;
 		}
 		return array_values(array_diff($related_posts, $set_pids));
+	}
+
+	/**
+	 * Exclude Set products from WooCommerce shortcodes (e.g. [products], [product_category], etc.).
+	 *
+	 * @param array  $query_args Query args for shortcode.
+	 * @param array  $_attributes Shortcode attributes.
+	 * @param string $_type       Shortcode type.
+	 * @return array Modified query args.
+	 */
+	public function exclude_set_products_from_shortcode_query(array $query_args, array $_attributes = [], string $_type = ''): array
+	{
+		$set_pids = $this->validator->get_all_set_product_ids();
+		if (! empty($set_pids)) {
+			$existing = (array) ($query_args['post__not_in'] ?? []);
+			$query_args['post__not_in'] = array_values(array_unique(array_merge($existing, $set_pids)));
+		}
+		return $query_args;
+	}
+
+	/**
+	 * Exclude Set products from WooCommerce Products widgets.
+	 *
+	 * @param array $query_args Widget query args.
+	 * @return array Modified query args.
+	 */
+	public function exclude_set_products_from_widget_query(array $query_args): array
+	{
+		$set_pids = $this->validator->get_all_set_product_ids();
+		if (! empty($set_pids)) {
+			$existing = (array) ($query_args['post__not_in'] ?? []);
+			$query_args['post__not_in'] = array_values(array_unique(array_merge($existing, $set_pids)));
+		}
+		return $query_args;
 	}
 
 	public function redirect_single_set_product(): void
