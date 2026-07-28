@@ -247,7 +247,7 @@
       }
     }
 
-    function showStep(stepNum) {
+    function showStep(stepNum, shouldScroll) {
       if (stepNum < 1 || stepNum > 2) return;
 
       syncParticipantInputsToState();
@@ -278,8 +278,10 @@
         targetPanel.classList.add('active');
       }
 
-      // Scroll to the top of the wizard smoothly
-      app.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Scroll to the top of the wizard smoothly only when explicitly requested (e.g. user navigation)
+      if (shouldScroll) {
+        app.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
 
       // Real-time server stock & price audit on step transitions
       if (stepNum === 2) {
@@ -603,7 +605,7 @@
       if (target.closest('#ak-btn-step-1-next')) {
         e.preventDefault();
         if (state.selectedWeekends.length === 0) return;
-        showStep(2);
+        showStep(2, true);
         return;
       }
 
@@ -646,7 +648,7 @@
       // 5. Step 2 Back
       if (target.closest('#ak-btn-step-2-back')) {
         e.preventDefault();
-        showStep(1);
+        showStep(1, true);
         return;
       }
 
@@ -656,7 +658,7 @@
         var clickedStep = parseInt(stepItem.getAttribute('data-step'), 10);
         if (!isNaN(clickedStep) && clickedStep < state.currentStep) {
           e.preventDefault();
-          showStep(clickedStep);
+          showStep(clickedStep, true);
         }
         return;
       }
@@ -683,8 +685,8 @@
     // Apply pre-selected weekends selection UI and sync DOM elements
     applyInitialSelectionUI();
 
-    // Initial Display Setup
-    showStep(1);
+    // Initial Display Setup (do NOT auto-scroll on initial page load)
+    showStep(1, false);
   }
 
   if (document.readyState === 'loading') {

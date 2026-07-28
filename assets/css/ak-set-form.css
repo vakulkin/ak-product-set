@@ -1,6 +1,6 @@
 /**
- * AK Product Set — shadcn-inspired Booking Wizard Stylesheet
- * Design system: neutral zinc palette, crisp borders, clean typography
+ * AK Product Set — Modern Booking Wizard Stylesheet
+ * Design System: Neutral zinc palette, crisp borders, glassmorphic accents
  *
  * All selectors are scoped under .ak-set-wizard-container to prevent
  * theme styles from overriding wizard UI.
@@ -12,9 +12,9 @@
    Design Tokens
    ============================================================ */
 :root {
-  --ak-font: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ak-font: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
-  /* Neutral zinc palette (shadcn default) */
+  /* Neutral zinc palette */
   --ak-zinc-50: #fafafa;
   --ak-zinc-100: #f4f4f5;
   --ak-zinc-200: #e4e4e7;
@@ -24,12 +24,12 @@
   --ak-zinc-700: #3f3f46;
   --ak-zinc-900: #18181b;
 
-  /* Accent — slate blue */
+  /* Accent */
   --ak-primary: #18181b;
   --ak-primary-hover: #27272a;
   --ak-ring: rgba(24, 24, 27, 0.10);
 
-  /* Status */
+  /* Status Colors */
   --ak-success-bg: #f0fdf4;
   --ak-success-text: #15803d;
   --ak-success-border: #bbf7d0;
@@ -42,18 +42,16 @@
   --ak-danger-text: #b91c1c;
   --ak-danger-border: #fecaca;
 
-  /* Radii */
+  /* Radii & Shadows */
   --ak-radius-sm: 6px;
   --ak-radius: 8px;
   --ak-radius-lg: 12px;
-
-  /* Shadow */
   --ak-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --ak-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.07), 0 1px 2px -1px rgba(0, 0, 0, 0.07);
 }
 
 /* ============================================================
-   Wizard Container
+   Wizard Container & Theme Isolation Reset
    ============================================================ */
 .ak-set-wizard-container {
   max-width: 880px;
@@ -72,10 +70,6 @@
   box-sizing: border-box;
 }
 
-/* ============================================================
-   Theme isolation — reset all elements inside the wizard so
-   theme stylesheets cannot bleed in and override our design.
-   ============================================================ */
 .ak-set-wizard-container *,
 .ak-set-wizard-container *::before,
 .ak-set-wizard-container *::after {
@@ -95,22 +89,14 @@
   background: none;
 }
 
-.ak-set-wizard-container p {
+.ak-set-wizard-container p,
+.ak-set-wizard-container ul,
+.ak-set-wizard-container ol,
+.ak-set-wizard-container li {
   font-family: var(--ak-font);
   margin: 0;
   padding: 0;
-}
-
-.ak-set-wizard-container ul,
-.ak-set-wizard-container ol {
-  margin: 0;
-  padding: 0;
   list-style: none;
-}
-
-.ak-set-wizard-container li {
-  margin: 0;
-  padding: 0;
 }
 
 .ak-set-wizard-container a {
@@ -120,18 +106,15 @@
 
 .ak-set-wizard-container button {
   font-family: var(--ak-font);
-  -webkit-appearance: none;
   appearance: none;
   cursor: pointer;
   line-height: 1;
-  /* Do NOT reset background/border/padding here — .ak-btn* classes own those */
 }
 
 .ak-set-wizard-container input,
 .ak-set-wizard-container select,
 .ak-set-wizard-container textarea {
   font-family: var(--ak-font);
-  -webkit-appearance: none;
   appearance: none;
   margin: 0;
   background: #ffffff;
@@ -141,7 +124,6 @@
   display: inline-block;
   vertical-align: middle;
   flex-shrink: 0;
-  overflow: visible;
 }
 
 /* ============================================================
@@ -153,7 +135,6 @@
   padding: 20px 28px;
   border-bottom: 1px solid var(--ak-zinc-200);
   background: var(--ak-zinc-50);
-  gap: 0;
 }
 
 .ak-step-item {
@@ -199,12 +180,6 @@
   color: #ffffff;
 }
 
-.ak-step-num-check {
-  display: none;
-  width: 12px;
-  height: 12px;
-}
-
 .ak-step-label {
   font-size: 13px;
   font-weight: 500;
@@ -225,7 +200,7 @@
 }
 
 /* ============================================================
-   Error / Alert Banner
+   Error / Alert Banner & Step Panels
    ============================================================ */
 .ak-wizard-error-banner {
   background: var(--ak-danger-bg);
@@ -239,9 +214,6 @@
   line-height: 1.5;
 }
 
-/* ============================================================
-   Step Panels
-   ============================================================ */
 .ak-wizard-steps-wrapper {
   padding: 28px;
 }
@@ -260,16 +232,12 @@
     opacity: 0;
     transform: translateY(8px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
-/* ============================================================
-   Step Header
-   ============================================================ */
 .ak-step-header {
   margin-bottom: 20px;
 }
@@ -290,7 +258,7 @@
 }
 
 /* ============================================================
-   Step 1: Weekend Grid
+   Step 1: Weekend Cards & Grid
    ============================================================ */
 .ak-weekends-grid {
   display: grid;
@@ -310,7 +278,26 @@
   user-select: none;
 }
 
-/* Advanced Card Layout */
+.ak-weekend-card * {
+  pointer-events: none;
+}
+
+.ak-weekend-card:hover:not(.disabled) {
+  border-color: var(--ak-zinc-400);
+  box-shadow: var(--ak-shadow);
+}
+
+.ak-weekend-card.selected {
+  border-color: var(--ak-zinc-900);
+  box-shadow: 0 0 0 1px var(--ak-zinc-900);
+}
+
+.ak-weekend-card.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: var(--ak-zinc-50);
+}
+
 .ak-card-layout-advanced {
   display: flex;
   gap: 16px;
@@ -353,6 +340,20 @@
   min-width: 0;
 }
 
+.ak-card-body-col .ak-weekend-title {
+  margin-top: -2px;
+}
+
+.ak-set-wizard-container h3.ak-weekend-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 32px 0;
+  padding-right: 56px;
+  color: var(--ak-zinc-900);
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+}
+
 .ak-weekend-desc {
   font-size: 13px;
   color: var(--ak-zinc-500);
@@ -369,31 +370,6 @@
   margin-bottom: 0;
 }
 
-.ak-card-body-col .ak-weekend-title {
-  margin-top: -2px; /* Optical alignment */
-}
-
-.ak-weekend-card * {
-  pointer-events: none;
-}
-
-.ak-weekend-card:hover:not(.disabled) {
-  border-color: var(--ak-zinc-400);
-  box-shadow: var(--ak-shadow);
-}
-
-.ak-weekend-card.selected {
-  border-color: var(--ak-zinc-900);
-  box-shadow: 0 0 0 1px var(--ak-zinc-900);
-}
-
-.ak-weekend-card.disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  background: var(--ak-zinc-50);
-}
-
-/* Checkbox indicator */
 .ak-card-checkbox-indicator {
   position: absolute;
   top: 14px;
@@ -424,7 +400,6 @@
   display: block;
 }
 
-/* SVG check — inlined via CSS content trick */
 .ak-check-icon::after {
   content: '';
   display: block;
@@ -433,16 +408,6 @@
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 12 12' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 6l3 3 5-5' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
   background-size: contain;
   background-repeat: no-repeat;
-}
-
-.ak-weekend-title {
-  font-size: 15px; /* slightly larger for 1-col layout */
-  font-weight: 600;
-  margin: 0 0 28px 0;
-  padding-right: 48px; /* High clearance for checkbox */
-  color: var(--ak-zinc-900);
-  letter-spacing: -0.01em;
-  line-height: 1.4;
 }
 
 .ak-weekend-meta {
@@ -472,7 +437,6 @@
   margin-top: 12px;
 }
 
-/* Badges */
 .ak-badge {
   display: inline-flex;
   align-items: center;
@@ -502,7 +466,7 @@
 }
 
 /* ============================================================
-   Step 2: Summary Bar (selected weekends)
+   Step 2: Summary Bar & Price Preview Card
    ============================================================ */
 .ak-summary-weekends {
   background: var(--ak-zinc-50);
@@ -523,9 +487,6 @@
 }
 
 #ak-summary-weekends-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -544,9 +505,6 @@
   padding: 3px 10px;
 }
 
-/* ============================================================
-   Price Preview Card
-   ============================================================ */
 .ak-price-preview-card {
   background: #ffffff;
   border: 1px solid var(--ak-zinc-200);
@@ -611,7 +569,7 @@
 }
 
 /* ============================================================
-   Participant Cards
+   Participant Cards & Form Inputs
    ============================================================ */
 .ak-participants-container {
   display: grid;
@@ -637,7 +595,6 @@
 }
 
 .ak-participant-card-header h4 {
-  margin: 0;
   font-size: 13px;
   font-weight: 600;
   color: var(--ak-zinc-700);
@@ -647,26 +604,10 @@
   padding: 16px;
 }
 
-/* Participant form grid:
-   Base 3 fields (name, email, phone) fill one row at 1fr each.
-   T-shirt fields appear on the same row at the same width if space allows,
-   or wrap to next row on smaller screens. */
 .ak-form-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-}
-
-@media (max-width: 720px) {
-  .ak-set-wizard-container .ak-form-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 480px) {
-  .ak-set-wizard-container .ak-form-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 .ak-form-group {
@@ -706,10 +647,6 @@
   box-shadow: 0 0 0 3px var(--ak-ring);
 }
 
-/* ============================================================
-   Add Participant Button
-   ============================================================ */
-/* Add Participant Button — full width */
 .ak-btn-add-participant-wrap {
   margin: 4px 0 24px;
 }
@@ -720,8 +657,7 @@
 }
 
 /* ============================================================
-   Buttons — scoped under .ak-set-wizard-container to ensure
-   these always win over theme and the generic button reset above.
+   Buttons & Actions
    ============================================================ */
 .ak-set-wizard-container .ak-btn {
   display: inline-flex;
@@ -742,7 +678,6 @@
   text-decoration: none;
 }
 
-/* Primary — filled black (shadcn default) */
 .ak-set-wizard-container .ak-btn-primary {
   background: var(--ak-zinc-900);
   color: #ffffff;
@@ -754,7 +689,6 @@
   border-color: var(--ak-zinc-700);
 }
 
-/* Secondary — outlined */
 .ak-set-wizard-container .ak-btn-secondary {
   background: #ffffff;
   color: var(--ak-zinc-700);
@@ -766,7 +700,6 @@
   border-color: var(--ak-zinc-300);
 }
 
-/* Ghost — full-width dashed add button */
 .ak-set-wizard-container .ak-btn-ghost {
   background: transparent;
   color: var(--ak-zinc-500);
@@ -779,7 +712,6 @@
   border-color: var(--ak-zinc-300);
 }
 
-/* Destructive — remove participant */
 .ak-set-wizard-container .ak-btn-destructive {
   background: transparent;
   color: var(--ak-danger-text);
@@ -793,7 +725,6 @@
   background: var(--ak-danger-bg);
 }
 
-/* Success / cart CTA */
 .ak-set-wizard-container .ak-btn-success {
   background: var(--ak-zinc-900);
   color: #ffffff;
@@ -815,16 +746,12 @@
   cursor: not-allowed;
 }
 
-/* Icon inside button */
 .ak-set-wizard-container .ak-btn-icon {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
 }
 
-/* ============================================================
-   Step Footer
-   ============================================================ */
 .ak-step-footer {
   display: flex;
   justify-content: space-between;
@@ -835,7 +762,7 @@
 }
 
 /* ============================================================
-   Loading Overlay
+   Loading Overlay & Toasts
    ============================================================ */
 .ak-wizard-loader-overlay {
   position: absolute;
@@ -872,9 +799,6 @@
   color: var(--ak-zinc-500);
 }
 
-/* ============================================================
-   Toast Notifications
-   ============================================================ */
 .ak-toast-notification {
   position: fixed;
   bottom: 24px;
@@ -882,7 +806,7 @@
   background: var(--ak-danger-bg);
   color: var(--ak-danger-text);
   border: 1px solid var(--ak-danger-border);
-  padding: 14px 40px 14px 20px; /* Extra right padding for close button */
+  padding: 14px 40px 14px 20px;
   border-radius: var(--ak-radius);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   font-family: var(--ak-font);
@@ -892,7 +816,7 @@
   opacity: 0;
   transform: translateY(16px);
   transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  pointer-events: none; /* Changed via JS when visible */
+  pointer-events: none;
   max-width: 400px;
   display: flex;
   align-items: flex-start;
@@ -902,7 +826,7 @@
 .ak-toast-notification.ak-toast-visible {
   opacity: 1;
   transform: translateY(0);
-  pointer-events: auto; /* Enable clicks when visible */
+  pointer-events: auto;
 }
 
 .ak-toast-close {
@@ -925,9 +849,6 @@
   opacity: 1;
 }
 
-/* ============================================================
-   Cart Summary (WooCommerce cart block)
-   ============================================================ */
 .ak-cart-summary-box {
   background: var(--ak-zinc-50);
   border: 1px solid var(--ak-zinc-200);
@@ -964,10 +885,14 @@
     gap: 14px;
   }
 
-  .ak-weekend-title {
+  .ak-set-wizard-container h3.ak-weekend-title {
     font-size: 14.5px;
-    margin-bottom: 18px;
-    padding-right: 36px;
+    margin-bottom: 24px;
+    padding-right: 48px;
+  }
+
+  .ak-set-wizard-container .ak-form-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -979,10 +904,7 @@
     border-right: 1px solid var(--ak-zinc-200);
   }
 
-  .ak-wizard-steps-wrapper {
-    padding: 16px 12px;
-  }
-
+  .ak-wizard-steps-wrapper,
   .ak-wizard-progress {
     padding: 14px 12px;
   }
@@ -1000,7 +922,6 @@
     padding: 12px;
   }
 
-  /* Smaller images on mobile */
   .ak-card-image-col {
     width: 80px;
     height: 80px;
@@ -1011,11 +932,11 @@
     gap: 12px;
   }
 
-  .ak-weekend-title {
+  .ak-set-wizard-container h3.ak-weekend-title {
     font-size: 14px;
     line-height: 1.35;
-    margin-bottom: 12px;
-    padding-right: 28px;
+    margin-bottom: 20px;
+    padding-right: 44px;
   }
 
   .ak-card-checkbox-indicator {
@@ -1037,7 +958,6 @@
     margin-top: 1px;
   }
 
-  /* Mobile participant forms */
   .ak-set-wizard-container .ak-form-grid {
     grid-template-columns: 1fr;
     gap: 10px;
@@ -1045,7 +965,7 @@
 
   .ak-form-group input,
   .ak-form-group select {
-    height: 40px; /* Touch-friendly tap target */
+    height: 40px;
     font-size: 14px;
   }
 
@@ -1059,7 +979,6 @@
     justify-content: space-between;
   }
 
-  /* Mobile Price Preview Card */
   .ak-price-preview-card {
     padding: 14px 12px;
   }
@@ -1068,7 +987,6 @@
     font-size: 13px;
   }
 
-  /* Mobile Buttons & Footer */
   .ak-step-footer {
     flex-direction: column-reverse;
     gap: 10px;
@@ -1099,15 +1017,15 @@
 }
 
 @media (max-width: 400px) {
-  /* Ultra compact images for small smartphones */
   .ak-card-image-col {
     width: 68px;
     height: 68px;
   }
 
-  .ak-weekend-title {
+  .ak-set-wizard-container h3.ak-weekend-title {
     font-size: 13px;
-    margin-bottom: 8px;
+    margin-bottom: 16px;
+    padding-right: 40px;
   }
 }
 
