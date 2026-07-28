@@ -894,6 +894,14 @@
   .ak-set-wizard-container .ak-form-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  /* Prevent mobile (iOS Safari) auto-zoom on input focus */
+  .ak-form-group input,
+  .ak-form-group select,
+  .ak-set-wizard-container input,
+  .ak-set-wizard-container select {
+    font-size: 16px !important;
+  }
 }
 
 @media (max-width: 600px) {
@@ -964,9 +972,11 @@
   }
 
   .ak-form-group input,
-  .ak-form-group select {
-    height: 40px;
-    font-size: 14px;
+  .ak-form-group select,
+  .ak-set-wizard-container input,
+  .ak-set-wizard-container select {
+    height: 42px;
+    font-size: 16px !important; /* Prevents iOS Safari auto-zoom on input focus */
   }
 
   .ak-participant-card-item {
