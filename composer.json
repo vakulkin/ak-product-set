@@ -1,0 +1,24 @@
+{
+  "name": "akademiablanika/ak-product-set",
+  "description": "AK Product Set",
+  "type": "wordpress-plugin",
+  "require-dev": {
+    "phpunit/phpunit": "^10.5",
+    "brain/monkey": "^2.6"
+  },
+  "autoload": {
+    "psr-4": {
+      "AK_Set\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "AK_Set\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit --testdox",
+    "test-coverage": "php -d pcov.enabled=1 vendor/bin/phpunit --coverage-text",
+    "test-coverage-xdebug": "XDEBUG_MODE=coverage phpunit --coverage-text"
+  }
+}

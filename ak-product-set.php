@@ -2,71 +2,62 @@
 
 /**
  * Plugin Name: AK Product Set
- * Description: Groups WooCommerce products into training "Sets" with participant management and dynamic tiered pricing.
- * Version:     1.0.0
+ * Plugin URI: https://akademiablanika.pl
+ * Description: Specialized WooCommerce extension for multi-weekend training courses, dynamic 3D pricing, participant registration, and stock decomposition.
+ * Version: 2.0.0
  * Text Domain: ak-product-set
- * Domain Path: /languages
- * Requires PHP: 8.0
- * Requires at least: 6.2
  * WC requires at least: 7.0
- * WC tested up to: 9.0
+ * WC tests up to: 9.0
  */
 
-declare(strict_types=1);
-
-namespace AK_Set;
-
-if (! defined('ABSPATH')) {
-	exit;
+if (!defined('ABSPATH')) {
+    exit;
 }
 
-// Plugin constants.
-define('AK_SET_VERSION',     '1.0.0');
-define('AK_SET_DIR',         plugin_dir_path(__FILE__));
-define('AK_SET_URL',         plugin_dir_url(__FILE__));
-define('AK_SET_PLUGIN_FILE', __FILE__);
-
-// Require all includes.
-$ak_set_includes = [
-	'includes/class-set-validator.php',
-	'includes/class-cpt-set.php',
-	'includes/class-participant-form.php',
-	'includes/class-cart-handler.php',
-	'includes/class-order-handler.php',
-	'includes/class-plugin.php',
-];
-
-foreach ($ak_set_includes as $_file) {
-	require_once AK_SET_DIR . $_file;
-}
-unset($_file);
+define('AK_SET_VERSION', '2.0.0');
+define('AK_SET_FILE', __FILE__);
+define('AK_SET_PATH', plugin_dir_path(__FILE__));
+define('AK_SET_URL', plugin_dir_url(__FILE__));
 
 /**
- * Boot the plugin after all plugins are loaded.
- * Checks for required dependencies before booting.
+ * PSR-4 Autoloader for AK_Set namespace
  */
-add_action('plugins_loaded', static function (): void {
-	if (! class_exists('\WooCommerce') || ! function_exists('acf_add_local_field_group')) {
-		add_action('admin_notices', static function (): void {
-			echo '<div class="notice notice-error"><p>';
-			printf(
-				/* translators: plugin name */
-				esc_html__('%s requires WooCommerce and Advanced Custom Fields (Free) to be active.', 'ak-product-set'),
-				'<strong>AK Product Set</strong>'
-			);
-			echo '</p></div>';
-		});
-		return;
-	}
+spl_autoload_register(function ($class) {
+    $prefix = 'AK_Set\\';
+    $base_dir = AK_SET_PATH . 'src/';
 
-	Plugin::get_instance()->boot();
+    $len = strlen($prefix);
+    if (strncmp($prefix, $class, $len) !== 0) {
+        return;
+    }
+
+    $relative_class = substr($class, $len);
+    $file = $base_dir . str_replace('\\', '/', $relative_class) . '.php';
+
+    if (file_exists($file)) {
+        require_once $file;
+    }
 });
 
 /**
- * Declare compatibility with WooCommerce High-Performance Order Storage (HPOS).
+ * Declare High-Performance Order Storage (HPOS) compatibility
  */
-add_action('before_woocommerce_init', static function (): void {
-	if (class_exists('\Automattic\WooCommerce\Utilities\FeaturesUtil')) {
-		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', AK_SET_PLUGIN_FILE, true);
-	}
+add_action('before_woocommerce_init', function () {
+    if (class_exists(\Automattic\WooCommerce\Utilities\FeaturesUtil::class)) {
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', AK_SET_FILE, true);
+    }
+});
+
+/**
+ * Bootstrap Plugin Instance
+ */
+add_action('plugins_loaded', function () {
+    if (!class_exists('WooCommerce')) {
+        add_action('admin_notices', function () {
+            echo '<div class="error"><p>' . esc_html__('AK Product Set requires WooCommerce to be installed and active.', 'ak-product-set') . '</p></div>';
+        });
+        return;
+    }
+
+    \AK_Set\Plugin::instance()->boot();
 });
