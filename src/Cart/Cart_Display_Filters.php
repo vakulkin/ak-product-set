@@ -159,24 +159,17 @@ class Cart_Display_Filters
         $headcount         = isset($cart_item['_ak_headcount']) ? (int) $cart_item['_ak_headcount'] : 1;
         $participants      = isset($cart_item['_ak_participants']) ? $cart_item['_ak_participants'] : [];
 
-        // 1. Wybrane Weekendy
-        $weekend_titles = [];
+        // 1. Wybrane Weekendy (Individual key entries: Termin 1, Termin 2, etc.)
+        $i = 1;
         foreach ($selected_weekends as $wid) {
             $w = new Weekend_Model($wid);
             if ($w->get_wc_product()) {
-                $weekend_titles[] = $w->get_title();
+                $item_data[] = [
+                    'name'  => sprintf(__('Termin %d', 'ak-product-set'), $i),
+                    'value' => esc_html($w->get_title()),
+                ];
+                $i++;
             }
-        }
-
-        if (!empty($weekend_titles)) {
-            $formatted_weekends = array_map(static function ($title) {
-                return '• ' . esc_html($title);
-            }, $weekend_titles);
-
-            $item_data[] = [
-                'name'  => __('Wybrane Weekendy', 'ak-product-set'),
-                'value' => implode('<br>', $formatted_weekends),
-            ];
         }
 
         // 2. Liczba uczestników
