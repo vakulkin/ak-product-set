@@ -26,18 +26,24 @@ class Shortcode_Handler {
      * Register plugin frontend CSS & JS assets
      */
     public function register_assets() {
+        $css_file = AK_SET_PATH . 'assets/css/ak-set-form.css';
+        $js_file  = AK_SET_PATH . 'assets/js/ak-set-form.js';
+
+        $css_ver = file_exists($css_file) ? AK_SET_VERSION . '.' . filemtime($css_file) : AK_SET_VERSION;
+        $js_ver  = file_exists($js_file) ? AK_SET_VERSION . '.' . filemtime($js_file) : AK_SET_VERSION;
+
         wp_enqueue_style(
             'ak-set-form-css',
             AK_SET_URL . 'assets/css/ak-set-form.css',
             [],
-            AK_SET_VERSION
+            $css_ver
         );
 
         wp_register_script(
             'ak-set-form-js',
             AK_SET_URL . 'assets/js/ak-set-form.js',
             ['jquery'],
-            AK_SET_VERSION,
+            $js_ver,
             true
         );
     }
