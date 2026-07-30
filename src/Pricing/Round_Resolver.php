@@ -48,15 +48,4 @@ class Round_Resolver {
         // If Round 2 has also expired, we are in Round 3.
         return 3;
     }
-
-    /**
-     * Alias method for resolve_round
-     *
-     * @param Set_Model $set
-     * @param int|null $current_timestamp
-     * @return int
-     */
-    public static function resolve(Set_Model $set, $current_timestamp = null) {
-        return self::resolve_round($set, $current_timestamp);
-    }
 }

@@ -40,4 +40,13 @@ class Composed_Cart_Manager_Test extends TestCase {
         $manager->validate_cart_stock();
         $this->assertTrue(true);
     }
+
+    /**
+     * inject_prices_from_session must handle empty cart safely
+     */
+    public function test_inject_prices_from_session_is_safe_when_cart_empty() {
+        $manager = new Composed_Cart_Manager();
+        $manager->inject_prices_from_session(null);
+        $this->assertTrue(true);
+    }
 }

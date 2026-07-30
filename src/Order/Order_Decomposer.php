@@ -11,12 +11,12 @@ if (!defined('ABSPATH')) {
 
 class Order_Decomposer {
 
-    public function init() {
-        add_action('woocommerce_new_order', [$this, 'decompose_order'], 10, 1);
+    public function init(): void
+    {
+        // Fire on standard checkout form submission (covers most gateways)
         add_action('woocommerce_checkout_order_processed', [$this, 'decompose_order'], 10, 1);
-        add_action('woocommerce_payment_complete', [$this, 'decompose_order'], 10, 1);
+        // Fire when order reaches 'processing' — catches async payment gateways (Stripe, PayPal, etc.)
         add_action('woocommerce_order_status_processing', [$this, 'decompose_order'], 10, 1);
-        add_action('woocommerce_order_status_completed', [$this, 'decompose_order'], 10, 1);
     }
 
     /**

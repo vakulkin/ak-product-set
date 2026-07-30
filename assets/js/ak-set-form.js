@@ -469,15 +469,24 @@
         success: function (res) {
           hideLoader();
           if (res && res.success && res.data) {
-            if (typeof jQuery !== 'undefined' && jQuery(document.body)) {
+            // Refresh mini-cart fragments (side drawer, header cart count, etc.)
+            if (typeof jQuery !== 'undefined') {
               if (res.data.fragments) {
                 jQuery(document.body).trigger('added_to_cart', [res.data.fragments, res.data.cart_hash]);
               }
               jQuery(document.body).trigger('wc_fragment_refresh');
             }
-            if (res.data.redirect_url) {
-              window.location.href = res.data.redirect_url;
+            // Show success message with navigation links instead of auto-redirecting
+            var cartUrl = res.data.cart_url || '';
+            var checkoutUrl = res.data.redirect_url || '';
+            var msg = 'Zestaw został dodany do koszyka.';
+            if (cartUrl || checkoutUrl) {
+              msg += ' <a href="' + (cartUrl || checkoutUrl) + '" style="text-decoration:underline;">Zobacz koszyk</a>';
+              if (checkoutUrl) {
+                msg += ' &bull; <a href="' + checkoutUrl + '" style="text-decoration:underline;">Zamów</a>';
+              }
             }
+            showToast(msg);
           } else {
             showToast(res && res.data && res.data.message ? res.data.message : 'Nie udało się dodać zestawu do koszyka.');
           }
@@ -512,7 +521,9 @@
       toast.className = 'ak-toast-notification';
 
       var textNode = document.createElement('span');
-      textNode.textContent = msg;
+      // Use innerHTML so that success messages with links render correctly.
+      // Error messages passed here from esc_html(server) are already safe.
+      textNode.innerHTML = msg;
       toast.appendChild(textNode);
 
       var closeBtn = document.createElement('button');

@@ -15,7 +15,7 @@ class Round_Resolver_Test extends TestCase {
 
         // Current time is before round 1 end
         $timestamp = strtotime('2026-07-26 12:00:00');
-        $this->assertEquals(1, Round_Resolver::resolve($set, $timestamp));
+        $this->assertEquals(1, Round_Resolver::resolve_round($set, $timestamp));
     }
 
     public function test_resolves_round_2() {
@@ -25,7 +25,7 @@ class Round_Resolver_Test extends TestCase {
 
         // Current time is after round 1 end but before round 2 end
         $timestamp = strtotime('2026-08-15 12:00:00');
-        $this->assertEquals(2, Round_Resolver::resolve($set, $timestamp));
+        $this->assertEquals(2, Round_Resolver::resolve_round($set, $timestamp));
     }
 
     public function test_resolves_round_3() {
@@ -35,7 +35,7 @@ class Round_Resolver_Test extends TestCase {
 
         // Current time is after round 2 end
         $timestamp = strtotime('2026-10-01 12:00:00');
-        $this->assertEquals(3, Round_Resolver::resolve($set, $timestamp));
+        $this->assertEquals(3, Round_Resolver::resolve_round($set, $timestamp));
     }
 
     public function test_fallback_to_round_1_when_no_dates_set() {
@@ -44,6 +44,6 @@ class Round_Resolver_Test extends TestCase {
         $set->shouldReceive('get_round_2_end_date')->andReturn('');
 
         $timestamp = strtotime('2026-07-26 12:00:00');
-        $this->assertEquals(1, Round_Resolver::resolve($set, $timestamp));
+        $this->assertEquals(1, Round_Resolver::resolve_round($set, $timestamp));
     }
 }

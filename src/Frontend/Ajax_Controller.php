@@ -98,37 +98,11 @@ class Ajax_Controller {
         $has_tshirt = $set->has_tshirt();
 
         // Server-side validation of participant fields
-        foreach ($raw_participants as $idx => $p) {
-            $p_num = $idx + 1;
-            $name  = isset($p['name']) ? trim($p['name']) : '';
-            $email = isset($p['email']) ? trim($p['email']) : '';
-            $phone = isset($p['phone']) ? trim($p['phone']) : '';
-            $size  = isset($p['tshirt_size']) ? trim($p['tshirt_size']) : '';
-
-            if (empty($name)) {
-                wp_send_json_error([
-                    'message' => sprintf(__('Proszę podać imię i nazwisko dla Uczestnika %d.', 'ak-product-set'), $p_num),
-                ]);
-            }
-
-            if (empty($email) || !\is_email($email)) {
-                wp_send_json_error([
-                    'message' => sprintf(__('Proszę podać prawidłowy adres e-mail dla Uczestnika %d (np. jan@example.com).', 'ak-product-set'), $p_num),
-                ]);
-            }
-
-            $clean_phone = preg_replace('/[^0-9]/', '', $phone);
-            if (empty($phone) || strlen($clean_phone) < 7 || strlen($clean_phone) > 15) {
-                wp_send_json_error([
-                    'message' => sprintf(__('Proszę podać prawidłowy numer telefonu dla Uczestnika %d (np. +48 600 000 000).', 'ak-product-set'), $p_num),
-                ]);
-            }
-
-            if ($has_tshirt && empty($size)) {
-                wp_send_json_error([
-                    'message' => sprintf(__('Proszę wybrać rozmiar koszulki dla Uczestnika %d.', 'ak-product-set'), $p_num),
-                ]);
-            }
+        $validation_error = $this->validate_participants($raw_participants, $has_tshirt);
+        if ($validation_error !== null) {
+            wp_send_json_error([
+                'message' => $validation_error,
+            ]);
         }
 
         // Sanitize participant models
@@ -184,4 +158,41 @@ class Ajax_Controller {
             'message' => __('Zestaw został usunięty z koszyka.', 'ak-product-set'),
         ]);
     }
+
+    /**
+     * Validate raw participant input arrays against required schema & format rules.
+     *
+     * @param array $raw_participants
+     * @param bool  $has_tshirt
+     * @return string|null Error message string on validation failure, or null if valid
+     */
+    private function validate_participants(array $raw_participants, bool $has_tshirt): ?string {
+        foreach ($raw_participants as $idx => $p) {
+            $p_num = $idx + 1;
+            $name  = isset($p['name']) ? trim($p['name']) : '';
+            $email = isset($p['email']) ? trim($p['email']) : '';
+            $phone = isset($p['phone']) ? trim($p['phone']) : '';
+            $size  = isset($p['tshirt_size']) ? trim($p['tshirt_size']) : '';
+
+            if (empty($name)) {
+                return sprintf(__('Proszę podać imię i nazwisko dla Uczestnika %d.', 'ak-product-set'), $p_num);
+            }
+
+            if (empty($email) || !\is_email($email)) {
+                return sprintf(__('Proszę podać prawidłowy adres e-mail dla Uczestnika %d (np. jan@example.com).', 'ak-product-set'), $p_num);
+            }
+
+            $clean_phone = preg_replace('/[^0-9]/', '', $phone);
+            if (empty($phone) || strlen($clean_phone) < 7 || strlen($clean_phone) > 15) {
+                return sprintf(__('Proszę podać prawidłowy numer telefonu dla Uczestnika %d (np. +48 600 000 000).', 'ak-product-set'), $p_num);
+            }
+
+            if ($has_tshirt && empty($size)) {
+                return sprintf(__('Proszę wybrać rozmiar koszulki dla Uczestnika %d.', 'ak-product-set'), $p_num);
+            }
+        }
+
+        return null;
+    }
 }
+

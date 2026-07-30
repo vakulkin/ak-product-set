@@ -2,6 +2,7 @@
 
 namespace AK_Set\Order;
 
+use AK_Set\Models\Set_Model;
 use AK_Set\Support\Helper;
 
 if (!defined('ABSPATH')) {
@@ -30,9 +31,9 @@ class Order_Processor {
         $item->add_meta_data('_ak_is_composed_set', true, true);
 
         if (isset($values['_ak_set_id'])) {
-            $set_id = (int)$values['_ak_set_id'];
+            $set_id = (int) $values['_ak_set_id'];
             $item->add_meta_data('_ak_set_id', $set_id, true);
-            $set = new \AK_Set\Models\Set_Model($set_id);
+            $set = new Set_Model($set_id);
             if ($set->get_title()) {
                 $item->set_name($set->get_title());
             }

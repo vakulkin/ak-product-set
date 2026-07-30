@@ -74,23 +74,21 @@ class Shortcode_Handler
      * @param int $set_id
      * @return array|null
      */
-    private function get_cart_initial_data($set_id)
+    private function get_cart_initial_data(int $set_id): ?array
     {
         if (!function_exists('WC') || !WC() || !WC()->cart) {
             return null;
         }
 
-        $set_id = (int)$set_id;
         $matched_data = null;
 
-        $cart = WC()->cart->get_cart();
-        foreach ($cart as $cart_item) {
+        foreach (WC()->cart->get_cart() as $cart_item) {
             if (!empty($cart_item['_ak_is_composed_set'])) {
-                $item_set_id = isset($cart_item['_ak_set_id']) ? (int)$cart_item['_ak_set_id'] : 0;
+                $item_set_id = isset($cart_item['_ak_set_id']) ? (int) $cart_item['_ak_set_id'] : 0;
                 if ($item_set_id === $set_id) {
                     $matched_data = [
                         'selected_weekends' => isset($cart_item['_ak_selected_weekends']) ? array_map('intval', $cart_item['_ak_selected_weekends']) : [],
-                        'headcount'         => isset($cart_item['_ak_headcount']) ? (int)$cart_item['_ak_headcount'] : 1,
+                        'headcount'         => isset($cart_item['_ak_headcount']) ? (int) $cart_item['_ak_headcount'] : 1,
                         'participants'      => isset($cart_item['_ak_participants']) ? $cart_item['_ak_participants'] : [],
                     ];
                 }

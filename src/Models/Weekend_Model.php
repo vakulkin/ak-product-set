@@ -44,14 +44,17 @@ class Weekend_Model {
      * @param string $size Image size, default 'woocommerce_thumbnail'
      * @return string
      */
-    public function get_image_url($size = 'woocommerce_thumbnail') {
-        if (!$this->product) return '';
-        $image_id = $this->product->get_image_id();
-        if ($image_id) {
-            $image_url = wp_get_attachment_image_url($image_id, $size);
-            return $image_url ? $image_url : '';
+    public function get_image_url($size = 'woocommerce_thumbnail')
+    {
+        if (!$this->product) {
+            return '';
         }
-        return '';
+
+        $image_id = $this->product->get_image_id();
+
+        return $image_id
+            ? (string) (wp_get_attachment_image_url($image_id, $size) ?: '')
+            : '';
     }
 
     /**

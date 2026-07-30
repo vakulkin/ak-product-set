@@ -35,7 +35,7 @@ class Plugin {
     /**
      * Boot all plugin services
      */
-    public function boot() {
+    public function boot(): void {
         // Core Admin & Custom Post Types
         $this->services['acf_registrar'] = new Admin\ACF_Registrar();
         $this->services['order_admin_view'] = new Admin\Order_Admin_View();
@@ -65,7 +65,7 @@ class Plugin {
      * @param string $key
      * @return mixed|null
      */
-    public function get_service($key) {
+    public function get_service(string $key) {
         return isset($this->services[$key]) ? $this->services[$key] : null;
     }
 }

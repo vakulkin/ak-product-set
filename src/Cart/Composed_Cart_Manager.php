@@ -13,11 +13,24 @@ if (!defined('ABSPATH')) {
 
 class Composed_Cart_Manager {
 
-    public function init() {
+    public function init(): void {
         add_action('woocommerce_before_calculate_totals', [$this, 'override_cart_item_prices'], 20, 1);
+        add_action('woocommerce_cart_loaded_from_session', [$this, 'inject_prices_from_session'], 20, 1);
         add_action('woocommerce_check_cart_items', [$this, 'validate_cart_stock']);
         add_action('woocommerce_checkout_process', [$this, 'validate_cart_stock']);
-        add_filter('woocommerce_cart_item_product', [$this, 'filter_cart_item_product'], 20, 2);
+    }
+
+    /**
+     * Return the active WC_Cart instance, or null if not available.
+     * Central guard used by all methods that interact with the cart.
+     *
+     * @return \WC_Cart|null
+     */
+    private static function get_cart(): ?\WC_Cart {
+        if (!function_exists('WC') || !WC() || !WC()->cart) {
+            return null;
+        }
+        return WC()->cart;
     }
 
     /**
@@ -72,16 +85,17 @@ class Composed_Cart_Manager {
      * Server-side real-time cart stock validation
      * Blocks checkout and displays notice if cumulative stock dropped below requested headcount
      */
-    public function validate_cart_stock() {
-        if (!function_exists('WC') || !WC() || !WC()->cart) {
+    public function validate_cart_stock(): void {
+        $cart = self::get_cart();
+        if (!$cart) {
             return;
         }
 
         $cart_changed = false;
 
-        // Calculate cumulative requested headcount for each weekend across all cart items
+        // Calculate cumulative requested headcount per weekend across all composed set cart items
         $weekend_total_headcount = [];
-        foreach (WC()->cart->get_cart() as $cart_item) {
+        foreach ($cart->get_cart() as $cart_item) {
             if (empty($cart_item['_ak_is_composed_set'])) {
                 continue;
             }
@@ -96,7 +110,7 @@ class Composed_Cart_Manager {
             }
         }
 
-        foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
+        foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
             if (empty($cart_item['_ak_is_composed_set'])) {
                 continue;
             }
@@ -106,14 +120,14 @@ class Composed_Cart_Manager {
             $headcount = isset($cart_item['_ak_headcount']) ? (int)$cart_item['_ak_headcount'] : 1;
 
             if (empty($selected_weekends) || $headcount < 1) {
-                WC()->cart->remove_cart_item($cart_item_key);
+                $cart->remove_cart_item($cart_item_key);
                 $cart_changed = true;
                 continue;
             }
 
             $set = new Set_Model($set_id);
             if (!$set->exists() || get_post_status($set_id) !== 'publish') {
-                WC()->cart->remove_cart_item($cart_item_key);
+                $cart->remove_cart_item($cart_item_key);
                 if (function_exists('wc_add_notice')) {
                     wc_add_notice(__('Zestaw został usunięty z koszyka, ponieważ nie jest już dostępny.', 'ak-product-set'), 'error');
                 }
@@ -123,7 +137,7 @@ class Composed_Cart_Manager {
 
             $calc = Pricing_Engine::calculate($set_id, $selected_weekends, $headcount);
             if (!$calc['valid'] || (isset($calc['total_price']) && $calc['total_price'] <= 0)) {
-                WC()->cart->remove_cart_item($cart_item_key);
+                $cart->remove_cart_item($cart_item_key);
                 if (function_exists('wc_add_notice')) {
                     wc_add_notice(__('Zestaw został usunięty z koszyka, ponieważ jego cena wynosi 0 zł lub jest nieprawidłowa.', 'ak-product-set'), 'error');
                 }
@@ -182,20 +196,19 @@ class Composed_Cart_Manager {
 
             if (count($valid_weekends) !== $original_count) {
                 if (empty($valid_weekends)) {
-                    // All weekends were invalid, remove entire set
-                    WC()->cart->remove_cart_item($cart_item_key);
+                    $cart->remove_cart_item($cart_item_key);
                     if (function_exists('wc_add_notice')) {
                         wc_add_notice(__('Zestaw został usunięty z koszyka, ponieważ żaden z wybranych terminów nie jest już dostępny.', 'ak-product-set'), 'error');
                     }
                 } else {
                     // Update cart item with only the valid weekends
-                    WC()->cart->cart_contents[$cart_item_key]['_ak_selected_weekends'] = $valid_weekends;
+                    $cart->cart_contents[$cart_item_key]['_ak_selected_weekends'] = $valid_weekends;
                 }
             }
         }
 
         if ($cart_changed) {
-            WC()->cart->set_session();
+            $cart->set_session();
         }
     }
 
@@ -209,7 +222,8 @@ class Composed_Cart_Manager {
      * @return string|false Cart item key on success, false on failure
      */
     public function add_set_to_cart($set_id, array $selected_weekends, $headcount, array $participants_raw) {
-        if (!function_exists('WC') || !WC() || !WC()->cart) {
+        $cart = self::get_cart();
+        if (!$cart) {
             return false;
         }
 
@@ -224,7 +238,7 @@ class Composed_Cart_Manager {
 
         // Calculate cumulative headcount for selected weekends in OTHER sets already in cart
         $cart_weekend_totals = [];
-        foreach (WC()->cart->get_cart() as $existing_item) {
+        foreach ($cart->get_cart() as $existing_item) {
             if (empty($existing_item['_ak_is_composed_set'])) {
                 continue;
             }
@@ -289,18 +303,17 @@ class Composed_Cart_Manager {
             '_ak_per_person_price'  => (float)$calc['per_person_price'],
             '_ak_round'             => (int)$calc['round'],
             '_ak_tier'              => (string)$calc['tier'],
-            '_ak_unique_key'        => md5(microtime() . rand()),
+            // Stable key per set_id ensures WooCommerce re-uses the same cart slot (no duplicates)
+            '_ak_unique_key'        => 'ak_set_' . (int)$set_id,
         ];
 
-        $cart_item_key = WC()->cart->add_to_cart(
+        return $cart->add_to_cart(
             $universal_product_id,
             1, // Composed single line item has quantity 1
             0,
             [],
             $cart_item_data
         );
-
-        return $cart_item_key;
     }
 
     /**
@@ -310,15 +323,16 @@ class Composed_Cart_Manager {
      *
      * @param int|null $set_id
      */
-    public function clear_existing_set_cart_items($set_id = null) {
-        if (!function_exists('WC') || !WC() || !WC()->cart) {
+    public function clear_existing_set_cart_items($set_id = null): void {
+        $cart = self::get_cart();
+        if (!$cart) {
             return;
         }
 
-        foreach (WC()->cart->get_cart() as $key => $item) {
+        foreach ($cart->get_cart() as $key => $item) {
             if (!empty($item['_ak_is_composed_set'])) {
-                if ($set_id === null || (isset($item['_ak_set_id']) && (int)$item['_ak_set_id'] === (int)$set_id)) {
-                    WC()->cart->remove_cart_item($key);
+                if ($set_id === null || (isset($item['_ak_set_id']) && (int) $item['_ak_set_id'] === (int) $set_id)) {
+                    $cart->remove_cart_item($key);
                 }
             }
         }
@@ -380,37 +394,56 @@ class Composed_Cart_Manager {
     }
 
     /**
-     * Dynamically inject applied set price and set name into WC_Product instance on cart item retrieval
-     * Ensures mini-cart widgets, side drawers, and templates receive non-zero prices and set names.
+     * Inject set price and name into WC_Product objects immediately after cart is loaded from session.
+     * This ensures mini-cart widgets, side drawers, and all templates always receive the correct price
+     * without relying on woocommerce_before_calculate_totals (which fires too late for mini-cart).
      *
-     * @param \WC_Product $product
-     * @param array $cart_item
-     * @return \WC_Product
+     * @param \WC_Cart $cart
      */
-    public function filter_cart_item_product($product, $cart_item) {
-        if (!empty($cart_item['_ak_is_composed_set']) && $product instanceof \WC_Product) {
-            $applied_price = isset($cart_item['_ak_applied_price']) ? (float)$cart_item['_ak_applied_price'] : 0.0;
-            if ($applied_price <= 0 && isset($cart_item['_ak_set_id']) && isset($cart_item['_ak_selected_weekends']) && isset($cart_item['_ak_headcount'])) {
-                $calc = Pricing_Engine::calculate((int)$cart_item['_ak_set_id'], $cart_item['_ak_selected_weekends'], (int)$cart_item['_ak_headcount']);
+    public function inject_prices_from_session($cart) {
+        if (empty($cart)) {
+            return;
+        }
+
+        foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
+            if (empty($cart_item['_ak_is_composed_set'])) {
+                continue;
+            }
+
+            $product = isset($cart_item['data']) ? $cart_item['data'] : null;
+            if (!($product instanceof \WC_Product)) {
+                continue;
+            }
+
+            // Use stored applied price first; fall back to live Pricing Engine calculation
+            $price = isset($cart_item['_ak_applied_price']) ? (float)$cart_item['_ak_applied_price'] : 0.0;
+            if ($price <= 0 && isset($cart_item['_ak_set_id'], $cart_item['_ak_selected_weekends'], $cart_item['_ak_headcount'])) {
+                $calc = Pricing_Engine::calculate(
+                    (int)$cart_item['_ak_set_id'],
+                    $cart_item['_ak_selected_weekends'],
+                    (int)$cart_item['_ak_headcount']
+                );
                 if ($calc['valid'] && $calc['total_price'] > 0) {
-                    $applied_price = (float)$calc['total_price'];
+                    $price = (float)$calc['total_price'];
+                    // Persist into cart meta so subsequent reads are immediate
+                    $cart->cart_contents[$cart_item_key]['_ak_applied_price'] = $price;
                 }
             }
 
-            if ($applied_price > 0) {
-                $product->set_price($applied_price);
-                $product->set_regular_price($applied_price);
+            if ($price > 0) {
+                $product->set_price($price);
+                $product->set_regular_price($price);
             }
 
+            // Inject set name so WooCommerce reads the correct product name everywhere
             $set_id = isset($cart_item['_ak_set_id']) ? (int)$cart_item['_ak_set_id'] : 0;
             if ($set_id > 0) {
                 $set = new Set_Model($set_id);
-                if ($set->get_title()) {
-                    $product->set_name($set->get_title());
+                $title = $set->get_title();
+                if ($title) {
+                    $product->set_name($title);
                 }
             }
         }
-
-        return $product;
     }
 }
