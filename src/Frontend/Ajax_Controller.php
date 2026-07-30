@@ -133,14 +133,8 @@ class Ajax_Controller {
                 ]);
             }
 
-            $fragments = [];
-            $cart_hash = '';
-            if (class_exists('\WC_AJAX')) {
-                $fragments = \WC_AJAX::get_refreshed_fragments();
-                if (WC()->cart) {
-                    $cart_hash = WC()->cart->get_cart_hash();
-                }
-            }
+            $fragments = $this->get_cart_fragments();
+            $cart_hash = (function_exists('WC') && WC() && WC()->cart) ? WC()->cart->get_cart_hash() : '';
 
             wp_send_json_success([
                 'message'      => __('Zestaw został pomyślnie dodany do koszyka.', 'ak-product-set'),
@@ -206,5 +200,25 @@ class Ajax_Controller {
 
         return null;
     }
+
+    /**
+     * Safely render and collect mini-cart HTML fragments without calling wp_send_json() or terminating execution.
+     *
+     * @return array
+     */
+    private function get_cart_fragments(): array {
+        if (!function_exists('woocommerce_mini_cart')) {
+            return [];
+        }
+
+        ob_start();
+        woocommerce_mini_cart();
+        $mini_cart = ob_get_clean();
+
+        return (array) apply_filters('woocommerce_add_to_cart_fragments', [
+            'div.widget_shopping_cart_content' => '<div class="widget_shopping_cart_content">' . $mini_cart . '</div>',
+        ]);
+    }
 }
+
 
