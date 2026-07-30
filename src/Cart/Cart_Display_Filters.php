@@ -169,16 +169,13 @@ class Cart_Display_Filters
         }
 
         if (!empty($weekend_titles)) {
-            $rows = array_map(static function ($title) {
-                return sprintf(
-                    '<li style="margin-bottom:3px; padding-left:12px; position:relative; line-height:1.45;"><span style="position:absolute; left:0; color:#71717a; font-size:12px;">•</span> %s</li>',
-                    esc_html($title)
-                );
+            $formatted_weekends = array_map(static function ($title) {
+                return '• ' . esc_html($title);
             }, $weekend_titles);
 
             $item_data[] = [
                 'name'  => __('Wybrane Weekendy', 'ak-product-set'),
-                'value' => '<ul style="margin:4px 0 6px 0; padding:0; list-style:none;">' . implode('', $rows) . '</ul>',
+                'value' => implode('<br>', $formatted_weekends),
             ];
         }
 
@@ -216,29 +213,23 @@ class Cart_Display_Filters
                 }
 
                 $meta_line = !empty($details_parts)
-                    ? sprintf(
-                        '<div style="font-size:12px; color:#52525b; margin-top:2px; line-height:1.4;">%s</div>',
-                        implode(' &bull; ', $details_parts)
-                    )
+                    ? '<br><span style="font-size:12px; color:#52525b;">' . implode(' • ', $details_parts) . '</span>'
                     : '';
 
-                $participant_rows[] = sprintf(
-                    '<li style="margin-bottom:8px; padding-left:12px; position:relative; line-height:1.4;"><span style="position:absolute; left:0; color:#71717a; font-size:12px;">•</span> <strong style="color:#18181b; font-weight:600;">%s</strong>%s</li>',
-                    esc_html($p['name']),
-                    $meta_line
-                );
+                $participant_rows[] = '• <strong>' . esc_html($p['name']) . '</strong>' . $meta_line;
             }
 
             if (!empty($participant_rows)) {
                 $item_data[] = [
                     'name'  => __('Uczestnicy', 'ak-product-set'),
-                    'value' => '<ul style="margin:4px 0 0 0; padding:0; list-style:none;">' . implode('', $participant_rows) . '</ul>',
+                    'value' => implode('<br>', $participant_rows),
                 ];
             }
         }
 
         return $item_data;
     }
+
 
     /**
      * Lock quantity input for composed set cart item to 1
@@ -325,24 +316,28 @@ class Cart_Display_Filters
      * @param \WC_Product $product
      * @return float|int
      */
+    /**
+     * Cap the quantity input max attribute to 1 ONLY for composed set products.
+     * Regular products in the store are completely unaffected.
+     *
+     * @param float|int   $max
+     * @param \WC_Product $product
+     * @return float|int
+     */
     public function filter_quantity_input_max($max, $product)
     {
-        if (!($product instanceof \WC_Product) || !function_exists('WC') || !WC() || !WC()->cart) {
+        if (!($product instanceof \WC_Product)) {
             return $max;
         }
 
-        foreach (WC()->cart->get_cart() as $cart_item) {
-            if (
-                !empty($cart_item['_ak_is_composed_set']) &&
-                !empty($cart_item['data']) &&
-                $cart_item['data']->get_id() === $product->get_id()
-            ) {
-                return 1;
-            }
+        $universal_id = Composed_Cart_Manager::get_or_create_universal_product_id();
+        if ($universal_id > 0 && $product->get_id() === $universal_id) {
+            return 1;
         }
 
         return $max;
     }
+
 
     /**
      * Intercept cart quantity updates and silently clamp composed set item qty back to 1.
