@@ -30,7 +30,12 @@ class Order_Processor {
         $item->add_meta_data('_ak_is_composed_set', true, true);
 
         if (isset($values['_ak_set_id'])) {
-            $item->add_meta_data('_ak_set_id', (int)$values['_ak_set_id'], true);
+            $set_id = (int)$values['_ak_set_id'];
+            $item->add_meta_data('_ak_set_id', $set_id, true);
+            $set = new \AK_Set\Models\Set_Model($set_id);
+            if ($set->get_title()) {
+                $item->set_name($set->get_title());
+            }
         }
 
         if (isset($values['_ak_selected_weekends'])) {

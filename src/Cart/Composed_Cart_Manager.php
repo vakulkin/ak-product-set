@@ -69,7 +69,7 @@ class Composed_Cart_Manager {
 
     /**
      * Server-side real-time cart stock validation
-     * Blocks checkout and displays notice if stock dropped below requested headcount
+     * Blocks checkout and displays notice if cumulative stock dropped below requested headcount
      */
     public function validate_cart_stock() {
         if (!function_exists('WC') || !WC() || !WC()->cart) {
@@ -77,6 +77,23 @@ class Composed_Cart_Manager {
         }
 
         $cart_changed = false;
+
+        // Calculate cumulative requested headcount for each weekend across all cart items
+        $weekend_total_headcount = [];
+        foreach (WC()->cart->get_cart() as $cart_item) {
+            if (empty($cart_item['_ak_is_composed_set'])) {
+                continue;
+            }
+            $selected = isset($cart_item['_ak_selected_weekends']) ? $cart_item['_ak_selected_weekends'] : [];
+            $hc = isset($cart_item['_ak_headcount']) ? (int)$cart_item['_ak_headcount'] : 1;
+            foreach ($selected as $wid) {
+                $wid = (int)$wid;
+                if (!isset($weekend_total_headcount[$wid])) {
+                    $weekend_total_headcount[$wid] = 0;
+                }
+                $weekend_total_headcount[$wid] += $hc;
+            }
+        }
 
         foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
             if (empty($cart_item['_ak_is_composed_set'])) {
@@ -138,9 +155,10 @@ class Composed_Cart_Manager {
                     $reason = __('zakończono rekrutację', 'ak-product-set');
                 } elseif ($w->managing_stock()) {
                     $stock = $w->get_stock_quantity();
-                    if ($stock !== null && $headcount > $stock) {
+                    $total_in_cart = isset($weekend_total_headcount[$wid]) ? $weekend_total_headcount[$wid] : $headcount;
+                    if ($stock !== null && $total_in_cart > $stock) {
                         $is_invalid = true;
-                        $reason = __('brak wystarczającej liczby miejsc', 'ak-product-set');
+                        $reason = sprintf(__('brak wystarczającej liczby miejsc (łącznie w koszyku: %1$d os., dostępne: %2$d os.)', 'ak-product-set'), $total_in_cart, $stock);
                     }
                 }
 
@@ -181,7 +199,7 @@ class Composed_Cart_Manager {
     }
 
     /**
-     * Add or replace composed set line item in WooCommerce cart using Universal Product
+     * Add composed set line item in WooCommerce cart using Universal Product
      *
      * @param int $set_id
      * @param array $selected_weekends
@@ -203,6 +221,44 @@ class Composed_Cart_Manager {
             throw new \Exception(__('Wybrano więcej miejsc niż jest aktualnie dostępne w wybranych terminach.', 'ak-product-set'));
         }
 
+        // Calculate cumulative headcount for selected weekends already in cart
+        $cart_weekend_totals = [];
+        foreach (WC()->cart->get_cart() as $existing_item) {
+            if (empty($existing_item['_ak_is_composed_set'])) {
+                continue;
+            }
+            $ex_weekends = isset($existing_item['_ak_selected_weekends']) ? $existing_item['_ak_selected_weekends'] : [];
+            $ex_hc = isset($existing_item['_ak_headcount']) ? (int)$existing_item['_ak_headcount'] : 1;
+            foreach ($ex_weekends as $wid) {
+                $wid = (int)$wid;
+                if (!isset($cart_weekend_totals[$wid])) {
+                    $cart_weekend_totals[$wid] = 0;
+                }
+                $cart_weekend_totals[$wid] += $ex_hc;
+            }
+        }
+
+        // Validate that adding new set headcount doesn't exceed stock limit for any selected weekend
+        foreach ($selected_weekends as $wid) {
+            $wid = (int)$wid;
+            $w = new Weekend_Model($wid);
+            if ($w->managing_stock()) {
+                $stock = $w->get_stock_quantity();
+                $already_in_cart = isset($cart_weekend_totals[$wid]) ? $cart_weekend_totals[$wid] : 0;
+                $total_requested = $already_in_cart + (int)$headcount;
+                if ($stock !== null && $total_requested > $stock) {
+                    $title = $w->get_title() ? $w->get_title() : __('Wybrany termin', 'ak-product-set');
+                    throw new \Exception(sprintf(
+                        __('Brak wystarczającej liczby miejsc dla terminu "%1$s". Dostępne miejsca: %2$d os. (w koszyku masz już %3$d os., próbujesz dodać %4$d os.).', 'ak-product-set'),
+                        esc_html($title),
+                        $stock,
+                        $already_in_cart,
+                        (int)$headcount
+                    ));
+                }
+            }
+        }
+
         $participants = Participant_Model::from_collection($participants_raw);
         $participants_array = array_map(function ($p) {
             return $p->to_array();
@@ -214,9 +270,6 @@ class Composed_Cart_Manager {
             // Fallback to first selected weekend product if universal product creation failed
             $universal_product_id = (int)$selected_weekends[0];
         }
-
-        // Always enforce single set cart isolation by replacing any existing set item
-        $this->clear_existing_set_cart_items();
 
         $cart_item_data = [
             '_ak_is_composed_set'   => true,
@@ -277,6 +330,11 @@ class Composed_Cart_Manager {
             }
 
             $set_id = isset($cart_item['_ak_set_id']) ? $cart_item['_ak_set_id'] : 0;
+            $set = new Set_Model($set_id);
+            if ($set->get_title()) {
+                $cart_item['data']->set_name($set->get_title());
+            }
+
             $selected_weekends = isset($cart_item['_ak_selected_weekends']) ? $cart_item['_ak_selected_weekends'] : [];
             $headcount = isset($cart_item['_ak_headcount']) ? $cart_item['_ak_headcount'] : 1;
 

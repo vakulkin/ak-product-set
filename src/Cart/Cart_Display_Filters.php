@@ -38,6 +38,11 @@ class Cart_Display_Filters
         $set_title = $set->get_title();
 
         $title_text = $set_title ? $set_title : $name;
+
+        if (function_exists('is_checkout') && is_checkout()) {
+            return esc_html($title_text);
+        }
+
         $edit_url = get_permalink($set_id);
 
         if (empty($edit_url)) {
