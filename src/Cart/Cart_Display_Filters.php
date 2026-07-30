@@ -125,10 +125,9 @@ class Cart_Display_Filters
         }
 
         return sprintf(
-            '<a href="%1$s" class="ak-set-title-link">%2$s</a> <a href="%1$s" class="ak-edit-booking-link">(%3$s)</a>',
+            '<a href="%s" class="ak-set-title-link">%s</a>',
             esc_url($permalink),
-            esc_html($title_text),
-            esc_html__('Edytuj rezerwację', 'ak-product-set')
+            esc_html($title_text)
         );
     }
 
