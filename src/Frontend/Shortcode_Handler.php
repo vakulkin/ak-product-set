@@ -3,16 +3,17 @@
 namespace AK_Set\Frontend;
 
 use AK_Set\Models\Set_Model;
-use AK_Set\Models\Weekend_Model;
 use AK_Set\Support\Helper;
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class Shortcode_Handler {
+class Shortcode_Handler
+{
 
-    public function init() {
+    public function init()
+    {
         // Shortcode backup
         add_shortcode('ak_set', [$this, 'render_shortcode']);
 
@@ -25,7 +26,8 @@ class Shortcode_Handler {
     /**
      * Register plugin frontend CSS & JS assets
      */
-    public function register_assets() {
+    public function register_assets()
+    {
         $css_file = AK_SET_PATH . 'assets/css/ak-set-form.css';
         $js_file  = AK_SET_PATH . 'assets/js/ak-set-form.js';
 
@@ -54,7 +56,8 @@ class Shortcode_Handler {
      * @param string $content
      * @return string
      */
-    public function render_single_set_content($content) {
+    public function render_single_set_content($content)
+    {
         if (is_singular('ak_set') && in_the_loop() && is_main_query()) {
             $set_id = get_the_ID();
             $wizard_html = $this->render_set_wizard($set_id);
@@ -66,27 +69,35 @@ class Shortcode_Handler {
 
     /**
      * Look up existing composed set item from active WooCommerce cart to sync form data
+     * Matches specific $set_id and uses the last added item for that set ID
      *
      * @param int $set_id
      * @return array|null
      */
-    private function get_cart_initial_data($set_id) {
-        if (!function_exists('WC') || !WC()->cart) {
+    private function get_cart_initial_data($set_id)
+    {
+        if (!function_exists('WC') || !WC() || !WC()->cart) {
             return null;
         }
+
+        $set_id = (int)$set_id;
+        $matched_data = null;
 
         $cart = WC()->cart->get_cart();
         foreach ($cart as $cart_item) {
             if (!empty($cart_item['_ak_is_composed_set'])) {
-                return [
-                    'selected_weekends' => isset($cart_item['_ak_selected_weekends']) ? array_map('intval', $cart_item['_ak_selected_weekends']) : [],
-                    'headcount'         => isset($cart_item['_ak_headcount']) ? (int)$cart_item['_ak_headcount'] : 1,
-                    'participants'      => isset($cart_item['_ak_participants']) ? $cart_item['_ak_participants'] : [],
-                ];
+                $item_set_id = isset($cart_item['_ak_set_id']) ? (int)$cart_item['_ak_set_id'] : 0;
+                if ($item_set_id === $set_id) {
+                    $matched_data = [
+                        'selected_weekends' => isset($cart_item['_ak_selected_weekends']) ? array_map('intval', $cart_item['_ak_selected_weekends']) : [],
+                        'headcount'         => isset($cart_item['_ak_headcount']) ? (int)$cart_item['_ak_headcount'] : 1,
+                        'participants'      => isset($cart_item['_ak_participants']) ? $cart_item['_ak_participants'] : [],
+                    ];
+                }
             }
         }
 
-        return null;
+        return $matched_data;
     }
 
     /**
@@ -95,7 +106,8 @@ class Shortcode_Handler {
      * @param array $atts
      * @return string
      */
-    public function render_shortcode($atts) {
+    public function render_shortcode($atts)
+    {
         $atts = shortcode_atts([
             'id' => get_the_ID(),
         ], $atts, 'ak_set');
@@ -109,7 +121,8 @@ class Shortcode_Handler {
      * @param int $set_id
      * @return string
      */
-    public function render_set_wizard($set_id) {
+    public function render_set_wizard($set_id)
+    {
         $set = new Set_Model($set_id);
 
         if (!$set->exists()) {

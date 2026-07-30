@@ -221,10 +221,14 @@ class Composed_Cart_Manager {
             throw new \Exception(__('Wybrano więcej miejsc niż jest aktualnie dostępne w wybranych terminach.', 'ak-product-set'));
         }
 
-        // Calculate cumulative headcount for selected weekends already in cart
+        // Calculate cumulative headcount for selected weekends in OTHER sets already in cart
         $cart_weekend_totals = [];
         foreach (WC()->cart->get_cart() as $existing_item) {
             if (empty($existing_item['_ak_is_composed_set'])) {
+                continue;
+            }
+            // Ignore previous bookings for the SAME set ID, as it will be overwritten
+            if (isset($existing_item['_ak_set_id']) && (int)$existing_item['_ak_set_id'] === (int)$set_id) {
                 continue;
             }
             $ex_weekends = isset($existing_item['_ak_selected_weekends']) ? $existing_item['_ak_selected_weekends'] : [];
@@ -258,6 +262,9 @@ class Composed_Cart_Manager {
                 }
             }
         }
+
+        // Overwrite / replace any previous booking for this SAME set ID
+        $this->clear_existing_set_cart_items($set_id);
 
         $participants = Participant_Model::from_collection($participants_raw);
         $participants_array = array_map(function ($p) {
@@ -296,16 +303,22 @@ class Composed_Cart_Manager {
     }
 
     /**
-     * Clear previous AK Set composed items from cart
+     * Clear previous AK Set composed items from cart.
+     * If $set_id is provided, only removes items for that specific set ID (overwriting same set).
+     * If $set_id is null, removes all composed set items from cart.
+     *
+     * @param int|null $set_id
      */
-    public function clear_existing_set_cart_items() {
+    public function clear_existing_set_cart_items($set_id = null) {
         if (!function_exists('WC') || !WC() || !WC()->cart) {
             return;
         }
 
         foreach (WC()->cart->get_cart() as $key => $item) {
             if (!empty($item['_ak_is_composed_set'])) {
-                WC()->cart->remove_cart_item($key);
+                if ($set_id === null || (isset($item['_ak_set_id']) && (int)$item['_ak_set_id'] === (int)$set_id)) {
+                    WC()->cart->remove_cart_item($key);
+                }
             }
         }
     }
@@ -322,6 +335,22 @@ class Composed_Cart_Manager {
 
         if (did_action('woocommerce_before_calculate_totals') > 1) {
             return;
+        }
+
+        // Deduplicate: If multiple items exist for the SAME set_id, keep ONLY the last added one
+        $set_latest_keys = [];
+        foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
+            if (empty($cart_item['_ak_is_composed_set'])) {
+                continue;
+            }
+            $set_id = isset($cart_item['_ak_set_id']) ? (int)$cart_item['_ak_set_id'] : 0;
+            if ($set_id > 0) {
+                if (isset($set_latest_keys[$set_id])) {
+                    $old_key = $set_latest_keys[$set_id];
+                    $cart->remove_cart_item($old_key);
+                }
+                $set_latest_keys[$set_id] = $cart_item_key;
+            }
         }
 
         foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
