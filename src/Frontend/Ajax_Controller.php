@@ -147,10 +147,21 @@ class Ajax_Controller {
                 ]);
             }
 
+            $fragments = [];
+            $cart_hash = '';
+            if (class_exists('\WC_AJAX')) {
+                $fragments = \WC_AJAX::get_refreshed_fragments();
+                if (WC()->cart) {
+                    $cart_hash = WC()->cart->get_cart_hash();
+                }
+            }
+
             wp_send_json_success([
                 'message'      => __('Zestaw został pomyślnie dodany do koszyka.', 'ak-product-set'),
                 'redirect_url' => wc_get_checkout_url(),
                 'cart_url'     => wc_get_cart_url(),
+                'fragments'    => $fragments,
+                'cart_hash'    => $cart_hash,
             ]);
 
         } catch (\Exception $e) {

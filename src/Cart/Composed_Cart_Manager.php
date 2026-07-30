@@ -17,6 +17,7 @@ class Composed_Cart_Manager {
         add_action('woocommerce_before_calculate_totals', [$this, 'override_cart_item_prices'], 20, 1);
         add_action('woocommerce_check_cart_items', [$this, 'validate_cart_stock']);
         add_action('woocommerce_checkout_process', [$this, 'validate_cart_stock']);
+        add_filter('woocommerce_cart_item_product', [$this, 'filter_cart_item_product'], 20, 2);
     }
 
     /**
@@ -371,9 +372,45 @@ class Composed_Cart_Manager {
             if ($calc['valid'] && $calc['total_price'] > 0) {
                 $price = (float)$calc['total_price'];
                 $cart_item['data']->set_price($price);
+                $cart_item['data']->set_regular_price($price);
             } else {
                 $cart->remove_cart_item($cart_item_key);
             }
         }
+    }
+
+    /**
+     * Dynamically inject applied set price and set name into WC_Product instance on cart item retrieval
+     * Ensures mini-cart widgets, side drawers, and templates receive non-zero prices and set names.
+     *
+     * @param \WC_Product $product
+     * @param array $cart_item
+     * @return \WC_Product
+     */
+    public function filter_cart_item_product($product, $cart_item) {
+        if (!empty($cart_item['_ak_is_composed_set']) && $product instanceof \WC_Product) {
+            $applied_price = isset($cart_item['_ak_applied_price']) ? (float)$cart_item['_ak_applied_price'] : 0.0;
+            if ($applied_price <= 0 && isset($cart_item['_ak_set_id']) && isset($cart_item['_ak_selected_weekends']) && isset($cart_item['_ak_headcount'])) {
+                $calc = Pricing_Engine::calculate((int)$cart_item['_ak_set_id'], $cart_item['_ak_selected_weekends'], (int)$cart_item['_ak_headcount']);
+                if ($calc['valid'] && $calc['total_price'] > 0) {
+                    $applied_price = (float)$calc['total_price'];
+                }
+            }
+
+            if ($applied_price > 0) {
+                $product->set_price($applied_price);
+                $product->set_regular_price($applied_price);
+            }
+
+            $set_id = isset($cart_item['_ak_set_id']) ? (int)$cart_item['_ak_set_id'] : 0;
+            if ($set_id > 0) {
+                $set = new Set_Model($set_id);
+                if ($set->get_title()) {
+                    $product->set_name($set->get_title());
+                }
+            }
+        }
+
+        return $product;
     }
 }

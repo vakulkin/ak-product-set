@@ -468,8 +468,16 @@
         dataType: 'json',
         success: function (res) {
           hideLoader();
-          if (res && res.success && res.data && res.data.redirect_url) {
-            window.location.href = res.data.redirect_url;
+          if (res && res.success && res.data) {
+            if (typeof jQuery !== 'undefined' && jQuery(document.body)) {
+              if (res.data.fragments) {
+                jQuery(document.body).trigger('added_to_cart', [res.data.fragments, res.data.cart_hash]);
+              }
+              jQuery(document.body).trigger('wc_fragment_refresh');
+            }
+            if (res.data.redirect_url) {
+              window.location.href = res.data.redirect_url;
+            }
           } else {
             showToast(res && res.data && res.data.message ? res.data.message : 'Nie udało się dodać zestawu do koszyka.');
           }

@@ -662,99 +662,193 @@
 }
 
 /* ============================================================
-   Buttons & Actions
+   Buttons & Actions (Ultra-High Specificity & Theme Protection)
    ============================================================ */
-.ak-set-wizard-container .ak-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 0 16px;
-  height: 36px;
-  font-size: 13px;
-  font-weight: 500;
-  font-family: var(--ak-font);
-  border-radius: var(--ak-radius-sm);
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: all 0.15s;
-  line-height: 1;
-  white-space: nowrap;
-  text-decoration: none;
+.ak-set-wizard-container .ak-btn,
+.ak-set-wizard-container button.ak-btn,
+.ak-set-wizard-container a.ak-btn,
+.ak-set-wizard-container input[type="button"].ak-btn,
+.ak-set-wizard-container input[type="submit"].ak-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 0 16px !important;
+  height: 36px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  font-family: var(--ak-font) !important;
+  border-radius: var(--ak-radius-sm) !important;
+  border: 1px solid transparent !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease-in-out !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  text-decoration: none !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
-.ak-set-wizard-container .ak-btn-primary {
-  background: var(--ak-zinc-900);
-  color: #ffffff;
-  border-color: var(--ak-zinc-900);
+.ak-set-wizard-container .ak-btn *,
+.ak-set-wizard-container button.ak-btn *,
+.ak-set-wizard-container a.ak-btn * {
+  color: inherit !important;
+  fill: currentColor !important;
 }
 
-.ak-set-wizard-container .ak-btn-primary:hover:not(:disabled) {
-  background: var(--ak-zinc-700);
-  border-color: var(--ak-zinc-700);
+/* Primary Button */
+.ak-set-wizard-container .ak-btn-primary,
+.ak-set-wizard-container button.ak-btn-primary,
+.ak-set-wizard-container a.ak-btn-primary {
+  background: var(--ak-zinc-900) !important;
+  background-color: var(--ak-zinc-900) !important;
+  color: #ffffff !important;
+  border-color: var(--ak-zinc-900) !important;
+  text-decoration: none !important;
 }
 
-.ak-set-wizard-container .ak-btn-secondary {
-  background: #ffffff;
-  color: var(--ak-zinc-700);
-  border-color: var(--ak-zinc-200);
+.ak-set-wizard-container .ak-btn-primary:hover:not(:disabled),
+.ak-set-wizard-container .ak-btn-primary:focus:not(:disabled),
+.ak-set-wizard-container .ak-btn-primary:active:not(:disabled),
+.ak-set-wizard-container button.ak-btn-primary:hover:not(:disabled),
+.ak-set-wizard-container button.ak-btn-primary:focus:not(:disabled),
+.ak-set-wizard-container button.ak-btn-primary:active:not(:disabled),
+.ak-set-wizard-container a.ak-btn-primary:hover:not(:disabled),
+.ak-set-wizard-container a.ak-btn-primary:focus:not(:disabled),
+.ak-set-wizard-container a.ak-btn-primary:active:not(:disabled) {
+  background: var(--ak-zinc-700) !important;
+  background-color: var(--ak-zinc-700) !important;
+  color: #ffffff !important;
+  border-color: var(--ak-zinc-700) !important;
+  text-decoration: none !important;
+  opacity: 1 !important;
 }
 
-.ak-set-wizard-container .ak-btn-secondary:hover:not(:disabled) {
-  background: var(--ak-zinc-50);
-  border-color: var(--ak-zinc-300);
+/* Secondary Button */
+.ak-set-wizard-container .ak-btn-secondary,
+.ak-set-wizard-container button.ak-btn-secondary,
+.ak-set-wizard-container a.ak-btn-secondary {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: var(--ak-zinc-700) !important;
+  border-color: var(--ak-zinc-200) !important;
+  text-decoration: none !important;
 }
 
-.ak-set-wizard-container .ak-btn-ghost {
-  background: transparent;
-  color: var(--ak-zinc-500);
-  border: 1px dashed var(--ak-zinc-200);
+.ak-set-wizard-container .ak-btn-secondary:hover:not(:disabled),
+.ak-set-wizard-container .ak-btn-secondary:focus:not(:disabled),
+.ak-set-wizard-container .ak-btn-secondary:active:not(:disabled),
+.ak-set-wizard-container button.ak-btn-secondary:hover:not(:disabled),
+.ak-set-wizard-container button.ak-btn-secondary:focus:not(:disabled),
+.ak-set-wizard-container button.ak-btn-secondary:active:not(:disabled),
+.ak-set-wizard-container a.ak-btn-secondary:hover:not(:disabled),
+.ak-set-wizard-container a.ak-btn-secondary:focus:not(:disabled),
+.ak-set-wizard-container a.ak-btn-secondary:active:not(:disabled) {
+  background: var(--ak-zinc-100) !important;
+  background-color: var(--ak-zinc-100) !important;
+  color: var(--ak-zinc-900) !important;
+  border-color: var(--ak-zinc-300) !important;
+  text-decoration: none !important;
+  opacity: 1 !important;
 }
 
-.ak-set-wizard-container .ak-btn-ghost:hover:not(:disabled) {
-  background: var(--ak-zinc-50);
-  color: var(--ak-zinc-700);
-  border-color: var(--ak-zinc-300);
+/* Ghost Button */
+.ak-set-wizard-container .ak-btn-ghost,
+.ak-set-wizard-container button.ak-btn-ghost,
+.ak-set-wizard-container a.ak-btn-ghost {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--ak-zinc-700) !important;
+  border: 1px dashed var(--ak-zinc-300) !important;
+  text-decoration: none !important;
 }
 
-.ak-set-wizard-container .ak-btn-destructive {
-  background: transparent;
-  color: var(--ak-danger-text);
-  border-color: transparent;
-  padding: 0 8px;
-  height: 28px;
-  font-size: 12px;
+.ak-set-wizard-container .ak-btn-ghost:hover:not(:disabled),
+.ak-set-wizard-container .ak-btn-ghost:focus:not(:disabled),
+.ak-set-wizard-container .ak-btn-ghost:active:not(:disabled),
+.ak-set-wizard-container button.ak-btn-ghost:hover:not(:disabled),
+.ak-set-wizard-container button.ak-btn-ghost:focus:not(:disabled),
+.ak-set-wizard-container button.ak-btn-ghost:active:not(:disabled),
+.ak-set-wizard-container a.ak-btn-ghost:hover:not(:disabled),
+.ak-set-wizard-container a.ak-btn-ghost:focus:not(:disabled),
+.ak-set-wizard-container a.ak-btn-ghost:active:not(:disabled) {
+  background: var(--ak-zinc-100) !important;
+  background-color: var(--ak-zinc-100) !important;
+  color: var(--ak-zinc-900) !important;
+  border: 1px solid var(--ak-zinc-400) !important;
+  text-decoration: none !important;
+  opacity: 1 !important;
 }
 
-.ak-set-wizard-container .ak-btn-destructive:hover:not(:disabled) {
-  background: var(--ak-danger-bg);
+/* Destructive Button */
+.ak-set-wizard-container .ak-btn-destructive,
+.ak-set-wizard-container button.ak-btn-destructive {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--ak-danger-text) !important;
+  border-color: transparent !important;
+  padding: 0 8px !important;
+  height: 28px !important;
+  font-size: 12px !important;
+  text-decoration: none !important;
 }
 
-.ak-set-wizard-container .ak-btn-success {
-  background: var(--ak-zinc-900);
-  color: #ffffff;
-  border-color: var(--ak-zinc-900);
+.ak-set-wizard-container .ak-btn-destructive:hover:not(:disabled),
+.ak-set-wizard-container .ak-btn-destructive:focus:not(:disabled),
+.ak-set-wizard-container .ak-btn-destructive:active:not(:disabled),
+.ak-set-wizard-container button.ak-btn-destructive:hover:not(:disabled),
+.ak-set-wizard-container button.ak-btn-destructive:focus:not(:disabled),
+.ak-set-wizard-container button.ak-btn-destructive:active:not(:disabled) {
+  background: var(--ak-danger-bg) !important;
+  background-color: var(--ak-danger-bg) !important;
+  color: #dc2626 !important;
+  border-color: transparent !important;
+  text-decoration: none !important;
+  opacity: 1 !important;
 }
 
-.ak-set-wizard-container .ak-btn-success:hover:not(:disabled) {
-  background: var(--ak-zinc-700);
+/* Success Button */
+.ak-set-wizard-container .ak-btn-success,
+.ak-set-wizard-container button.ak-btn-success {
+  background: var(--ak-zinc-900) !important;
+  background-color: var(--ak-zinc-900) !important;
+  color: #ffffff !important;
+  border-color: var(--ak-zinc-900) !important;
+  text-decoration: none !important;
 }
 
-.ak-set-wizard-container .ak-btn-lg {
-  height: 40px;
-  padding: 0 20px;
-  font-size: 14px;
+.ak-set-wizard-container .ak-btn-success:hover:not(:disabled),
+.ak-set-wizard-container .ak-btn-success:focus:not(:disabled),
+.ak-set-wizard-container .ak-btn-success:active:not(:disabled),
+.ak-set-wizard-container button.ak-btn-success:hover:not(:disabled),
+.ak-set-wizard-container button.ak-btn-success:focus:not(:disabled),
+.ak-set-wizard-container button.ak-btn-success:active:not(:disabled) {
+  background: var(--ak-zinc-700) !important;
+  background-color: var(--ak-zinc-700) !important;
+  color: #ffffff !important;
+  border-color: var(--ak-zinc-700) !important;
+  text-decoration: none !important;
+  opacity: 1 !important;
 }
 
-.ak-set-wizard-container .ak-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.ak-set-wizard-container .ak-btn-lg,
+.ak-set-wizard-container button.ak-btn-lg,
+.ak-set-wizard-container a.ak-btn-lg {
+  height: 40px !important;
+  padding: 0 20px !important;
+  font-size: 14px !important;
+}
+
+.ak-set-wizard-container .ak-btn:disabled,
+.ak-set-wizard-container button.ak-btn:disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
 }
 
 .ak-set-wizard-container .ak-btn-icon {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
+  width: 14px !important;
+  height: 14px !important;
+  flex-shrink: 0 !important;
 }
 
 .ak-step-footer {

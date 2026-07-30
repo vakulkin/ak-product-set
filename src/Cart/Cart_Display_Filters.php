@@ -17,6 +17,9 @@ class Cart_Display_Filters
         add_filter('woocommerce_cart_item_name', [$this, 'filter_cart_item_name'], 10, 3);
         add_filter('woocommerce_get_item_data', [$this, 'filter_item_data'], 10, 2);
         add_filter('woocommerce_cart_item_quantity', [$this, 'filter_cart_item_quantity'], 10, 3);
+        add_filter('woocommerce_widget_cart_item_quantity', [$this, 'filter_widget_cart_item_quantity'], 10, 3);
+        add_filter('woocommerce_cart_item_price', [$this, 'filter_cart_item_price'], 10, 3);
+        add_filter('woocommerce_cart_item_subtotal', [$this, 'filter_cart_item_subtotal'], 10, 3);
     }
 
     /**
@@ -75,7 +78,7 @@ class Cart_Display_Filters
         $headcount = isset($cart_item['_ak_headcount']) ? (int)$cart_item['_ak_headcount'] : 1;
         $participants = isset($cart_item['_ak_participants']) ? $cart_item['_ak_participants'] : [];
 
-        // 1. Weekends list
+        // 1. Wybrane Weekendy (Formatted List)
         $weekend_titles = [];
         foreach ($selected_weekends as $wid) {
             $w = new Weekend_Model($wid);
@@ -85,35 +88,62 @@ class Cart_Display_Filters
         }
 
         if (!empty($weekend_titles)) {
+            $weekend_rows = [];
+            foreach ($weekend_titles as $title) {
+                $weekend_rows[] = sprintf(
+                    '<li style="margin-bottom:3px; padding-left:12px; position:relative; line-height:1.45;"><span style="position:absolute; left:0; color:#71717a; font-size:12px;">•</span> %s</li>',
+                    esc_html($title)
+                );
+            }
             $item_data[] = [
                 'name'  => __('Wybrane Weekendy', 'ak-product-set'),
-                'value' => esc_html(implode(', ', $weekend_titles)),
+                'value' => '<ul style="margin:4px 0 6px 0; padding:0; list-style:none;">' . implode('', $weekend_rows) . '</ul>',
             ];
         }
 
-        // 2. Headcount
+        // 2. Liczba uczestników
         $item_data[] = [
             'name'  => __('Liczba uczestników', 'ak-product-set'),
             'value' => sprintf(__('%d os.', 'ak-product-set'), $headcount),
         ];
 
-        // 3. Participants summary
+        // 3. Uczestnicy (Clean Structured Text Layout)
         if (!empty($participants)) {
-            $rows = [];
+            $participant_rows = [];
             foreach ($participants as $idx => $p) {
-                if (!empty($p['name'])) {
-                    $details = '<strong>' . esc_html($p['name']) . '</strong>';
-                    if (!empty($p['tshirt_size'])) {
-                        $cut = (!empty($p['tshirt_cut']) && $p['tshirt_cut'] === 'women') ? __('damska', 'ak-product-set') : __('męska', 'ak-product-set');
-                        $details .= ' <span style="opacity:0.8;">(Koszulka: ' . esc_html($p['tshirt_size']) . ' ' . $cut . ')</span>';
-                    }
-                    $rows[] = '<li style="margin-bottom:2px;">' . $details . '</li>';
+                if (empty($p['name'])) {
+                    continue;
                 }
+
+                $details_parts = [];
+                if (!empty($p['email'])) {
+                    $details_parts[] = esc_html($p['email']);
+                }
+                if (!empty($p['phone'])) {
+                    $details_parts[] = esc_html($p['phone']);
+                }
+                if (!empty($p['tshirt_size'])) {
+                    $cut = (!empty($p['tshirt_cut']) && $p['tshirt_cut'] === 'women')
+                        ? __('damska', 'ak-product-set')
+                        : __('męska', 'ak-product-set');
+                    $details_parts[] = sprintf(__('Koszulka: %1$s (%2$s)', 'ak-product-set'), esc_html($p['tshirt_size']), $cut);
+                }
+
+                $meta_line = !empty($details_parts)
+                    ? sprintf('<div style="font-size:12px; color:#52525b; margin-top:2px; line-height:1.4;">%s</div>', implode(' &bull; ', $details_parts))
+                    : '';
+
+                $participant_rows[] = sprintf(
+                    '<li style="margin-bottom:8px; padding-left:12px; position:relative; line-height:1.4;"><span style="position:absolute; left:0; color:#71717a; font-size:12px;">•</span> <strong style="color:#18181b; font-weight:600;">%s</strong>%s</li>',
+                    esc_html($p['name']),
+                    $meta_line
+                );
             }
-            if (!empty($rows)) {
+
+            if (!empty($participant_rows)) {
                 $item_data[] = [
                     'name'  => __('Uczestnicy', 'ak-product-set'),
-                    'value' => '<ul style="margin:4px 0 0 16px; padding:0; list-style-type:disc;">' . implode('', $rows) . '</ul>',
+                    'value' => '<ul style="margin:4px 0 0 0; padding:0; list-style:none;">' . implode('', $participant_rows) . '</ul>',
                 ];
             }
         }
@@ -136,5 +166,86 @@ class Cart_Display_Filters
         }
 
         return $product_quantity;
+    }
+
+    /**
+     * Filter mini cart widget quantity and price display string
+     *
+     * @param string $html
+     * @param array $cart_item
+     * @param string $cart_item_key
+     * @return string
+     */
+    public function filter_widget_cart_item_quantity($html, $cart_item, $cart_item_key)
+    {
+        if (!empty($cart_item['_ak_is_composed_set'])) {
+            $applied_price = isset($cart_item['_ak_applied_price']) ? (float)$cart_item['_ak_applied_price'] : 0.0;
+            if ($applied_price <= 0 && isset($cart_item['_ak_set_id']) && isset($cart_item['_ak_selected_weekends']) && isset($cart_item['_ak_headcount'])) {
+                $calc = \AK_Set\Pricing\Pricing_Engine::calculate((int)$cart_item['_ak_set_id'], $cart_item['_ak_selected_weekends'], (int)$cart_item['_ak_headcount']);
+                if ($calc['valid'] && $calc['total_price'] > 0) {
+                    $applied_price = (float)$calc['total_price'];
+                }
+            }
+
+            if ($applied_price > 0 && function_exists('wc_price')) {
+                return '<span class="quantity">1 &times; ' . wc_price($applied_price) . '</span>';
+            }
+        }
+
+        return $html;
+    }
+
+    /**
+     * Filter cart line item unit price display HTML
+     *
+     * @param string $price_html
+     * @param array $cart_item
+     * @param string $cart_item_key
+     * @return string
+     */
+    public function filter_cart_item_price($price_html, $cart_item, $cart_item_key)
+    {
+        if (!empty($cart_item['_ak_is_composed_set'])) {
+            $applied_price = isset($cart_item['_ak_applied_price']) ? (float)$cart_item['_ak_applied_price'] : 0.0;
+            if ($applied_price <= 0 && isset($cart_item['_ak_set_id']) && isset($cart_item['_ak_selected_weekends']) && isset($cart_item['_ak_headcount'])) {
+                $calc = \AK_Set\Pricing\Pricing_Engine::calculate((int)$cart_item['_ak_set_id'], $cart_item['_ak_selected_weekends'], (int)$cart_item['_ak_headcount']);
+                if ($calc['valid'] && $calc['total_price'] > 0) {
+                    $applied_price = (float)$calc['total_price'];
+                }
+            }
+
+            if ($applied_price > 0 && function_exists('wc_price')) {
+                return wc_price($applied_price);
+            }
+        }
+
+        return $price_html;
+    }
+
+    /**
+     * Filter cart line item subtotal display HTML
+     *
+     * @param string $subtotal_html
+     * @param array $cart_item
+     * @param string $cart_item_key
+     * @return string
+     */
+    public function filter_cart_item_subtotal($subtotal_html, $cart_item, $cart_item_key)
+    {
+        if (!empty($cart_item['_ak_is_composed_set'])) {
+            $applied_price = isset($cart_item['_ak_applied_price']) ? (float)$cart_item['_ak_applied_price'] : 0.0;
+            if ($applied_price <= 0 && isset($cart_item['_ak_set_id']) && isset($cart_item['_ak_selected_weekends']) && isset($cart_item['_ak_headcount'])) {
+                $calc = \AK_Set\Pricing\Pricing_Engine::calculate((int)$cart_item['_ak_set_id'], $cart_item['_ak_selected_weekends'], (int)$cart_item['_ak_headcount']);
+                if ($calc['valid'] && $calc['total_price'] > 0) {
+                    $applied_price = (float)$calc['total_price'];
+                }
+            }
+
+            if ($applied_price > 0 && function_exists('wc_price')) {
+                return wc_price($applied_price);
+            }
+        }
+
+        return $subtotal_html;
     }
 }
