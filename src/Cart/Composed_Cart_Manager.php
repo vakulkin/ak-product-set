@@ -44,6 +44,15 @@ class Composed_Cart_Manager {
         $product_id = get_option($option_key);
 
         if ($product_id && get_post_type($product_id) === 'product') {
+            $status = get_post_status($product_id);
+            if ($status === 'publish') {
+                return (int)$product_id;
+            }
+            // If post was trashed or put in draft, restore it to published
+            wp_update_post([
+                'ID'          => $product_id,
+                'post_status' => 'publish',
+            ]);
             return (int)$product_id;
         }
 
@@ -51,6 +60,10 @@ class Composed_Cart_Manager {
         if (function_exists('wc_get_product_id_by_sku')) {
             $existing_id = wc_get_product_id_by_sku('ak-set-universal-product');
             if ($existing_id) {
+                wp_update_post([
+                    'ID'          => $existing_id,
+                    'post_status' => 'publish',
+                ]);
                 update_option($option_key, $existing_id);
                 return (int)$existing_id;
             }
@@ -71,6 +84,7 @@ class Composed_Cart_Manager {
         $product->set_price(0);
         $product->set_regular_price(0);
         $product->set_manage_stock(false);
+        $product->set_sold_individually(false);
         $new_id = $product->save();
 
         if ($new_id) {
@@ -303,8 +317,8 @@ class Composed_Cart_Manager {
             '_ak_per_person_price'  => (float)$calc['per_person_price'],
             '_ak_round'             => (int)$calc['round'],
             '_ak_tier'              => (string)$calc['tier'],
-            // Stable key per set_id ensures WooCommerce re-uses the same cart slot (no duplicates)
-            '_ak_unique_key'        => 'ak_set_' . (int)$set_id,
+            // Unique key ensures WooCommerce creates a fresh cart slot without key collision
+            '_ak_unique_key'        => md5(uniqid('ak_set_' . (int)$set_id . '_', true)),
         ];
 
         return $cart->add_to_cart(
@@ -329,12 +343,17 @@ class Composed_Cart_Manager {
             return;
         }
 
+        $keys_to_remove = [];
         foreach ($cart->get_cart() as $key => $item) {
             if (!empty($item['_ak_is_composed_set'])) {
                 if ($set_id === null || (isset($item['_ak_set_id']) && (int) $item['_ak_set_id'] === (int) $set_id)) {
-                    $cart->remove_cart_item($key);
+                    $keys_to_remove[] = $key;
                 }
             }
+        }
+
+        foreach ($keys_to_remove as $key) {
+            $cart->remove_cart_item($key);
         }
     }
 
@@ -354,6 +373,7 @@ class Composed_Cart_Manager {
 
         // Deduplicate: If multiple items exist for the SAME set_id, keep ONLY the last added one
         $set_latest_keys = [];
+        $keys_to_remove  = [];
         foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
             if (empty($cart_item['_ak_is_composed_set'])) {
                 continue;
@@ -361,11 +381,14 @@ class Composed_Cart_Manager {
             $set_id = isset($cart_item['_ak_set_id']) ? (int)$cart_item['_ak_set_id'] : 0;
             if ($set_id > 0) {
                 if (isset($set_latest_keys[$set_id])) {
-                    $old_key = $set_latest_keys[$set_id];
-                    $cart->remove_cart_item($old_key);
+                    $keys_to_remove[] = $set_latest_keys[$set_id];
                 }
                 $set_latest_keys[$set_id] = $cart_item_key;
             }
+        }
+
+        foreach ($keys_to_remove as $old_key) {
+            $cart->remove_cart_item($old_key);
         }
 
         foreach ($cart->get_cart() as $cart_item_key => $cart_item) {

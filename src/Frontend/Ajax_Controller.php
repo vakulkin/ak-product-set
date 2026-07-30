@@ -116,8 +116,20 @@ class Ajax_Controller {
             $cart_item_key = $cart_manager->add_set_to_cart($set_id, $selected_weekends, $headcount, $participants);
 
             if (!$cart_item_key) {
+                $error_msg = __('Nie udało się dodać zestawu do koszyka.', 'ak-product-set');
+                if (function_exists('wc_get_notices')) {
+                    $notices = wc_get_notices('error');
+                    if (!empty($notices)) {
+                        $notice    = end($notices);
+                        $raw_text  = is_array($notice) ? (isset($notice['notice']) ? $notice['notice'] : '') : $notice;
+                        if (!empty($raw_text)) {
+                            $error_msg = wp_strip_all_tags($raw_text);
+                        }
+                        wc_clear_notices();
+                    }
+                }
                 wp_send_json_error([
-                    'message' => __('Nie udało się dodać zestawu do koszyka.', 'ak-product-set'),
+                    'message' => $error_msg,
                 ]);
             }
 
