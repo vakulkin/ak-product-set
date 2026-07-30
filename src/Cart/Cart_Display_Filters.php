@@ -16,6 +16,7 @@ class Cart_Display_Filters
     public function init(): void
     {
         add_filter('woocommerce_cart_item_name', [$this, 'filter_cart_item_name'], 10, 3);
+        add_filter('woocommerce_cart_item_permalink', [$this, 'filter_cart_item_permalink'], 10, 3);
         add_filter('woocommerce_get_item_data', [$this, 'filter_item_data'], 10, 2);
         add_filter('woocommerce_cart_item_quantity', [$this, 'filter_cart_item_quantity'], 10, 3);
         add_filter('woocommerce_widget_cart_item_quantity', [$this, 'filter_widget_cart_item_quantity'], 10, 3);
@@ -77,7 +78,31 @@ class Cart_Display_Filters
     // -------------------------------------------------------------------------
 
     /**
-     * Customize composed line item title in cart & append Edit Booking link
+     * Filter cart item permalink to point to the Set CPT post page.
+     * Ensures product image, title, and mini-cart links lead to the Set page.
+     *
+     * @param string $permalink
+     * @param array  $cart_item
+     * @param string $cart_item_key
+     * @return string
+     */
+    public function filter_cart_item_permalink($permalink, $cart_item, $cart_item_key)
+    {
+        if (!empty($cart_item['_ak_is_composed_set'])) {
+            $set_id = isset($cart_item['_ak_set_id']) ? (int) $cart_item['_ak_set_id'] : 0;
+            if ($set_id > 0) {
+                $set_permalink = get_permalink($set_id);
+                if (!empty($set_permalink)) {
+                    return $set_permalink;
+                }
+            }
+        }
+
+        return $permalink;
+    }
+
+    /**
+     * Customize composed line item title in cart & checkout table, wrapping title in link to set page
      *
      * @param string $name
      * @param array  $cart_item
@@ -93,22 +118,29 @@ class Cart_Display_Filters
         $set_id     = isset($cart_item['_ak_set_id']) ? (int) $cart_item['_ak_set_id'] : 0;
         $set        = new Set_Model($set_id);
         $title_text = $set->get_title() ?: $name;
+        $permalink  = get_permalink($set_id);
+
+        if (!empty($permalink)) {
+            $title_html = sprintf('<a href="%s">%s</a>', esc_url($permalink), esc_html($title_text));
+        } else {
+            $title_html = esc_html($title_text);
+        }
 
         if (function_exists('is_checkout') && is_checkout()) {
-            return esc_html($title_text);
+            return $title_html;
         }
 
-        $edit_url = get_permalink($set_id);
-        if (empty($edit_url)) {
-            return esc_html($title_text);
+        if (empty($permalink)) {
+            return $title_html;
         }
 
-        return esc_html($title_text) . sprintf(
+        return $title_html . sprintf(
             ' <a href="%s" class="ak-edit-booking-link">%s</a>',
-            esc_url($edit_url),
+            esc_url($permalink),
             esc_html__('Edytuj rezerwację', 'ak-product-set')
         );
     }
+
 
     /**
      * Render composed line item breakdown metadata in cart table
