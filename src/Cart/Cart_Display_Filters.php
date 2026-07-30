@@ -120,23 +120,14 @@ class Cart_Display_Filters
         $title_text = $set->get_title() ?: $name;
         $permalink  = get_permalink($set_id);
 
-        if (!empty($permalink)) {
-            $title_html = sprintf('<a href="%s">%s</a>', esc_url($permalink), esc_html($title_text));
-        } else {
-            $title_html = esc_html($title_text);
-        }
-
-        if (function_exists('is_checkout') && is_checkout()) {
-            return $title_html;
-        }
-
         if (empty($permalink)) {
-            return $title_html;
+            return esc_html($title_text);
         }
 
-        return $title_html . sprintf(
-            ' <a href="%s" class="ak-edit-booking-link">%s</a>',
+        return sprintf(
+            '<a href="%1$s" class="ak-set-title-link">%2$s</a> <a href="%1$s" class="ak-edit-booking-link">(%3$s)</a>',
             esc_url($permalink),
+            esc_html($title_text),
             esc_html__('Edytuj rezerwację', 'ak-product-set')
         );
     }
