@@ -15,7 +15,7 @@ class Composed_Cart_Manager {
 
     public function init(): void {
         add_action('woocommerce_before_calculate_totals', [$this, 'override_cart_item_prices'], 20, 1);
-        add_action('woocommerce_cart_loaded_from_session', [$this, 'inject_prices_from_session'], 20, 1);
+        add_filter('woocommerce_cart_item_product', [$this, 'filter_cart_item_product'], 20, 2);
         add_action('woocommerce_check_cart_items', [$this, 'validate_cart_stock']);
         add_action('woocommerce_checkout_process', [$this, 'validate_cart_stock']);
     }
@@ -417,56 +417,42 @@ class Composed_Cart_Manager {
     }
 
     /**
-     * Inject set price and name into WC_Product objects immediately after cart is loaded from session.
-     * This ensures mini-cart widgets, side drawers, and all templates always receive the correct price
-     * without relying on woocommerce_before_calculate_totals (which fires too late for mini-cart).
+     * Dynamically inject applied set price and set name into WC_Product instance on cart item retrieval.
+     * Standard WooCommerce filter for cart product object modification.
      *
-     * @param \WC_Cart $cart
+     * @param \WC_Product $product
+     * @param array       $cart_item
+     * @return \WC_Product
      */
-    public function inject_prices_from_session($cart) {
-        if (empty($cart)) {
-            return;
-        }
-
-        foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
-            if (empty($cart_item['_ak_is_composed_set'])) {
-                continue;
-            }
-
-            $product = isset($cart_item['data']) ? $cart_item['data'] : null;
-            if (!($product instanceof \WC_Product)) {
-                continue;
-            }
-
-            // Use stored applied price first; fall back to live Pricing Engine calculation
-            $price = isset($cart_item['_ak_applied_price']) ? (float)$cart_item['_ak_applied_price'] : 0.0;
-            if ($price <= 0 && isset($cart_item['_ak_set_id'], $cart_item['_ak_selected_weekends'], $cart_item['_ak_headcount'])) {
+    public function filter_cart_item_product($product, $cart_item) {
+        if (!empty($cart_item['_ak_is_composed_set']) && $product instanceof \WC_Product) {
+            $applied_price = isset($cart_item['_ak_applied_price']) ? (float) $cart_item['_ak_applied_price'] : 0.0;
+            if ($applied_price <= 0 && isset($cart_item['_ak_set_id'], $cart_item['_ak_selected_weekends'], $cart_item['_ak_headcount'])) {
                 $calc = Pricing_Engine::calculate(
-                    (int)$cart_item['_ak_set_id'],
+                    (int) $cart_item['_ak_set_id'],
                     $cart_item['_ak_selected_weekends'],
-                    (int)$cart_item['_ak_headcount']
+                    (int) $cart_item['_ak_headcount']
                 );
                 if ($calc['valid'] && $calc['total_price'] > 0) {
-                    $price = (float)$calc['total_price'];
-                    // Persist into cart meta so subsequent reads are immediate
-                    $cart->cart_contents[$cart_item_key]['_ak_applied_price'] = $price;
+                    $applied_price = (float) $calc['total_price'];
                 }
             }
 
-            if ($price > 0) {
-                $product->set_price($price);
-                $product->set_regular_price($price);
+            if ($applied_price > 0) {
+                $product->set_price($applied_price);
+                $product->set_regular_price($applied_price);
             }
 
-            // Inject set name so WooCommerce reads the correct product name everywhere
-            $set_id = isset($cart_item['_ak_set_id']) ? (int)$cart_item['_ak_set_id'] : 0;
+            $set_id = isset($cart_item['_ak_set_id']) ? (int) $cart_item['_ak_set_id'] : 0;
             if ($set_id > 0) {
-                $set = new Set_Model($set_id);
+                $set   = new Set_Model($set_id);
                 $title = $set->get_title();
                 if ($title) {
                     $product->set_name($title);
                 }
             }
         }
+
+        return $product;
     }
 }

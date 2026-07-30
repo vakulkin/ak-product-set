@@ -42,11 +42,12 @@ class Composed_Cart_Manager_Test extends TestCase {
     }
 
     /**
-     * inject_prices_from_session must handle empty cart safely
+     * filter_cart_item_product must handle non-composed items safely
      */
-    public function test_inject_prices_from_session_is_safe_when_cart_empty() {
+    public function test_filter_cart_item_product_returns_product_for_non_composed() {
         $manager = new Composed_Cart_Manager();
-        $manager->inject_prices_from_session(null);
-        $this->assertTrue(true);
+        $product = \Mockery::mock(\WC_Product::class);
+        $result  = $manager->filter_cart_item_product($product, []);
+        $this->assertSame($product, $result);
     }
 }

@@ -467,27 +467,25 @@
         },
         dataType: 'json',
         success: function (res) {
-          hideLoader();
           if (res && res.success && res.data) {
-            // Refresh mini-cart fragments (side drawer, header cart count, etc.)
+            // Trigger WC mini-cart fragment refresh in background
             if (typeof jQuery !== 'undefined') {
               if (res.data.fragments) {
                 jQuery(document.body).trigger('added_to_cart', [res.data.fragments, res.data.cart_hash]);
               }
               jQuery(document.body).trigger('wc_fragment_refresh');
             }
-            // Show success message with navigation links instead of auto-redirecting
-            var cartUrl = res.data.cart_url || '';
-            var checkoutUrl = res.data.redirect_url || '';
-            var msg = 'Zestaw został dodany do koszyka.';
-            if (cartUrl || checkoutUrl) {
-              msg += ' <a href="' + (cartUrl || checkoutUrl) + '" style="text-decoration:underline;">Zobacz koszyk</a>';
-              if (checkoutUrl) {
-                msg += ' &bull; <a href="' + checkoutUrl + '" style="text-decoration:underline;">Zamów</a>';
-              }
+            // Redirect directly to checkout page
+            if (res.data.redirect_url) {
+              window.location.href = res.data.redirect_url;
+            } else if (res.data.cart_url) {
+              window.location.href = res.data.cart_url;
+            } else {
+              hideLoader();
+              showToast('Zestaw został dodany do koszyka.');
             }
-            showToast(msg);
           } else {
+            hideLoader();
             showToast(res && res.data && res.data.message ? res.data.message : 'Nie udało się dodać zestawu do koszyka.');
           }
         },
