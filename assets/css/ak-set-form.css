@@ -1137,38 +1137,3 @@
     padding-right: 40px;
   }
 }
-
-/* ==========================================================================
-   Edit Booking Glassmorphism Badge (Cart & Checkout Line Item Title)
-   ========================================================================== */
-.ak-edit-booking-link {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  font-size: 11px !important;
-  font-weight: 600 !important;
-  line-height: 1 !important;
-  letter-spacing: 0.03em !important;
-  color: #1e40af !important;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.75), rgba(239, 246, 255, 0.55)) !important;
-  backdrop-filter: blur(10px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(10px) saturate(180%) !important;
-  border: 1px solid rgba(191, 219, 254, 0.8) !important;
-  border-radius: 20px !important;
-  padding: 5px 12px !important;
-  margin-left: 10px !important;
-  text-decoration: none !important;
-  vertical-align: middle !important;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
-}
-
-.ak-edit-booking-link:hover,
-.ak-edit-booking-link:focus {
-  color: #ffffff !important;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
-  border-color: rgba(37, 99, 235, 0.9) !important;
-  text-decoration: none !important;
-  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-  transform: translateY(-1.5px) scale(1.02) !important;
-}
