@@ -52,16 +52,22 @@ add_action('before_woocommerce_init', function () {
  * Plugin activation: create the read-only roster manager role.
  */
 register_activation_hook(AK_SET_FILE, function () {
-    // ak_roster_manager — read access + custom roster cap only
     add_role('ak_roster_manager', __('Menadżer rejestru', 'ak-product-set'), [
-        'read'           => true,
-        'ak_view_roster' => true,
+        'read'                       => true,
+        'ak_view_roster'             => true,
+        'edit_shop_orders'           => true,
+        'read_shop_order'            => true,
+        'read_private_shop_orders'   => true,
+        'edit_others_shop_orders'    => true,
+        'edit_published_shop_orders' => true,
+        'publish_shop_orders'        => true,
     ]);
 
-    // Grant the cap to the administrator role as well (idempotent)
-    $admin_role = get_role('administrator');
-    if ($admin_role) {
-        $admin_role->add_cap('ak_view_roster');
+    foreach (['administrator', 'shop_manager'] as $role_name) {
+        $role = get_role($role_name);
+        if ($role) {
+            $role->add_cap('ak_view_roster');
+        }
     }
 });
 

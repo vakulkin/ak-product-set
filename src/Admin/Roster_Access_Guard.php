@@ -16,6 +16,17 @@ class Roster_Access_Guard {
         add_action('admin_init',                    [$this, 'enforce_roster_only_access'], 1);
         add_action('admin_menu',                    [$this, 'strip_menu_for_manager'], 999);
         add_action('wp_before_admin_bar_render',    [$this, 'strip_admin_bar_for_manager']);
+        add_filter('woocommerce_prevent_admin_access', [$this, 'allow_admin_access']);
+    }
+
+    /**
+     * Prevent WooCommerce from redirecting roster managers to /my-account/
+     */
+    public function allow_admin_access(bool $prevent_access): bool {
+        if (current_user_can('ak_view_roster')) {
+            return false;
+        }
+        return $prevent_access;
     }
 
     // -------------------------------------------------------------------------
@@ -35,7 +46,7 @@ class Roster_Access_Guard {
     // -------------------------------------------------------------------------
 
     /**
-     * Redirect the manager away from every admin page except the roster.
+     * Redirect the manager away from every admin page except the roster and order pages.
      * Fires early (priority 1) so it runs before other admin_init callbacks.
      */
     public function enforce_roster_only_access(): void {
@@ -54,10 +65,23 @@ class Roster_Access_Guard {
 
         global $pagenow;
 
-        // Allow: admin.php?page=ak-roster (including export sub-requests)
+        // Allow: admin.php?page=ak-roster or wc-orders
         if ($pagenow === 'admin.php') {
             $page = isset($_GET['page']) ? sanitize_key($_GET['page']) : '';
-            if ($page === Roster_Admin_Page::MENU_SLUG) {
+            if (in_array($page, [Roster_Admin_Page::MENU_SLUG, 'wc-orders', 'wc-orders--new'], true)) {
+                return;
+            }
+        }
+
+        // Allow: legacy CPT order list
+        if ($pagenow === 'edit.php' && isset($_GET['post_type']) && $_GET['post_type'] === 'shop_order') {
+            return;
+        }
+
+        // Allow: single order post edit view
+        if ($pagenow === 'post.php' && isset($_GET['post'])) {
+            $post_id = (int) $_GET['post'];
+            if ($post_id > 0 && get_post_type($post_id) === 'shop_order') {
                 return;
             }
         }
@@ -68,7 +92,7 @@ class Roster_Access_Guard {
     }
 
     /**
-     * Remove every admin menu item except the roster page.
+     * Remove every admin menu item except the roster and order pages.
      * Runs at priority 999 so all items have been registered first.
      */
     public function strip_menu_for_manager(): void {
@@ -78,8 +102,15 @@ class Roster_Access_Guard {
 
         global $menu;
 
+        $allowed_slugs = [
+            Roster_Admin_Page::MENU_SLUG,
+            'woocommerce',
+            'wc-orders',
+            'edit.php?post_type=shop_order',
+        ];
+
         foreach ($menu as $item) {
-            if (isset($item[2]) && $item[2] !== Roster_Admin_Page::MENU_SLUG) {
+            if (isset($item[2]) && !in_array($item[2], $allowed_slugs, true)) {
                 remove_menu_page($item[2]);
             }
         }

@@ -42,17 +42,34 @@ class Plugin {
         $this->services['roster_page']       = new Admin\Roster_Admin_Page();
         $this->services['roster_guard']      = new Admin\Roster_Access_Guard();
 
-        // Ensure roster manager role and administrator cap are registered
-        if (!get_role('ak_roster_manager')) {
-            add_role('ak_roster_manager', __('Menadżer rejestru', 'ak-product-set'), [
-                'read'           => true,
-                'ak_view_roster' => true,
-            ]);
+        // Ensure roster manager role and capabilities are synced
+        $roster_caps = [
+            'read'                       => true,
+            'ak_view_roster'             => true,
+            'edit_shop_orders'           => true,
+            'read_shop_order'            => true,
+            'read_private_shop_orders'   => true,
+            'edit_others_shop_orders'    => true,
+            'edit_published_shop_orders' => true,
+            'publish_shop_orders'        => true,
+        ];
+
+        $roster_role = get_role('ak_roster_manager');
+        if ($roster_role) {
+            foreach ($roster_caps as $cap => $grant) {
+                if (!$roster_role->has_cap($cap)) {
+                    $roster_role->add_cap($cap);
+                }
+            }
+        } else {
+            add_role('ak_roster_manager', __('Menadżer rejestru', 'ak-product-set'), $roster_caps);
         }
 
-        $admin_role = get_role('administrator');
-        if ($admin_role && !$admin_role->has_cap('ak_view_roster')) {
-            $admin_role->add_cap('ak_view_roster');
+        foreach (['administrator', 'shop_manager'] as $role_name) {
+            $role = get_role($role_name);
+            if ($role && !$role->has_cap('ak_view_roster')) {
+                $role->add_cap('ak_view_roster');
+            }
         }
 
         // Cart & Order Engine
