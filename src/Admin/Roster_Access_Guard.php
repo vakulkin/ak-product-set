@@ -7,16 +7,22 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Restricts users with the ak_roster_manager role to the roster page only.
- * Redirects all other admin pages, strips the admin menu and admin bar nodes.
+ * Restricts users with the ak_roster_manager role to the roster page and read-only order views.
+ * Redirects unauthorized admin pages, strips unrelated admin menu nodes, and blocks any POST/save mutations.
  */
 class Roster_Access_Guard {
 
     public function init(): void {
-        add_action('admin_init',                    [$this, 'enforce_roster_only_access'], 1);
-        add_action('admin_menu',                    [$this, 'strip_menu_for_manager'], 999);
-        add_action('wp_before_admin_bar_render',    [$this, 'strip_admin_bar_for_manager']);
-        add_filter('woocommerce_prevent_admin_access', [$this, 'allow_admin_access']);
+        add_action('admin_init',                         [$this, 'enforce_roster_only_access'], 1);
+        add_action('admin_init',                         [$this, 'prevent_order_mutations']);
+        add_action('admin_menu',                         [$this, 'strip_menu_for_manager'], 999);
+        add_action('wp_before_admin_bar_render',         [$this, 'strip_admin_bar_for_manager']);
+        add_filter('woocommerce_prevent_admin_access',   [$this, 'allow_admin_access']);
+        add_filter('bulk_actions-edit-shop_order',       [$this, 'remove_order_bulk_actions']);
+        add_filter('bulk_actions-woocommerce_page_wc-orders', [$this, 'remove_order_bulk_actions']);
+        add_action('admin_head',                         [$this, 'inject_read_only_order_styles']);
+        add_action('admin_notices',                      [$this, 'show_read_only_notice']);
+        add_action('woocommerce_before_order_object_save', [$this, 'block_order_save']);
     }
 
     /**
@@ -38,6 +44,13 @@ class Roster_Access_Guard {
             return false;
         }
         $user = wp_get_current_user();
+        if (!$user || !isset($user->roles)) {
+            return false;
+        }
+        // Do not restrict administrators even if they have the role assigned
+        if (in_array('administrator', (array) $user->roles, true)) {
+            return false;
+        }
         return in_array('ak_roster_manager', (array) $user->roles, true);
     }
 
@@ -92,6 +105,129 @@ class Roster_Access_Guard {
     }
 
     /**
+     * Block POST requests that attempt to mutate or save orders.
+     */
+    public function prevent_order_mutations(): void {
+        if (!$this->is_roster_manager()) {
+            return;
+        }
+
+        if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            global $pagenow;
+            $page      = isset($_GET['page']) ? sanitize_key($_GET['page']) : '';
+            $post_type = isset($_POST['post_type']) ? sanitize_key($_POST['post_type']) : '';
+            $action    = isset($_POST['action']) ? sanitize_key($_POST['action']) : '';
+
+            if ($page === 'wc-orders' || $post_type === 'shop_order' || str_contains($action, 'order')) {
+                wp_die(
+                    esc_html__('Menadżer rejestru posiada uprawnienia tylko do podglądu zamówień. Modyfikacja danych jest zablokowana.', 'ak-product-set'),
+                    esc_html__('Brak uprawnień', 'ak-product-set'),
+                    ['back_link' => true]
+                );
+            }
+        }
+    }
+
+    /**
+     * Prevent programmatic WooCommerce order object saves for roster managers.
+     */
+    public function block_order_save($order): void {
+        if ($this->is_roster_manager()) {
+            wp_die(
+                esc_html__('Menadżer rejestru posiada uprawnienia tylko do podglądu zamówień. Modyfikacja danych jest zablokowana.', 'ak-product-set')
+            );
+        }
+    }
+
+    /**
+     * Remove bulk actions on order list tables for roster managers.
+     */
+    public function remove_order_bulk_actions(array $actions): array {
+        if ($this->is_roster_manager()) {
+            return [];
+        }
+        return $actions;
+    }
+
+    /**
+     * Display a notice explaining read-only access when viewing WooCommerce orders.
+     */
+    public function show_read_only_notice(): void {
+        if (!$this->is_roster_manager()) {
+            return;
+        }
+
+        if (function_exists('get_current_screen')) {
+            $screen = get_current_screen();
+            if ($screen && (in_array($screen->id, ['woocommerce_page_wc-orders', 'shop_order'], true) || str_contains($screen->id, 'order'))) {
+                echo '<div class="notice notice-info"><p><strong>' . esc_html__('Tryb tylko do odczytu:', 'ak-product-set') . '</strong> ' . esc_html__('Masz dostęp do podglądu zamówień. Modyfikacja danych i zapisywanie zmian są wyłączone.', 'ak-product-set') . '</p></div>';
+            }
+        }
+    }
+
+    /**
+     * Inject CSS and JS to hide save buttons, edit links, and disable inputs on order screens.
+     */
+    public function inject_read_only_order_styles(): void {
+        if (!$this->is_roster_manager()) {
+            return;
+        }
+
+        if (function_exists('get_current_screen')) {
+            $screen = get_current_screen();
+            if (!$screen || (!in_array($screen->id, ['woocommerce_page_wc-orders', 'shop_order'], true) && !str_contains($screen->id, 'order'))) {
+                return;
+            }
+        }
+
+        ?>
+        <style>
+        /* Hide edit & save controls for read-only roster manager */
+        #publishing-action,
+        .order-actions-save,
+        button.save-order,
+        button.save_order,
+        .wc-order-actions-save,
+        #woocommerce-order-actions input[type="submit"],
+        .wc-order-data-row-toggle,
+        .edit_address,
+        .add-line-items,
+        .refund-items,
+        .delete_note,
+        .add_note,
+        .wc-order-bulk-actions,
+        .column-wc_actions .button,
+        #actions button,
+        .bulk-actions-select,
+        #doaction,
+        #doaction2 {
+            display: none !important;
+        }
+
+        .order_data_column input,
+        .order_data_column select,
+        .order_data_column textarea,
+        #woocommerce-order-items input,
+        #woocommerce-order-items select,
+        #woocommerce-order-items textarea {
+            pointer-events: none !important;
+            background-color: #f7f7f7 !important;
+            border-color: #ddd !important;
+            opacity: 0.85 !important;
+        }
+        </style>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.order_data_column input, .order_data_column select, .order_data_column textarea, #woocommerce-order-items input, #woocommerce-order-items select, #woocommerce-order-items textarea').forEach(function(el) {
+                el.setAttribute('disabled', 'disabled');
+                el.setAttribute('readonly', 'readonly');
+            });
+        });
+        </script>
+        <?php
+    }
+
+    /**
      * Remove every admin menu item except the roster and order pages.
      * Runs at priority 999 so all items have been registered first.
      */
@@ -136,8 +272,6 @@ class Roster_Access_Guard {
             'documentation',
             'support-forums',
             'feedback',
-            'site-name',
-            'view-site',
             'updates',
             'comments',
             'new-content',
@@ -150,3 +284,4 @@ class Roster_Access_Guard {
         }
     }
 }
+
