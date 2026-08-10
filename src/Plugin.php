@@ -42,7 +42,14 @@ class Plugin {
         $this->services['roster_page']       = new Admin\Roster_Admin_Page();
         $this->services['roster_guard']      = new Admin\Roster_Access_Guard();
 
-        // Ensure administrator always has the roster view capability
+        // Ensure roster manager role and administrator cap are registered
+        if (!get_role('ak_roster_manager')) {
+            add_role('ak_roster_manager', __('Menadżer rejestru', 'ak-product-set'), [
+                'read'           => true,
+                'ak_view_roster' => true,
+            ]);
+        }
+
         $admin_role = get_role('administrator');
         if ($admin_role && !$admin_role->has_cap('ak_view_roster')) {
             $admin_role->add_cap('ak_view_roster');
