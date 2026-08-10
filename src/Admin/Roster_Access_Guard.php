@@ -18,6 +18,7 @@ class Roster_Access_Guard {
         add_action('admin_menu',                         [$this, 'strip_menu_for_manager'], 999);
         add_action('wp_before_admin_bar_render',         [$this, 'strip_admin_bar_for_manager']);
         add_filter('woocommerce_prevent_admin_access',   [$this, 'allow_admin_access']);
+        add_filter('show_admin_bar',                     [$this, 'force_show_admin_bar_for_manager'], 9999);
         add_filter('user_has_cap',                       [$this, 'filter_user_caps'], 10, 4);
         add_filter('bulk_actions-edit-shop_order',       [$this, 'remove_order_bulk_actions']);
         add_filter('bulk_actions-woocommerce_page_wc-orders', [$this, 'remove_order_bulk_actions']);
@@ -34,6 +35,16 @@ class Roster_Access_Guard {
             return false;
         }
         return $prevent_access;
+    }
+
+    /**
+     * Force-enable the top admin bar on the frontend for logged-in roster managers.
+     */
+    public function force_show_admin_bar_for_manager(bool $show): bool {
+        if (is_user_logged_in() && $this->is_roster_manager()) {
+            return true;
+        }
+        return $show;
     }
 
     /**

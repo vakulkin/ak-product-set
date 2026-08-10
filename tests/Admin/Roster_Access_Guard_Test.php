@@ -30,4 +30,14 @@ class Roster_Access_Guard_Test extends TestCase {
         $guard = new Roster_Access_Guard();
         $this->assertFalse($guard->allow_admin_access(true));
     }
+
+    public function test_force_show_admin_bar_returns_true_for_roster_manager(): void {
+        Functions\stubs([
+            'is_user_logged_in' => true,
+            'wp_get_current_user' => (object) ['roles' => ['ak_roster_manager']],
+        ]);
+
+        $guard = new Roster_Access_Guard();
+        $this->assertTrue($guard->force_show_admin_bar_for_manager(false));
+    }
 }
