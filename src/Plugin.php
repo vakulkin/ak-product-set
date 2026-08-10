@@ -37,8 +37,16 @@ class Plugin {
      */
     public function boot(): void {
         // Core Admin & Custom Post Types
-        $this->services['acf_registrar'] = new Admin\ACF_Registrar();
-        $this->services['order_admin_view'] = new Admin\Order_Admin_View();
+        $this->services['acf_registrar']     = new Admin\ACF_Registrar();
+        $this->services['order_admin_view']  = new Admin\Order_Admin_View();
+        $this->services['roster_page']       = new Admin\Roster_Admin_Page();
+        $this->services['roster_guard']      = new Admin\Roster_Access_Guard();
+
+        // Ensure administrator always has the roster view capability
+        $admin_role = get_role('administrator');
+        if ($admin_role && !$admin_role->has_cap('ak_view_roster')) {
+            $admin_role->add_cap('ak_view_roster');
+        }
 
         // Cart & Order Engine
         $this->services['cart_manager'] = new Cart\Composed_Cart_Manager();

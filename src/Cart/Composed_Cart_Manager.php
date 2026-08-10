@@ -358,11 +358,12 @@ class Composed_Cart_Manager {
     }
 
     /**
-     * Override cart item price dynamically via woocommerce_before_calculate_totals
+     * Override cart item price dynamically via woocommerce_before_calculate_totals.
+     * Orchestrates three focused cleanup/pricing steps in order.
      *
      * @param \WC_Cart $cart
      */
-    public function override_cart_item_prices($cart) {
+    public function override_cart_item_prices(\WC_Cart $cart): void {
         if (is_admin() && !defined('DOING_AJAX')) {
             return;
         }
@@ -371,14 +372,70 @@ class Composed_Cart_Manager {
             return;
         }
 
-        // Deduplicate: If multiple items exist for the SAME set_id, keep ONLY the last added one
+        $this->remove_rogue_set_products($cart);
+        $this->deduplicate_composed_set_items($cart);
+        $this->apply_composed_set_prices($cart);
+    }
+
+    /**
+     * Remove any plain (non-composed) cart items whose product_id is assigned
+     * to at least one published ak_set. Silently strips items that landed in the
+     * cart outside the set booking flow.
+     *
+     * @param \WC_Cart $cart
+     */
+    private function remove_rogue_set_products(\WC_Cart $cart): void {
+        $assigned_ids = [];
+
+        $set_posts = get_posts([
+            'post_type'      => 'ak_set',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'fields'         => 'ids',
+        ]);
+
+        foreach ($set_posts as $set_post_id) {
+            $products = get_field('set_products', $set_post_id);
+            if (!empty($products) && is_array($products)) {
+                foreach ($products as $p) {
+                    $pid = is_object($p) ? $p->ID : (int) $p;
+                    if ($pid > 0) {
+                        $assigned_ids[$pid] = true;
+                    }
+                }
+            }
+        }
+
+        if (empty($assigned_ids)) {
+            return;
+        }
+
+        foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
+            if (!empty($cart_item['_ak_is_composed_set'])) {
+                continue; // composed set items are intentional — leave them
+            }
+            $pid = isset($cart_item['product_id']) ? (int) $cart_item['product_id'] : 0;
+            if ($pid > 0 && isset($assigned_ids[$pid])) {
+                $cart->remove_cart_item($cart_item_key);
+            }
+        }
+    }
+
+    /**
+     * If multiple composed set items share the same set_id (e.g. from session
+     * replay or a double-submit), keep only the most-recently added one.
+     *
+     * @param \WC_Cart $cart
+     */
+    private function deduplicate_composed_set_items(\WC_Cart $cart): void {
         $set_latest_keys = [];
         $keys_to_remove  = [];
+
         foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
             if (empty($cart_item['_ak_is_composed_set'])) {
                 continue;
             }
-            $set_id = isset($cart_item['_ak_set_id']) ? (int)$cart_item['_ak_set_id'] : 0;
+            $set_id = isset($cart_item['_ak_set_id']) ? (int) $cart_item['_ak_set_id'] : 0;
             if ($set_id > 0) {
                 if (isset($set_latest_keys[$set_id])) {
                     $keys_to_remove[] = $set_latest_keys[$set_id];
@@ -390,24 +447,32 @@ class Composed_Cart_Manager {
         foreach ($keys_to_remove as $old_key) {
             $cart->remove_cart_item($old_key);
         }
+    }
 
+    /**
+     * Recalculate and inject the live price (and set name) into every composed
+     * set cart item. Items whose price cannot be determined are removed.
+     *
+     * @param \WC_Cart $cart
+     */
+    private function apply_composed_set_prices(\WC_Cart $cart): void {
         foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
             if (empty($cart_item['_ak_is_composed_set'])) {
                 continue;
             }
 
             $set_id = isset($cart_item['_ak_set_id']) ? $cart_item['_ak_set_id'] : 0;
-            $set = new Set_Model($set_id);
+            $set    = new Set_Model($set_id);
             if ($set->get_title()) {
                 $cart_item['data']->set_name($set->get_title());
             }
 
             $selected_weekends = isset($cart_item['_ak_selected_weekends']) ? $cart_item['_ak_selected_weekends'] : [];
-            $headcount = isset($cart_item['_ak_headcount']) ? $cart_item['_ak_headcount'] : 1;
+            $headcount         = isset($cart_item['_ak_headcount']) ? $cart_item['_ak_headcount'] : 1;
 
             $calc = Pricing_Engine::calculate($set_id, $selected_weekends, $headcount);
             if ($calc['valid'] && $calc['total_price'] > 0) {
-                $price = (float)$calc['total_price'];
+                $price = (float) $calc['total_price'];
                 $cart_item['data']->set_price($price);
                 $cart_item['data']->set_regular_price($price);
             } else {
