@@ -18,6 +18,7 @@ class Roster_Access_Guard {
         add_action('admin_menu',                         [$this, 'strip_menu_for_manager'], 999);
         add_action('wp_before_admin_bar_render',         [$this, 'strip_admin_bar_for_manager']);
         add_filter('woocommerce_prevent_admin_access',   [$this, 'allow_admin_access']);
+        add_filter('user_has_cap',                       [$this, 'filter_user_caps'], 10, 4);
         add_filter('bulk_actions-edit-shop_order',       [$this, 'remove_order_bulk_actions']);
         add_filter('bulk_actions-woocommerce_page_wc-orders', [$this, 'remove_order_bulk_actions']);
         add_action('admin_head',                         [$this, 'inject_read_only_order_styles']);
@@ -33,6 +34,29 @@ class Roster_Access_Guard {
             return false;
         }
         return $prevent_access;
+    }
+
+    /**
+     * Dynamically grant order reading & viewing capabilities to roster manager users.
+     */
+    public function filter_user_caps(array $allcaps, array $caps, array $args, \WP_User $user): array {
+        if (in_array('ak_roster_manager', (array) $user->roles, true)) {
+            $order_caps = [
+                'edit_shop_order',
+                'read_shop_order',
+                'edit_shop_orders',
+                'read_shop_orders',
+                'edit_others_shop_orders',
+                'edit_published_shop_orders',
+                'edit_private_shop_orders',
+                'read_private_shop_orders',
+                'publish_shop_orders',
+            ];
+            foreach ($order_caps as $cap) {
+                $allcaps[$cap] = true;
+            }
+        }
+        return $allcaps;
     }
 
     // -------------------------------------------------------------------------
@@ -92,9 +116,16 @@ class Roster_Access_Guard {
         }
 
         // Allow: single order post edit view
-        if ($pagenow === 'post.php' && isset($_GET['post'])) {
-            $post_id = (int) $_GET['post'];
-            if ($post_id > 0 && get_post_type($post_id) === 'shop_order') {
+        if ($pagenow === 'post.php') {
+            $post_id = isset($_GET['post']) ? (int) $_GET['post'] : 0;
+            $action  = isset($_GET['action']) ? sanitize_key($_GET['action']) : '';
+            if ($post_id > 0) {
+                $post_type = get_post_type($post_id);
+                if (!$post_type || $post_type === 'shop_order') {
+                    return;
+                }
+            }
+            if ($action === 'edit') {
                 return;
             }
         }
