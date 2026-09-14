@@ -3,48 +3,31 @@ namespace AK_Set\Tests\Pricing;
 
 use AK_Set\Tests\TestCase;
 use AK_Set\Pricing\Round_Resolver;
-use AK_Set\Models\Set_Model;
+use AK_Set\Models\Weekend_Model;
 use Mockery;
 
 class Round_Resolver_Test extends TestCase {
     
-    public function test_resolves_round_1() {
-        $set = Mockery::mock(Set_Model::class);
-        $set->shouldReceive('get_round_1_end_date')->andReturn('2026-08-01 23:59:59');
-        $set->shouldReceive('get_round_2_end_date')->andReturn('2026-09-01 23:59:59');
-
-        // Current time is before round 1 end
-        $timestamp = strtotime('2026-07-26 12:00:00');
-        $this->assertEquals(1, Round_Resolver::resolve_round($set, $timestamp));
+    public function test_resolves_weekend_round_1() {
+        $w = Mockery::mock(Weekend_Model::class);
+        $w->shouldReceive('get_current_round')->with(1000)->andReturn(1);
+        $this->assertEquals(1, Round_Resolver::resolve_weekend_round($w, 1000));
     }
 
-    public function test_resolves_round_2() {
-        $set = Mockery::mock(Set_Model::class);
-        $set->shouldReceive('get_round_1_end_date')->andReturn('2026-08-01 23:59:59');
-        $set->shouldReceive('get_round_2_end_date')->andReturn('2026-09-01 23:59:59');
-
-        // Current time is after round 1 end but before round 2 end
-        $timestamp = strtotime('2026-08-15 12:00:00');
-        $this->assertEquals(2, Round_Resolver::resolve_round($set, $timestamp));
+    public function test_resolves_weekend_round_2() {
+        $w = Mockery::mock(Weekend_Model::class);
+        $w->shouldReceive('get_current_round')->with(2000)->andReturn(2);
+        $this->assertEquals(2, Round_Resolver::resolve_weekend_round($w, 2000));
     }
 
-    public function test_resolves_round_3() {
-        $set = Mockery::mock(Set_Model::class);
-        $set->shouldReceive('get_round_1_end_date')->andReturn('2026-08-01 23:59:59');
-        $set->shouldReceive('get_round_2_end_date')->andReturn('2026-09-01 23:59:59');
-
-        // Current time is after round 2 end
-        $timestamp = strtotime('2026-10-01 12:00:00');
-        $this->assertEquals(3, Round_Resolver::resolve_round($set, $timestamp));
+    public function test_resolves_weekend_round_3() {
+        $w = Mockery::mock(Weekend_Model::class);
+        $w->shouldReceive('get_current_round')->with(3000)->andReturn(3);
+        $this->assertEquals(3, Round_Resolver::resolve_weekend_round($w, 3000));
     }
 
-    public function test_fallback_to_round_1_when_no_dates_set() {
-        $set = Mockery::mock(Set_Model::class);
-        $set->shouldReceive('get_round_1_end_date')->andReturn('');
-        $set->shouldReceive('get_round_2_end_date')->andReturn('');
-
-        $timestamp = strtotime('2026-07-26 12:00:00');
-        $this->assertEquals(1, Round_Resolver::resolve_round($set, $timestamp));
+    public function test_resolves_weekend_round_returns_1_for_invalid_input() {
+        $this->assertEquals(1, Round_Resolver::resolve_weekend_round(null));
     }
 
     public function test_resolve_weekend_round_from_weekend_model() {

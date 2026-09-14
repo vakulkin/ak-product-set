@@ -51,14 +51,6 @@ class Set_Model {
         return (bool)get_field('set_has_tshirt', $this->set_id);
     }
 
-    public function get_round_1_end_date() {
-        return get_field('round_1_end_date', $this->set_id);
-    }
-
-    public function get_round_2_end_date() {
-        return get_field('round_2_end_date', $this->set_id);
-    }
-
     /**
      * Get 3D pricing field value from ACF matrix on ak_set post
      *

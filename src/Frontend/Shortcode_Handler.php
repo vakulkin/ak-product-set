@@ -180,6 +180,37 @@ class Shortcode_Handler
             'initial_data' => $initial_data,
             'cart_url'     => wc_get_cart_url(),
             'checkout_url' => wc_get_checkout_url(),
+            'i18n'         => [
+                /* translators: %1$d: max limit, %2$d: declared persons, %3$d: persons to remove */
+                'stock_limit_changed'     => __('Dostępność miejsc uległa zmianie. Dostępny limit wynosi %1$d miejsc [zadeklarowano %2$d os.]. Proszę usunąć %3$d uczestników, aby kontynuować.', 'ak-product-set'),
+                /* translators: %d: participant number */
+                'participant_title'       => __('Uczestnik %d', 'ak-product-set'),
+                'remove'                  => __('Usuń', 'ak-product-set'),
+                'name_label'              => __('Imię i nazwisko', 'ak-product-set'),
+                'email_label'             => __('Adres e-mail', 'ak-product-set'),
+                'phone_label'             => __('Telefon', 'ak-product-set'),
+                'tshirt_size_label'       => __('Rozmiar koszulki', 'ak-product-set'),
+                'select_size'             => __('Wybierz rozmiar', 'ak-product-set'),
+                'tshirt_cut_label'        => __('Krój koszulki', 'ak-product-set'),
+                /* translators: %d: participant number */
+                'err_name'                => __('Proszę podać imię i nazwisko dla Uczestnika %d.', 'ak-product-set'),
+                /* translators: %d: participant number */
+                'err_email'               => __('Proszę podać prawidłowy adres e-mail dla Uczestnika %d [np. jan@example.com].', 'ak-product-set'),
+                /* translators: %d: participant number */
+                'err_phone'               => __('Proszę podać prawidłowy numer telefonu dla Uczestnika %d [np. +48 600 000 000].', 'ak-product-set'),
+                /* translators: %d: participant number */
+                'err_tshirt'              => __('Proszę wybrać rozmiar koszulki dla Uczestnika %d.', 'ak-product-set'),
+                /* translators: %d: max limit */
+                'max_limit_reached'       => __('Nie możesz dodać kolejnego uczestnika. Osiągnięto limit miejsc [%d os.].', 'ak-product-set'),
+                'calc_error'              => __('Błąd przeliczenia ceny.', 'ak-product-set'),
+                'network_error'           => __('Błąd połączenia z serwerem przy przeliczaniu ceny.', 'ak-product-set'),
+                'jquery_error'            => __('Błąd środowiska: brak biblioteki jQuery.', 'ak-product-set'),
+                'added_to_cart'           => __('Zestaw został dodany do koszyka.', 'ak-product-set'),
+                'add_to_cart_error'       => __('Nie udało się dodać zestawu do koszyka.', 'ak-product-set'),
+                'server_conn_error'       => __('Błąd połączenia z serwerem. Spróbuj ponownie.', 'ak-product-set'),
+                /* translators: %d: max limit */
+                'stock_limit_note'        => __('Dostępny limit: %d os.', 'ak-product-set'),
+            ],
         ];
 
         wp_enqueue_style('ak-set-form-css');

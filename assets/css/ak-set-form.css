@@ -948,29 +948,6 @@
   opacity: 1;
 }
 
-.ak-cart-summary-box {
-  background: var(--ak-zinc-50);
-  border: 1px solid var(--ak-zinc-200);
-  border-radius: var(--ak-radius);
-  padding: 14px 16px;
-  margin-top: 8px;
-  font-family: var(--ak-font);
-  font-size: 13px;
-  color: var(--ak-zinc-700);
-}
-
-.ak-cart-summary-title {
-  margin: 0 0 8px 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ak-zinc-900);
-}
-
-.ak-cart-summary-headcount {
-  margin: 0 0 10px 0;
-  color: var(--ak-zinc-500);
-}
-
 /* ============================================================
    Responsive Adaptations & Mobile Optimizations
    ============================================================ */

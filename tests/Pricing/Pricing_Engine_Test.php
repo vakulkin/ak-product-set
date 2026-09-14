@@ -128,6 +128,28 @@ class Pricing_Engine_Test extends TestCase {
         $this->assertStringContainsString('wynosi 0 zł', $result['error']);
     }
 
+    public function test_calculate_rejects_expired_weekend() {
+        $fakePost = new \stdClass();
+        $fakePost->ID = 1;
+        $fakePost->post_type = 'ak_set';
+        $fakePost->post_title = 'Test Set';
+
+        $mockProduct = Mockery::mock('WC_Product');
+        $mockProduct->shouldReceive('get_title')->andReturn('Weekend 1');
+
+        Functions\when('get_post')->justReturn($fakePost);
+        Functions\when('wc_get_product')->justReturn($mockProduct);
+        Functions\when('get_field')->alias(function($key) {
+            if ($key === 'set_products') return [10];
+            if ($key === 'ak_event_end_datetime') return '2020-01-01 10:00:00'; // expired before current time
+            return '';
+        });
+
+        $result = Pricing_Engine::calculate(1, [10], 1);
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('zakończona', $result['error']);
+    }
+
     // -------------------------------------------------------------------------
     // get_max_headcount_limit
     // -------------------------------------------------------------------------

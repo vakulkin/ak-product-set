@@ -142,15 +142,16 @@ $all_csv_url = wp_nonce_url($base_url . '&ak_export=all', Roster_Admin_Page::NON
     <div class="ak-roster-toolbar">
         <?php if ($csv_url) : ?>
             <a href="<?php echo esc_url($csv_url); ?>" class="button button-primary">
-                <?php esc_html_e('Pobierz CSV (ten termin)', 'ak-product-set'); ?>
+                <?php esc_html_e('Pobierz CSV [ten termin]', 'ak-product-set'); ?>
             </a>
         <?php endif; ?>
         <a href="<?php echo esc_url($all_csv_url); ?>" class="button">
-            <?php esc_html_e('Pobierz CSV (wszystkie terminy)', 'ak-product-set'); ?>
+            <?php esc_html_e('Pobierz CSV [wszystkie terminy]', 'ak-product-set'); ?>
         </a>
         <?php if ($count > 0) : ?>
             <span class="ak-roster-count">
                 <?php echo esc_html(sprintf(
+                    /* translators: %d: number of participants */
                     _n('%d uczestnik', '%d uczestników', $count, 'ak-product-set'),
                     $count
                 )); ?>
@@ -177,7 +178,7 @@ $all_csv_url = wp_nonce_url($base_url . '&ak_export=all', Roster_Admin_Page::NON
         <table class="wp-list-table widefat fixed striped ak-roster-table">
             <thead>
                 <tr>
-                    <th class="col-id" title="<?php esc_attr_e('Unikalny identyfikator uczestnika (UUID)', 'ak-product-set'); ?>">
+                    <th class="col-id" title="<?php esc_attr_e('Unikalny identyfikator uczestnika [UUID]', 'ak-product-set'); ?>">
                         <?php esc_html_e('ID uczestnika', 'ak-product-set'); ?>
                     </th>
                     <th class="col-num">#</th>

@@ -181,20 +181,26 @@ class Composed_Cart_Manager {
                     $reason = __('produkt jest wyprzedany', 'ak-product-set');
                 } elseif ($w->is_expired()) {
                     $is_invalid = true;
-                    $reason = __('zakończono rekrutację', 'ak-product-set');
+                    $reason = __('rekrutacja zakończona', 'ak-product-set');
                 } elseif ($w->managing_stock()) {
                     $stock = $w->get_stock_quantity();
                     $total_in_cart = isset($weekend_total_headcount[$wid]) ? $weekend_total_headcount[$wid] : $headcount;
                     if ($stock !== null && $total_in_cart > $stock) {
                         $is_invalid = true;
-                        $reason = sprintf(__('brak wystarczającej liczby miejsc (łącznie w koszyku: %1$d os., dostępne: %2$d os.)', 'ak-product-set'), $total_in_cart, $stock);
+                        $reason = sprintf(
+                            /* translators: %1$d: total in cart, %2$d: available stock */
+                            __('brak wystarczającej liczby miejsc [łącznie w koszyku: %1$d os., dostępne: %2$d os.]', 'ak-product-set'),
+                            $total_in_cart,
+                            $stock
+                        );
                     }
                 }
 
                 if ($is_invalid) {
                     $title = $w->get_title() ? $w->get_title() : __('Nieznany termin', 'ak-product-set');
                     $message = sprintf(
-                        __('Termin "%1$s" z zestawu "%2$s" został automatycznie usunięty z koszyka (%3$s).', 'ak-product-set'),
+                        /* translators: %1$s: weekend title, %2$s: set title, %3$s: reason */
+                        __('Termin "%1$s" z zestawu "%2$s" został automatycznie usunięty z koszyka [%3$s].', 'ak-product-set'),
                         esc_html($title),
                         esc_html($set->get_title()),
                         $reason
@@ -271,10 +277,19 @@ class Composed_Cart_Manager {
             }
         }
 
-        // Validate that adding new set headcount doesn't exceed stock limit for any selected weekend
+        // Validate that selected weekends are not expired and do not exceed stock limits
         foreach ($selected_weekends as $wid) {
             $wid = (int)$wid;
             $w = new Weekend_Model($wid);
+            if ($w->is_expired()) {
+                /* translators: %d: weekend id */
+                $title = $w->get_title() ? $w->get_title() : sprintf(__('Termin #%d', 'ak-product-set'), $wid);
+                throw new \Exception(sprintf(
+                    /* translators: %s: weekend title */
+                    __('Dla terminu "%s" rekrutacja została zakończona.', 'ak-product-set'),
+                    esc_html($title)
+                ));
+            }
             if ($w->managing_stock()) {
                 $stock = $w->get_stock_quantity();
                 $already_in_cart = isset($cart_weekend_totals[$wid]) ? $cart_weekend_totals[$wid] : 0;
@@ -282,7 +297,8 @@ class Composed_Cart_Manager {
                 if ($stock !== null && $total_requested > $stock) {
                     $title = $w->get_title() ? $w->get_title() : __('Wybrany termin', 'ak-product-set');
                     throw new \Exception(sprintf(
-                        __('Brak wystarczającej liczby miejsc dla terminu "%1$s". Dostępne miejsca: %2$d os. (w koszyku masz już %3$d os., próbujesz dodać %4$d os.).', 'ak-product-set'),
+                        /* translators: %1$s: weekend title, %2$d: available stock, %3$d: already in cart, %4$d: attempting to add */
+                        __('Brak wystarczającej liczby miejsc dla terminu "%1$s". Dostępne miejsca: %2$d os. [w koszyku masz już %3$d os., próbujesz dodać %4$d os.].', 'ak-product-set'),
                         esc_html($title),
                         $stock,
                         $already_in_cart,

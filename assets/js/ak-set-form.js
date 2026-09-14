@@ -28,6 +28,13 @@
       return;
     }
 
+    function t(key, fallback) {
+      if (config && config.i18n && config.i18n[key]) {
+        return config.i18n[key];
+      }
+      return fallback;
+    }
+
     var initialData = config.initial_data || {};
 
     var initialParticipants = Array.isArray(initialData.participants) ? initialData.participants : [];
@@ -68,8 +75,8 @@
         var card = cards[i];
         var wid = parseInt(card.getAttribute('data-weekend-id'), 10);
         var checkbox = card.querySelector('input[type="checkbox"]');
-        // Check if DOM says it's selected OR if the initial JSON config says it's selected
-        var isServerSelected = card.classList.contains('selected') || (checkbox && checkbox.checked) || state.selectedWeekends.indexOf(wid) !== -1;
+        // Check if DOM says it's selected OR if the initial JSON config says it's selected (never select disabled cards)
+        var isServerSelected = (card.classList.contains('selected') || (checkbox && checkbox.checked) || state.selectedWeekends.indexOf(wid) !== -1) && !card.classList.contains('disabled');
 
         if (isServerSelected) {
           card.classList.add('selected');
@@ -108,7 +115,11 @@
 
       if (maxStock !== null && currentCount > maxStock) {
         var excess = currentCount - maxStock;
-        showBannerError('Dostępność miejsc uległa zmianie. Dostępny limit wynosi ' + maxStock + ' miejsc (zadeklarowano ' + currentCount + ' os.). Proszę usunąć ' + excess + ' uczestników, aby kontynuować.');
+        var limitMsg = t('stock_limit_changed', 'Dostępność miejsc uległa zmianie. Dostępny limit wynosi %1$d miejsc [zadeklarowano %2$d os.]. Proszę usunąć %3$d uczestników, aby kontynuować.')
+          .replace('%1$d', maxStock)
+          .replace('%2$d', currentCount)
+          .replace('%3$d', excess);
+        showBannerError(limitMsg);
         if (btnSubmit) {
           btnSubmit.disabled = true;
           btnSubmit.setAttribute('disabled', 'disabled');
@@ -188,14 +199,14 @@
             renderStep2UIFromJSON(res.data);
             if (callback) callback(null, res.data);
           } else {
-            var msg = res && res.data && res.data.message ? res.data.message : 'Błąd przeliczenia ceny.';
+            var msg = res && res.data && res.data.message ? res.data.message : t('calc_error', 'Błąd przeliczenia ceny.');
             showToast(msg);
             if (callback) callback(new Error(msg));
           }
         },
         error: function () {
           state.isCalculating = false;
-          showToast('Błąd połączenia z serwerem przy przeliczaniu ceny.');
+          showToast(t('network_error', 'Błąd połączenia z serwerem przy przeliczaniu ceny.'));
           if (callback) callback(new Error('Network error'));
         }
       });
@@ -210,7 +221,7 @@
 
       if (data.max_headcount !== null && data.max_headcount !== undefined) {
         if (note) {
-          note.textContent = data.formatted && data.formatted.stock_note_text ? data.formatted.stock_note_text : ('Dostępny limit: ' + data.max_headcount + ' os.');
+          note.textContent = data.formatted && data.formatted.stock_note_text ? data.formatted.stock_note_text : t('stock_limit_note', 'Dostępny limit: %d os.').replace('%d', data.max_headcount);
           note.style.display = 'block';
         }
         if (btnAddParticipant) {
@@ -327,34 +338,34 @@
         var removeBtnHTML = (count > 1)
           ? '<button type="button" class="ak-btn ak-btn-destructive ak-btn-remove-participant" data-index="' + i + '">' +
           '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 4h10M6 4V2h4v2M5 4l.5 9h5L11 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-          'Usu\u0144</button>'
+          escapeHtml(t('remove', 'Usuń')) + '</button>'
           : '';
 
         var html =
           '<div class="ak-participant-card-header">' +
-          '<h4>Uczestnik ' + (i + 1) + '</h4>' +
+          '<h4>' + escapeHtml(t('participant_title', 'Uczestnik %d').replace('%d', i + 1)) + '</h4>' +
           removeBtnHTML +
           '</div>' +
           '<div class="ak-participant-card-body">' +
           '<div class="ak-form-grid">' +
           '<div class="ak-form-group">' +
-          '<label>Imi\u0119 i nazwisko</label>' +
+          '<label>' + escapeHtml(t('name_label', 'Imię i nazwisko')) + '</label>' +
           '<input type="text" class="ak-input-p-name" value="' + escapeAttr(pData.name) + '" placeholder="Jan Kowalski">' +
           '</div>' +
           '<div class="ak-form-group">' +
-          '<label>Adres e-mail</label>' +
+          '<label>' + escapeHtml(t('email_label', 'Adres e-mail')) + '</label>' +
           '<input type="email" class="ak-input-p-email" value="' + escapeAttr(pData.email) + '" placeholder="jan@example.com">' +
           '</div>' +
           '<div class="ak-form-group">' +
-          '<label>Telefon</label>' +
+          '<label>' + escapeHtml(t('phone_label', 'Telefon')) + '</label>' +
           '<input type="tel" class="ak-input-p-phone" value="' + escapeAttr(pData.phone) + '" placeholder="+48 600 000 000">' +
           '</div>';
 
         if (hasTshirt) {
           html += '<div class="ak-form-group">' +
-            '<label>Rozmiar koszulki</label>' +
+            '<label>' + escapeHtml(t('tshirt_size_label', 'Rozmiar koszulki')) + '</label>' +
             '<select class="ak-input-p-size">' +
-            '<option value="">Wybierz rozmiar</option>';
+            '<option value="">' + escapeHtml(t('select_size', 'Wybierz rozmiar')) + '</option>';
 
           for (var sizeKey in config.tshirt_sizes) {
             var selected = (pData.tshirt_size === sizeKey) ? 'selected' : '';
@@ -363,7 +374,7 @@
 
           html += '</select></div>' +
             '<div class="ak-form-group">' +
-            '<label>Kr\u00f3j koszulki</label>' +
+            '<label>' + escapeHtml(t('tshirt_cut_label', 'Krój koszulki')) + '</label>' +
             '<select class="ak-input-p-cut">';
 
           for (var cutKey in config.tshirt_cuts) {
@@ -426,22 +437,22 @@
         var pNum = i + 1;
 
         if (!p.name) {
-          showToast('Proszę podać imię i nazwisko dla Uczestnika ' + pNum + '.');
+          showToast(t('err_name', 'Proszę podać imię i nazwisko dla Uczestnika %d.').replace('%d', pNum));
           return;
         }
 
         if (!p.email || !isValidEmail(p.email)) {
-          showToast('Proszę podać prawidłowy adres e-mail dla Uczestnika ' + pNum + ' (np. jan@example.com).');
+          showToast(t('err_email', 'Proszę podać prawidłowy adres e-mail dla Uczestnika %d [np. jan@example.com].').replace('%d', pNum));
           return;
         }
 
         if (!p.phone || !isValidPhone(p.phone)) {
-          showToast('Proszę podać prawidłowy numer telefonu dla Uczestnika ' + pNum + ' (np. +48 600 000 000).');
+          showToast(t('err_phone', 'Proszę podać prawidłowy numer telefonu dla Uczestnika %d [np. +48 600 000 000].').replace('%d', pNum));
           return;
         }
 
         if (config.has_tshirt && !p.tshirt_size) {
-          showToast('Proszę wybrać rozmiar koszulki dla Uczestnika ' + pNum + '.');
+          showToast(t('err_tshirt', 'Proszę wybrać rozmiar koszulki dla Uczestnika %d.').replace('%d', pNum));
           return;
         }
       }
@@ -450,7 +461,7 @@
 
       if (typeof jQuery === 'undefined') {
         hideLoader();
-        showToast('Błąd środowiska: brak biblioteki jQuery.');
+        showToast(t('jquery_error', 'Błąd środowiska: brak biblioteki jQuery.'));
         return;
       }
 
@@ -482,16 +493,16 @@
               window.location.href = res.data.cart_url;
             } else {
               hideLoader();
-              showToast('Zestaw został dodany do koszyka.');
+              showToast(t('added_to_cart', 'Zestaw został dodany do koszyka.'));
             }
           } else {
             hideLoader();
-            showToast(res && res.data && res.data.message ? res.data.message : 'Nie udało się dodać zestawu do koszyka.');
+            showToast(res && res.data && res.data.message ? res.data.message : t('add_to_cart_error', 'Nie udało się dodać zestawu do koszyka.'));
           }
         },
         error: function () {
           hideLoader();
-          showToast('Błąd połączenia z serwerem. Spróbuj ponownie.');
+          showToast(t('server_conn_error', 'Błąd połączenia z serwerem. Spróbuj ponownie.'));
         }
       });
     }
@@ -657,7 +668,7 @@
           renderParticipantCards();
           fetchServerPriceCalculation();
         } else {
-          showToast('Nie możesz dodać kolejnego uczestnika. Osiągnięto limit miejsc (' + maxLimit + ' os.).');
+          showToast(t('max_limit_reached', 'Nie możesz dodać kolejnego uczestnika. Osiągnięto limit miejsc [%d os.].').replace('%d', maxLimit));
         }
         return;
       }

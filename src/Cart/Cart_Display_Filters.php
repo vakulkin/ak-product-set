@@ -155,6 +155,7 @@ class Cart_Display_Filters
             $w = new Weekend_Model($wid);
             if ($w->get_wc_product()) {
                 $item_data[] = [
+                    /* translators: %d: weekend date index */
                     'name'  => sprintf(__('Termin %d', 'ak-product-set'), $i),
                     'value' => esc_html($w->get_title()),
                 ];
@@ -165,6 +166,7 @@ class Cart_Display_Filters
         // 2. Liczba uczestników
         $item_data[] = [
             'name'  => __('Liczba uczestników', 'ak-product-set'),
+            /* translators: %d: number of persons */
             'value' => sprintf(__('%d os.', 'ak-product-set'), $headcount),
         ];
 
@@ -189,7 +191,8 @@ class Cart_Display_Filters
                         ? __('damska', 'ak-product-set')
                         : __('męska', 'ak-product-set');
                     $details_parts[] = sprintf(
-                        __('Koszulka: %1$s (%2$s)', 'ak-product-set'),
+                        /* translators: %1$s: t-shirt size, %2$s: t-shirt cut */
+                        __('Koszulka: %1$s [%2$s]', 'ak-product-set'),
                         esc_html($p['tshirt_size']),
                         $cut
                     );

@@ -1,0 +1,770 @@
+# Copyright (C) 2026
+# This file is distributed under the same license as the AK Product Set plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: AK Product Set 2.1.4\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/ak-product-set\n"
+"Last-Translator: Antigravity <support@akademiablanika.pl>\n"
+"Language-Team: en_US\n"
+"Language: en_US\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Antigravity i18n Engine\n"
+"X-Domain: ak-product-set\n"
+
+#. Plugin Name of the plugin
+#: ak-product-set.php
+msgid "AK Product Set"
+msgstr "AK Product Set"
+
+#. Plugin URI of the plugin
+#: ak-product-set.php
+msgid "https://akademiablanika.pl"
+msgstr "https://akademiablanika.pl"
+
+#. Description of the plugin
+#: ak-product-set.php
+msgid "Specialized WooCommerce extension for multi-weekend training courses, dynamic 3D pricing, participant registration, and stock decomposition."
+msgstr "Specialized WooCommerce extension for multi-weekend training courses, dynamic 3D pricing, participant registration, and stock decomposition."
+
+#: ak-product-set.php:55
+#: src/Plugin.php:64
+msgid "Menadżer rejestru"
+msgstr "Roster Manager"
+
+#: ak-product-set.php:92
+msgid "AK Product Set requires WooCommerce to be installed and active."
+msgstr "AK Product Set requires WooCommerce to be installed and active."
+
+#: src/Admin/ACF_Registrar.php:20
+msgctxt "Post Type General Name"
+msgid "AK Zestawy"
+msgstr "AK Sets"
+
+#: src/Admin/ACF_Registrar.php:21
+msgctxt "Post Type Singular Name"
+msgid "AK Zestaw"
+msgstr "AK Set"
+
+#: src/Admin/ACF_Registrar.php:22
+msgid "AK Zestawy"
+msgstr "AK Sets"
+
+#: src/Admin/ACF_Registrar.php:23
+#: src/Admin/ACF_Registrar.php:35
+msgid "AK Zestaw"
+msgstr "AK Set"
+
+#: src/Admin/ACF_Registrar.php:24
+msgid "Wszystkie Zestawy"
+msgstr "All Sets"
+
+#: src/Admin/ACF_Registrar.php:25
+msgid "Dodaj Nowy Zestaw"
+msgstr "Add New Set"
+
+#: src/Admin/ACF_Registrar.php:26
+msgid "Dodaj Nowy"
+msgstr "Add New"
+
+#: src/Admin/ACF_Registrar.php:27
+msgid "Nowy Zestaw"
+msgstr "New Set"
+
+#: src/Admin/ACF_Registrar.php:28
+msgid "Edytuj Zestaw"
+msgstr "Edit Set"
+
+#: src/Admin/ACF_Registrar.php:29
+msgid "Aktualizuj Zestaw"
+msgstr "Update Set"
+
+#: src/Admin/ACF_Registrar.php:30
+msgid "Zobacz Zestaw"
+msgstr "View Set"
+
+#: src/Admin/ACF_Registrar.php:31
+msgid "Szukaj Zestawu"
+msgstr "Search Sets"
+
+#: src/Admin/ACF_Registrar.php:68
+msgid "Opcje Zestawu AK"
+msgstr "AK Set Options"
+
+#: src/Admin/ACF_Registrar.php:72
+msgid "Wybrane Weekendy [Produkty]"
+msgstr "Selected Weekends [Products]"
+
+#: src/Admin/ACF_Registrar.php:75
+msgid "Wybierz produkty WooCommerce poszczególnych weekendów należących do tego zestawu."
+msgstr "Select WooCommerce products of individual weekends belonging to this set."
+
+#: src/Admin/ACF_Registrar.php:82
+msgid "Czy wymagana Koszulka?"
+msgstr "Is T-shirt required?"
+
+#: src/Admin/ACF_Registrar.php:85
+msgid "Włącz, jeśli podczas rejestracji ma być wymagana deklaracja rozmiaru i kroju koszulki."
+msgstr "Enable if declaration of T-shirt size and fit is required during registration."
+
+#: src/Admin/ACF_Registrar.php:104
+msgid "Ustawienia Wydarzenia & Rekrutacji"
+msgstr "Event & Registration Settings"
+
+#: src/Admin/ACF_Registrar.php:108
+msgid "Data i godzina rozpoczęcia wydarzenia"
+msgstr "Event start date and time"
+
+#: src/Admin/ACF_Registrar.php:116
+msgid "Data i godzina zakończenia wydarzenia"
+msgstr "Event end date and time"
+
+#: src/Admin/ACF_Registrar.php:124
+msgid "Data i godzina rozpoczęcia rekrutacji"
+msgstr "Registration start date and time"
+
+#: src/Admin/ACF_Registrar.php:132
+msgid "Data i godzina zakończenia rekrutacji"
+msgstr "Registration end date and time"
+
+#: src/Admin/ACF_Registrar.php:140
+msgid "Koniec Rundy 1 [Early Bird]"
+msgstr "Round 1 End [Early Bird]"
+
+#: src/Admin/ACF_Registrar.php:148
+msgid "Koniec Rundy 2 [Regular]"
+msgstr "Round 2 End [Regular]"
+
+#: src/Admin/ACF_Registrar.php:156
+msgid "Koniec Rundy 3 [Ostateczny termin / Late]"
+msgstr "Round 3 End [Final Deadline / Late]"
+
+#: src/Admin/ACF_Registrar.php:159
+msgid "Opcjonalnie. Jeśli puste, Runda 3 trwa do końca rekrutacji."
+msgstr "Optional. If empty, Round 3 lasts until the end of registration."
+
+#: src/Admin/ACF_Registrar.php:165
+msgid "Lokalizacja / Miejsce"
+msgstr "Location / Venue"
+
+#: src/Admin/ACF_Registrar.php:186
+msgid "1 osoba"
+msgstr "1 person"
+
+#: src/Admin/ACF_Registrar.php:187
+msgid "Grupa 5-9 os."
+msgstr "Group 5-9 pers."
+
+#: src/Admin/ACF_Registrar.php:188
+msgid "Grupa 10+ os."
+msgstr "Group 10+ pers."
+
+#. translators: %d: round number
+#: src/Admin/ACF_Registrar.php:196
+#: src/Frontend/Ajax_Controller.php:67
+#, php-format
+msgid "Runda %d"
+msgstr "Round %d"
+
+#. translators: %1$d: number of weekends, %2$s: tier label
+#: src/Admin/ACF_Registrar.php:205
+#, php-format
+msgid "Pakiet %1$d w. [%2$s]"
+msgstr "Package %1$d w. [%2$s]"
+
+#. translators: %1$d: number of weekends, %2$d: round number, %3$s: tier label
+#: src/Admin/ACF_Registrar.php:207
+#, php-format
+msgid "Cena za 1 os. za pakiet %1$d weekendów w Rundzie %2$d [%3$s]"
+msgstr "Price per person for %1$d weekend package in Round %2$d [%3$s]"
+
+#: src/Admin/ACF_Registrar.php:226
+msgid "Cennik Dynamiczny Zestawu [Matrix 3D]"
+msgstr "Dynamic Set Pricing [3D Matrix]"
+
+#: src/Admin/Roster_Access_Guard.php:214
+#: src/Admin/Roster_Access_Guard.php:228
+msgid "Menadżer rejestru posiada uprawnienia tylko do podglądu zamówień. Modyfikacja danych jest zablokowana."
+msgstr "Roster manager has permission to view orders only. Data modification is disabled."
+
+#: src/Admin/Roster_Access_Guard.php:215
+msgid "Brak uprawnień"
+msgstr "Permission denied"
+
+#: src/Admin/Roster_Access_Guard.php:254
+msgid "Tryb tylko do odczytu:"
+msgstr "Read-only mode:"
+
+#: src/Admin/Roster_Access_Guard.php:254
+msgid "Masz dostęp do podglądu zamówień. Modyfikacja danych i zapisywanie zmian są wyłączone."
+msgstr "You have access to view orders. Modifying data and saving changes are disabled."
+
+#: src/Admin/Roster_Admin_Page.php:25
+#: templates/admin/roster-page.php:119
+msgid "Rejestr uczestników"
+msgstr "Participant Roster"
+
+#: src/Admin/Roster_Admin_Page.php:26
+msgid "Rejestr"
+msgstr "Roster"
+
+#: src/Admin/Roster_Admin_Page.php:37
+msgid "Rejestr i eksport uczestników"
+msgstr "Participant Roster & Export"
+
+#: src/Admin/Roster_Admin_Page.php:38
+msgid "Rejestr i eksport"
+msgstr "Roster & Export"
+
+#: src/Admin/Roster_Admin_Page.php:51
+#: src/Admin/Roster_Admin_Page.php:80
+msgid "Brak uprawnień."
+msgstr "Permission denied."
+
+#: src/Admin/Roster_Admin_Page.php:85
+msgid "Błąd bezpieczeństwa — odśwież stronę i spróbuj ponownie."
+msgstr "Security check failed — please refresh the page and try again."
+
+#: src/Admin/Roster_Admin_Page.php:169
+msgid "Termin"
+msgstr "Date"
+
+#: src/Admin/Roster_Admin_Page.php:175
+#: src/Frontend/Shortcode_Handler.php:189
+#: templates/admin/roster-page.php:185
+msgid "Imię i nazwisko"
+msgstr "Full Name"
+
+#: src/Admin/Roster_Admin_Page.php:176
+#: templates/admin/roster-page.php:186
+msgid "E-mail"
+msgstr "Email"
+
+#: src/Admin/Roster_Admin_Page.php:177
+#: src/Frontend/Shortcode_Handler.php:191
+#: templates/admin/roster-page.php:187
+msgid "Telefon"
+msgstr "Phone"
+
+#: src/Admin/Roster_Admin_Page.php:178
+#: templates/admin/roster-page.php:188
+msgid "Koszulka"
+msgstr "T-shirt"
+
+#: src/Admin/Roster_Admin_Page.php:179
+#: templates/admin/roster-page.php:189
+msgid "Krój"
+msgstr "Fit"
+
+#: src/Admin/Roster_Admin_Page.php:180
+#: templates/admin/roster-page.php:190
+msgid "Zestaw"
+msgstr "Set"
+
+#: src/Admin/Roster_Admin_Page.php:181
+msgid "Nr zamówienia"
+msgstr "Order No."
+
+#: src/Admin/Roster_Admin_Page.php:182
+msgid "Status zamówienia"
+msgstr "Order Status"
+
+#: src/Admin/Roster_Admin_Page.php:183
+#: templates/admin/roster-page.php:193
+msgid "Data płatności"
+msgstr "Payment Date"
+
+#: src/Admin/Roster_Admin_Page.php:184
+#: templates/admin/roster-page.php:194
+msgid "Metoda płatności"
+msgstr "Payment Method"
+
+#: src/Admin/Roster_Admin_Page.php:200
+#: src/Support/Helper.php:79
+#: src/Support/Helper.php:114
+#: templates/admin/roster-page.php:204
+msgid "Damska"
+msgstr "Women's"
+
+#: src/Admin/Roster_Admin_Page.php:202
+#: src/Support/Helper.php:78
+#: src/Support/Helper.php:114
+#: templates/admin/roster-page.php:206
+msgid "Męska"
+msgstr "Men's"
+
+#. translators: %d: weekend date index
+#: src/Cart/Cart_Display_Filters.php:159
+#, php-format
+msgid "Termin %d"
+msgstr "Date %d"
+
+#: src/Cart/Cart_Display_Filters.php:168
+msgid "Liczba uczestników"
+msgstr "Number of participants"
+
+#. translators: %d: number of persons
+#: src/Cart/Cart_Display_Filters.php:170
+#, php-format
+msgid "%d os."
+msgstr "%d pers."
+
+#: src/Cart/Cart_Display_Filters.php:191
+msgid "damska"
+msgstr "women's"
+
+#: src/Cart/Cart_Display_Filters.php:192
+msgid "męska"
+msgstr "men's"
+
+#. translators: %1$s: t-shirt size, %2$s: t-shirt cut
+#: src/Cart/Cart_Display_Filters.php:195
+#, php-format
+msgid "Koszulka: %1$s [%2$s]"
+msgstr "T-shirt: %1$s [%2$s]"
+
+#: src/Cart/Cart_Display_Filters.php:210
+msgid "Uczestnicy"
+msgstr "Participants"
+
+#: src/Cart/Composed_Cart_Manager.php:78
+msgid "Rezerwacja Zestawu AK"
+msgstr "AK Set Reservation"
+
+#: src/Cart/Composed_Cart_Manager.php:146
+msgid "Zestaw został usunięty z koszyka, ponieważ nie jest już dostępny."
+msgstr "The set was removed from the cart because it is no longer available."
+
+#: src/Cart/Composed_Cart_Manager.php:156
+msgid "Zestaw został usunięty z koszyka, ponieważ jego cena wynosi 0 zł lub jest nieprawidłowa."
+msgstr "The set was removed from the cart because its price is 0 PLN or invalid."
+
+#: src/Cart/Composed_Cart_Manager.php:175
+msgid "produkt już nie istnieje lub jest niedostępny"
+msgstr "product no longer exists or is unavailable"
+
+#: src/Cart/Composed_Cart_Manager.php:178
+msgid "produkt nie jest dostępny do zakupu"
+msgstr "product is not available for purchase"
+
+#: src/Cart/Composed_Cart_Manager.php:181
+msgid "produkt jest wyprzedany"
+msgstr "product is sold out"
+
+#: src/Cart/Composed_Cart_Manager.php:184
+msgid "rekrutacja zakończona"
+msgstr "registration closed"
+
+#. translators: %1$d: total in cart, %2$d: available stock
+#: src/Cart/Composed_Cart_Manager.php:192
+#, php-format
+msgid "brak wystarczającej liczby miejsc [łącznie w koszyku: %1$d os., dostępne: %2$d os.]"
+msgstr "not enough seats available [total in cart: %1$d pers., available: %2$d pers.]"
+
+#: src/Cart/Composed_Cart_Manager.php:200
+msgid "Nieznany termin"
+msgstr "Unknown date"
+
+#. translators: %1$s: weekend title, %2$s: set title, %3$s: reason
+#: src/Cart/Composed_Cart_Manager.php:203
+#, php-format
+msgid "Termin \"%1$s\" z zestawu \"%2$s\" został automatycznie usunięty z koszyka [%3$s]."
+msgstr "Date \"%1$s\" from set \"%2$s\" was automatically removed from cart [%3$s]."
+
+#: src/Cart/Composed_Cart_Manager.php:221
+msgid "Zestaw został usunięty z koszyka, ponieważ żaden z wybranych terminów nie jest już dostępny."
+msgstr "The set was removed from the cart because none of the selected dates is available anymore."
+
+#: src/Cart/Composed_Cart_Manager.php:252
+msgid "Błąd wyliczenia ceny."
+msgstr "Price calculation error."
+
+#: src/Cart/Composed_Cart_Manager.php:256
+msgid "Wybrano więcej miejsc niż jest aktualnie dostępne w wybranych terminach."
+msgstr "More seats selected than currently available for the selected dates."
+
+#. translators: %d: weekend id
+#: src/Cart/Composed_Cart_Manager.php:286
+#: src/Pricing/Pricing_Engine.php:99
+#, php-format
+msgid "Termin #%d"
+msgstr "Date #%d"
+
+#. translators: %s: weekend title
+#: src/Cart/Composed_Cart_Manager.php:289
+#: src/Pricing/Pricing_Engine.php:104
+#, php-format
+msgid "Dla terminu \"%s\" rekrutacja została zakończona."
+msgstr "Registration for date \"%s\" has closed."
+
+#: src/Cart/Composed_Cart_Manager.php:298
+msgid "Wybrany termin"
+msgstr "Selected date"
+
+#. translators: %1$s: weekend title, %2$d: available stock, %3$d: already in cart, %4$d: attempting to add
+#: src/Cart/Composed_Cart_Manager.php:301
+#, php-format
+msgid "Brak wystarczającej liczby miejsc dla terminu \"%1$s\". Dostępne miejsca: %2$d os. [w koszyku masz już %3$d os., próbujesz dodać %4$d os.]."
+msgstr "Not enough seats available for date \"%1$s\". Available seats: %2$d pers. [already in cart: %3$d pers., trying to add: %4$d pers.]."
+
+#: src/Frontend/Ajax_Controller.php:41
+msgid "Wybierz co najmniej jeden termin."
+msgstr "Select at least one date."
+
+#: src/Frontend/Ajax_Controller.php:49
+msgid "Nieprawidłowa kalkulacja ceny."
+msgstr "Invalid price calculation."
+
+#: src/Frontend/Ajax_Controller.php:54
+msgid "1 osoba [Indywidualna]"
+msgstr "1 person [Individual]"
+
+#: src/Frontend/Ajax_Controller.php:55
+msgid "Grupa 5-9 osób [Rabat Grupowy]"
+msgstr "Group 5-9 people [Group Discount]"
+
+#: src/Frontend/Ajax_Controller.php:56
+msgid "Grupa 10+ osób [Max Rabat]"
+msgstr "Group 10+ people [Max Discount]"
+
+#. translators: %d: number of weekends
+#: src/Frontend/Ajax_Controller.php:65
+#, php-format
+msgid "%d weekend"
+msgid_plural "%d weekendy"
+msgstr[0] "%d weekend"
+msgstr[1] "%d weekends"
+
+#: src/Frontend/Ajax_Controller.php:89
+msgid "Musisz wybrać co najmniej jeden termin [weekend]."
+msgstr "You must select at least one date [weekend]."
+
+#: src/Frontend/Ajax_Controller.php:96
+#: src/Pricing/Pricing_Engine.php:78
+msgid "Zestaw nie istnieje."
+msgstr "The set does not exist."
+
+#: src/Frontend/Ajax_Controller.php:121
+#: src/Frontend/Shortcode_Handler.php:209
+msgid "Nie udało się dodać zestawu do koszyka."
+msgstr "Failed to add set to cart."
+
+#: src/Frontend/Ajax_Controller.php:142
+msgid "Zestaw został pomyślnie dodany do koszyka."
+msgstr "The set was successfully added to cart."
+
+#: src/Frontend/Ajax_Controller.php:166
+msgid "Zestaw został usunięty z koszyka."
+msgstr "The set was removed from cart."
+
+#. translators: %d: participant number
+#: src/Frontend/Ajax_Controller.php:187
+#: src/Frontend/Shortcode_Handler.php:196
+#, php-format
+msgid "Proszę podać imię i nazwisko dla Uczestnika %d."
+msgstr "Please provide full name for Participant %d."
+
+#. translators: %d: participant number
+#: src/Frontend/Ajax_Controller.php:192
+#: src/Frontend/Shortcode_Handler.php:198
+#, php-format
+msgid "Proszę podać prawidłowy adres e-mail dla Uczestnika %d [np. jan@example.com]."
+msgstr "Please provide a valid email address for Participant %d [e.g. john@example.com]."
+
+#. translators: %d: participant number
+#: src/Frontend/Ajax_Controller.php:198
+#: src/Frontend/Shortcode_Handler.php:200
+#, php-format
+msgid "Proszę podać prawidłowy numer telefonu dla Uczestnika %d [np. +48 600 000 000]."
+msgstr "Please provide a valid phone number for Participant %d [e.g. +48 600 000 000]."
+
+#. translators: %d: participant number
+#: src/Frontend/Ajax_Controller.php:203
+#: src/Frontend/Shortcode_Handler.php:202
+#, php-format
+msgid "Proszę wybrać rozmiar koszulki dla Uczestnika %d."
+msgstr "Please select T-shirt size for Participant %d."
+
+#: src/Frontend/Shortcode_Handler.php:127
+msgid "Brak zestawu o podanym identyfikatorze."
+msgstr "No set found with the specified ID."
+
+#: src/Frontend/Shortcode_Handler.php:132
+msgid "Ten zestaw nie posiada jeszcze przypisanych terminów/weekendów."
+msgstr "This set does not have any dates/weekends assigned yet."
+
+#. translators: %1$d: max limit, %2$d: declared persons, %3$d: persons to remove
+#: src/Frontend/Shortcode_Handler.php:185
+#, php-format
+msgid "Dostępność miejsc uległa zmianie. Dostępny limit wynosi %1$d miejsc [zadeklarowano %2$d os.]. Proszę usunąć %3$d uczestników, aby kontynuować."
+msgstr "Seat availability has changed. The available limit is %1$d seats [%2$d people declared]. Please remove %3$d participants to continue."
+
+#. translators: %d: participant number
+#: src/Frontend/Shortcode_Handler.php:187
+#: src/Support/Helper.php:117
+#, php-format
+msgid "Uczestnik %d"
+msgstr "Participant %d"
+
+#: src/Frontend/Shortcode_Handler.php:188
+msgid "Usuń"
+msgstr "Remove"
+
+#: src/Frontend/Shortcode_Handler.php:190
+msgid "Adres e-mail"
+msgstr "Email address"
+
+#: src/Frontend/Shortcode_Handler.php:192
+msgid "Rozmiar koszulki"
+msgstr "T-shirt size"
+
+#: src/Frontend/Shortcode_Handler.php:193
+msgid "Wybierz rozmiar"
+msgstr "Select size"
+
+#: src/Frontend/Shortcode_Handler.php:194
+msgid "Krój koszulki"
+msgstr "T-shirt fit"
+
+#. translators: %d: max limit
+#: src/Frontend/Shortcode_Handler.php:204
+#, php-format
+msgid "Nie możesz dodać kolejnego uczestnika. Osiągnięto limit miejsc [%d os.]."
+msgstr "You cannot add another participant. Seat limit reached [%d pers.]."
+
+#: src/Frontend/Shortcode_Handler.php:205
+msgid "Błąd przeliczenia ceny."
+msgstr "Price recalculation error."
+
+#: src/Frontend/Shortcode_Handler.php:206
+msgid "Błąd połączenia z serwerem przy przeliczaniu ceny."
+msgstr "Server connection error while calculating price."
+
+#: src/Frontend/Shortcode_Handler.php:207
+msgid "Błąd środowiska: brak biblioteki jQuery."
+msgstr "Environment error: missing jQuery library."
+
+#: src/Frontend/Shortcode_Handler.php:208
+msgid "Zestaw został dodany do koszyka."
+msgstr "The set has been added to cart."
+
+#: src/Frontend/Shortcode_Handler.php:210
+msgid "Błąd połączenia z serwerem. Spróbuj ponownie."
+msgstr "Server connection error. Please try again."
+
+#. translators: %d: max limit
+#: src/Frontend/Shortcode_Handler.php:212
+#, php-format
+msgid "Dostępny limit: %d os."
+msgstr "Available limit: %d pers."
+
+#: src/Pricing/Pricing_Engine.php:90
+msgid "Liczba wybranych weekendów musi wynosić od 1 do 10. Nieprawidłowe weekendy mogły zostać odrzucone."
+msgstr "The number of selected weekends must be between 1 and 10. Invalid weekends may have been rejected."
+
+#: src/Pricing/Pricing_Engine.php:128
+msgid "Cena dla wybranego pakietu i liczby osób nie została ustalona lub wynosi 0 zł. Zestaw nie może zostać dodany do koszyka."
+msgstr "Price for the selected package and number of people is not set or is 0 PLN. The set cannot be added to cart."
+
+#. translators: %d: number of available seats
+#: src/Pricing/Pricing_Engine.php:140
+#, php-format
+msgid "Dostępność miejsc uległa zmianie. Liczba dostępnych miejsc: %d os."
+msgstr "Seat availability has changed. Number of available seats: %d pers."
+
+#: templates/admin/roster-page.php:126
+msgid "Wybierz termin:"
+msgstr "Select date:"
+
+#: templates/admin/roster-page.php:129
+msgid "wybierz termin"
+msgstr "select date"
+
+#: templates/admin/roster-page.php:137
+msgid "Pokaż"
+msgstr "Show"
+
+#: templates/admin/roster-page.php:145
+msgid "Pobierz CSV [ten termin]"
+msgstr "Download CSV [this date]"
+
+#: templates/admin/roster-page.php:149
+msgid "Pobierz CSV [wszystkie terminy]"
+msgstr "Download CSV [all dates]"
+
+#. translators: %d: number of participants
+#: templates/admin/roster-page.php:155
+#, php-format
+msgid "%d uczestnik"
+msgid_plural "%d uczestników"
+msgstr[0] "%d participant"
+msgstr[1] "%d participants"
+
+#: templates/admin/roster-page.php:166
+msgid "Wybierz termin z listy, aby wyświetlić uczestników."
+msgstr "Select a date from the list to display participants."
+
+#: templates/admin/roster-page.php:173
+msgid "Brak uczestników dla wybranego terminu."
+msgstr "No participants for the selected date."
+
+#: templates/admin/roster-page.php:181
+msgid "Unikalny identyfikator uczestnika [UUID]"
+msgstr "Unique participant identifier [UUID]"
+
+#: templates/admin/roster-page.php:182
+msgid "ID uczestnika"
+msgstr "Participant ID"
+
+#: templates/admin/roster-page.php:191
+msgid "Zamówienie"
+msgstr "Order"
+
+#: templates/admin/roster-page.php:192
+msgid "Status"
+msgstr "Status"
+
+#: templates/admin/roster-page.php:257
+msgid "Nieopłacono"
+msgstr "Unpaid"
+
+#: templates/frontend/step-1-weekends.php:20
+msgid "Wybierz terminy"
+msgstr "Select dates"
+
+#: templates/frontend/step-1-weekends.php:21
+msgid "Zaznacz co najmniej jeden termin. Rabaty grupowe naliczają się automatycznie od 5 i 10 osób."
+msgstr "Select at least one date. Group discounts are calculated automatically for 5 and 10+ people."
+
+#: templates/frontend/step-1-weekends.php:85
+msgid "Wydarzenie:"
+msgstr "Event:"
+
+#: templates/frontend/step-1-weekends.php:101
+msgid "Rekrutacja:"
+msgstr "Registration:"
+
+#: templates/frontend/step-1-weekends.php:117
+msgid "Lokalizacja:"
+msgstr "Location:"
+
+#. translators: %s: round deadline date
+#: templates/frontend/step-1-weekends.php:135
+#, php-format
+msgid "Runda 1 do %s"
+msgstr "Round 1 until %s"
+
+#. translators: %s: round deadline date
+#: templates/frontend/step-1-weekends.php:135
+msgid "Runda 1 [Early Bird]"
+msgstr "Round 1 [Early Bird]"
+
+#. translators: %s: round deadline date
+#: templates/frontend/step-1-weekends.php:142
+#, php-format
+msgid "Runda 2 do %s"
+msgstr "Round 2 until %s"
+
+#. translators: %s: round deadline date
+#: templates/frontend/step-1-weekends.php:142
+msgid "Runda 2 [Regular]"
+msgstr "Round 2 [Regular]"
+
+#. translators: %s: round deadline date
+#: templates/frontend/step-1-weekends.php:149
+#, php-format
+msgid "Runda 3 do %s"
+msgstr "Round 3 until %s"
+
+#. translators: %s: round deadline date
+#: templates/frontend/step-1-weekends.php:149
+msgid "Runda 3 [Late]"
+msgstr "Round 3 [Late]"
+
+#: templates/frontend/step-1-weekends.php:156
+msgid "Rekrutacja zakończona"
+msgstr "Registration closed"
+
+#: templates/frontend/step-1-weekends.php:158
+msgid "Brak miejsc"
+msgstr "Sold out"
+
+#. translators: %d: number of seats left
+#: templates/frontend/step-1-weekends.php:162
+#, php-format
+msgid "Zostało %d miejsc"
+msgstr "%d seats left"
+
+#. translators: %d: number of available seats
+#: templates/frontend/step-1-weekends.php:167
+#, php-format
+msgid "%d miejsc dostępnych"
+msgstr "%d seats available"
+
+#: templates/frontend/step-1-weekends.php:170
+msgid "Miejsca dostępne"
+msgstr "Seats available"
+
+#: templates/frontend/step-1-weekends.php:182
+msgid "Dalej"
+msgstr "Next"
+
+#: templates/frontend/step-2-participants.php:15
+#: templates/frontend/wizard.php:32
+msgid "Uczestnicy i podsumowanie"
+msgstr "Participants and summary"
+
+#: templates/frontend/step-2-participants.php:16
+msgid "Uzupełnij dane uczestników. Rabaty grupowe naliczają się automatycznie w zależności od liczby osób."
+msgstr "Fill in participant details. Group discounts are calculated automatically based on the number of people."
+
+#: templates/frontend/step-2-participants.php:21
+msgid "Wybrane terminy"
+msgstr "Selected dates"
+
+#: templates/frontend/step-2-participants.php:27
+msgid "Kalkulacja ceny"
+msgstr "Price calculation"
+
+#: templates/frontend/step-2-participants.php:29
+msgid "Pakiet"
+msgstr "Package"
+
+#: templates/frontend/step-2-participants.php:33
+msgid "Runda cenowa"
+msgstr "Price round"
+
+#: templates/frontend/step-2-participants.php:37
+msgid "Kategoria"
+msgstr "Category"
+
+#: templates/frontend/step-2-participants.php:41
+msgid "Cena za osobę"
+msgstr "Price per person"
+
+#: templates/frontend/step-2-participants.php:45
+msgid "Łącznie"
+msgstr "Total"
+
+#: templates/frontend/step-2-participants.php:59
+msgid "Dodaj uczestnika"
+msgstr "Add participant"
+
+#: templates/frontend/step-2-participants.php:68
+msgid "Wstecz"
+msgstr "Back"
+
+#: templates/frontend/step-2-participants.php:71
+msgid "Przejdź do płatności"
+msgstr "Proceed to payment"
+
+#: templates/frontend/wizard.php:27
+msgid "Wybór terminów"
+msgstr "Date selection"
+
+#: templates/frontend/wizard.php:52
+msgid "Przetwarzanie..."
+msgstr "Processing..."
+

@@ -38,7 +38,6 @@ class Plugin {
     public function boot(): void {
         // Core Admin & Custom Post Types
         $this->services['acf_registrar']     = new Admin\ACF_Registrar();
-        $this->services['order_admin_view']  = new Admin\Order_Admin_View();
         $this->services['roster_page']       = new Admin\Roster_Admin_Page();
         $this->services['roster_guard']      = new Admin\Roster_Access_Guard();
 

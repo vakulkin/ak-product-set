@@ -91,6 +91,23 @@ class Pricing_Engine {
             ];
         }
 
+        // Validate that none of the selected weekends are expired
+        foreach ($selected_weekend_ids as $wid) {
+            $w = new Weekend_Model((int)$wid);
+            if ($w->is_expired()) {
+                /* translators: %d: weekend id */
+                $title = $w->get_title() ? $w->get_title() : sprintf(__('Termin #%d', 'ak-product-set'), (int)$wid);
+                return [
+                    'valid' => false,
+                    'error' => sprintf(
+                        /* translators: %s: weekend title */
+                        __('Dla terminu "%s" rekrutacja została zakończona.', 'ak-product-set'),
+                        $title
+                    ),
+                ];
+            }
+        }
+
         $headcount = max(1, (int)$requested_headcount);
 
         // Server-side Round & Group Tier Resolution (Variant A: Max Round across selected weekends)
@@ -119,6 +136,7 @@ class Pricing_Engine {
         if ($max_headcount !== null && $headcount > $max_headcount) {
             $stock_clamped = true;
             $stock_warning = sprintf(
+                /* translators: %d: number of available seats */
                 __('Dostępność miejsc uległa zmianie. Liczba dostępnych miejsc: %d os.', 'ak-product-set'),
                 $max_headcount
             );

@@ -51,9 +51,9 @@ class Ajax_Controller {
         }
 
         $tier_labels = [
-            'ind' => __('1 osoba (Indywidualna)', 'ak-product-set'),
-            'g5'  => __('Grupa 5-9 osób (Rabat Grupowy)', 'ak-product-set'),
-            'g10' => __('Grupa 10+ osób (Max Rabat)', 'ak-product-set'),
+            'ind' => __('1 osoba [Indywidualna]', 'ak-product-set'),
+            'g5'  => __('Grupa 5-9 osób [Rabat Grupowy]', 'ak-product-set'),
+            'g10' => __('Grupa 10+ osób [Max Rabat]', 'ak-product-set'),
         ];
 
         $calc['formatted'] = [
@@ -61,7 +61,9 @@ class Ajax_Controller {
             'total_price'       => function_exists('wc_price') ? wc_price($calc['total_price']) : number_format_i18n($calc['total_price'], 2) . ' zł',
             'per_person_raw'    => number_format_i18n($calc['per_person_price'], 2) . ' zł',
             'total_raw'         => number_format_i18n($calc['total_price'], 2) . ' zł',
+            /* translators: %d: number of weekends */
             'package_size_text' => sprintf(_n('%d weekend', '%d weekendy', $calc['package_size'], 'ak-product-set'), $calc['package_size']),
+            /* translators: %d: round number */
             'round_text'        => sprintf(__('Runda %d', 'ak-product-set'), $calc['round']),
             'tier_text'         => isset($tier_labels[$calc['tier']]) ? $tier_labels[$calc['tier']] : $calc['tier'],
             'stock_note_text'   => '',
@@ -84,7 +86,7 @@ class Ajax_Controller {
 
         if (!$set_id || empty($selected_weekends)) {
             wp_send_json_error([
-                'message' => __('Musisz wybrać co najmniej jeden termin (weekend).', 'ak-product-set'),
+                'message' => __('Musisz wybrać co najmniej jeden termin [weekend].', 'ak-product-set'),
             ]);
         }
 
@@ -181,19 +183,23 @@ class Ajax_Controller {
             $size  = isset($p['tshirt_size']) ? trim($p['tshirt_size']) : '';
 
             if (empty($name)) {
+                /* translators: %d: participant number */
                 return sprintf(__('Proszę podać imię i nazwisko dla Uczestnika %d.', 'ak-product-set'), $p_num);
             }
 
             if (empty($email) || !\is_email($email)) {
-                return sprintf(__('Proszę podać prawidłowy adres e-mail dla Uczestnika %d (np. jan@example.com).', 'ak-product-set'), $p_num);
+                /* translators: %d: participant number */
+                return sprintf(__('Proszę podać prawidłowy adres e-mail dla Uczestnika %d [np. jan@example.com].', 'ak-product-set'), $p_num);
             }
 
             $clean_phone = preg_replace('/[^0-9]/', '', $phone);
             if (empty($phone) || strlen($clean_phone) < 7 || strlen($clean_phone) > 15) {
-                return sprintf(__('Proszę podać prawidłowy numer telefonu dla Uczestnika %d (np. +48 600 000 000).', 'ak-product-set'), $p_num);
+                /* translators: %d: participant number */
+                return sprintf(__('Proszę podać prawidłowy numer telefonu dla Uczestnika %d [np. +48 600 000 000].', 'ak-product-set'), $p_num);
             }
 
             if ($has_tshirt && empty($size)) {
+                /* translators: %d: participant number */
                 return sprintf(__('Proszę wybrać rozmiar koszulki dla Uczestnika %d.', 'ak-product-set'), $p_num);
             }
         }

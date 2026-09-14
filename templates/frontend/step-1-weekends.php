@@ -29,7 +29,7 @@ $pre_selected = is_array($pre_selected_raw) ? array_map('intval', $pre_selected_
             $managing_stock = $weekend->managing_stock();
             $stock        = $weekend->get_stock_quantity();
             $is_disabled  = $is_expired || ($managing_stock && $stock !== null && $stock <= 0);
-            $is_checked   = in_array($wid, $pre_selected, true);
+            $is_checked   = in_array($wid, $pre_selected, true) && !$is_disabled;
             $start_dt     = $weekend->get_event_start_datetime();
             $end_dt       = $weekend->get_event_end_datetime();
             $recr_start   = $weekend->get_recruitment_start_datetime();
@@ -46,7 +46,8 @@ $pre_selected = is_array($pre_selected_raw) ? array_map('intval', $pre_selected_
                  data-weekend-id="<?php echo esc_attr($wid); ?>"
                  data-round="<?php echo esc_attr($round_num); ?>"
                  data-managing-stock="<?php echo esc_attr($managing_stock ? '1' : '0'); ?>"
-                 data-stock="<?php echo esc_attr($stock !== null ? $stock : ''); ?>">
+                 data-stock="<?php echo esc_attr($stock !== null ? $stock : ''); ?>"
+                 data-is-expired="<?php echo esc_attr($is_expired ? '1' : '0'); ?>">
 
                 <input type="checkbox"
                        name="ak_selected_weekends[]"
@@ -129,15 +130,24 @@ $pre_selected = is_array($pre_selected_raw) ? array_map('intval', $pre_selected_
                             <?php if (!$is_expired): ?>
                                 <?php if ($round_num === 1): ?>
                                     <span class="ak-badge info" style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;">
-                                        <?php echo esc_html(!empty($r1_end) ? sprintf(__('Runda 1 do %s', 'ak-product-set'), date_i18n('d.m.Y', strtotime($r1_end))) : __('Runda 1 (Early Bird)', 'ak-product-set')); ?>
+                                        <?php
+                                        /* translators: %s: round deadline date */
+                                        echo esc_html(!empty($r1_end) ? sprintf(__('Runda 1 do %s', 'ak-product-set'), date_i18n('d.m.Y', strtotime($r1_end))) : __('Runda 1 [Early Bird]', 'ak-product-set'));
+                                        ?>
                                     </span>
                                 <?php elseif ($round_num === 2): ?>
                                     <span class="ak-badge info" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;">
-                                        <?php echo esc_html(!empty($r2_end) ? sprintf(__('Runda 2 do %s', 'ak-product-set'), date_i18n('d.m.Y', strtotime($r2_end))) : __('Runda 2 (Regular)', 'ak-product-set')); ?>
+                                        <?php
+                                        /* translators: %s: round deadline date */
+                                        echo esc_html(!empty($r2_end) ? sprintf(__('Runda 2 do %s', 'ak-product-set'), date_i18n('d.m.Y', strtotime($r2_end))) : __('Runda 2 [Regular]', 'ak-product-set'));
+                                        ?>
                                     </span>
                                 <?php else: ?>
                                     <span class="ak-badge info" style="background:#f3e8ff;color:#6b21a8;border:1px solid #e9d5ff;">
-                                        <?php echo esc_html(!empty($r3_end) ? sprintf(__('Runda 3 do %s', 'ak-product-set'), date_i18n('d.m.Y', strtotime($r3_end))) : __('Runda 3', 'ak-product-set')); ?>
+                                        <?php
+                                        /* translators: %s: round deadline date */
+                                        echo esc_html(!empty($r3_end) ? sprintf(__('Runda 3 do %s', 'ak-product-set'), date_i18n('d.m.Y', strtotime($r3_end))) : __('Runda 3 [Late]', 'ak-product-set'));
+                                        ?>
                                     </span>
                                 <?php endif; ?>
                             <?php endif; ?>
@@ -147,9 +157,15 @@ $pre_selected = is_array($pre_selected_raw) ? array_map('intval', $pre_selected_
                             <?php elseif ($managing_stock && $stock !== null && $stock <= 0): ?>
                                 <span class="ak-badge danger"><?php esc_html_e('Brak miejsc', 'ak-product-set'); ?></span>
                             <?php elseif ($managing_stock && $stock !== null && $stock <= 5): ?>
-                                <span class="ak-badge warning"><?php printf(esc_html__('Zostało %d miejsc', 'ak-product-set'), $stock); ?></span>
+                                <span class="ak-badge warning"><?php
+                                    /* translators: %d: number of seats left */
+                                    printf(esc_html__('Zostało %d miejsc', 'ak-product-set'), $stock);
+                                ?></span>
                             <?php elseif ($managing_stock && $stock !== null): ?>
-                                <span class="ak-badge success"><?php printf(esc_html__('%d miejsc dostępnych', 'ak-product-set'), $stock); ?></span>
+                                <span class="ak-badge success"><?php
+                                    /* translators: %d: number of available seats */
+                                    printf(esc_html__('%d miejsc dostępnych', 'ak-product-set'), $stock);
+                                ?></span>
                             <?php else: ?>
                                 <span class="ak-badge success"><?php esc_html_e('Miejsca dostępne', 'ak-product-set'); ?></span>
                             <?php endif; ?>

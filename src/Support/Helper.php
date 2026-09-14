@@ -108,11 +108,11 @@ class Helper
                 $contact[] = $p['phone'];
             }
             if (!empty($contact)) {
-                $details .= ' (' . implode(', ', $contact) . ')';
+                $details .= ' [' . implode(', ', $contact) . ']';
             }
             if (!empty($p['tshirt_size'])) {
                 $cut = (!empty($p['tshirt_cut']) && $p['tshirt_cut'] === 'women') ? __('Damska', 'ak-product-set') : __('Męska', 'ak-product-set');
-                $details .= ' — Koszulka: ' . $p['tshirt_size'] . ' (' . $cut . ')';
+                $details .= ' — Koszulka: ' . $p['tshirt_size'] . ' [' . $cut . ']';
             }
             $item->add_meta_data(sprintf(__('Uczestnik %d', 'ak-product-set'), $i), $details, true);
             $i++;

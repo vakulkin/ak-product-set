@@ -96,3 +96,10 @@ add_action('plugins_loaded', function () {
 
     \AK_Set\Plugin::instance()->boot();
 });
+
+/**
+ * Load plugin text domain for translations
+ */
+add_action('init', function () {
+    load_plugin_textdomain('ak-product-set', false, dirname(plugin_basename(AK_SET_FILE)) . '/languages');
+});

@@ -69,7 +69,7 @@ class ACF_Registrar {
             'fields' => [
                 [
                     'key' => 'field_ak_set_products',
-                    'label' => __('Wybrane Weekendy (Produkty)', 'ak-product-set'),
+                    'label' => __('Wybrane Weekendy [Produkty]', 'ak-product-set'),
                     'name' => 'set_products',
                     'type' => 'relationship',
                     'instructions' => __('Wybierz produkty WooCommerce poszczególnych weekendów należących do tego zestawu.', 'ak-product-set'),
@@ -137,7 +137,7 @@ class ACF_Registrar {
                 ],
                 [
                     'key' => 'field_ak_round_1_end_datetime',
-                    'label' => __('Koniec Rundy 1 (Early Bird)', 'ak-product-set'),
+                    'label' => __('Koniec Rundy 1 [Early Bird]', 'ak-product-set'),
                     'name' => 'ak_round_1_end_datetime',
                     'type' => 'date_time_picker',
                     'display_format' => 'Y-m-d H:i',
@@ -145,7 +145,7 @@ class ACF_Registrar {
                 ],
                 [
                     'key' => 'field_ak_round_2_end_datetime',
-                    'label' => __('Koniec Rundy 2 (Regular)', 'ak-product-set'),
+                    'label' => __('Koniec Rundy 2 [Regular]', 'ak-product-set'),
                     'name' => 'ak_round_2_end_datetime',
                     'type' => 'date_time_picker',
                     'display_format' => 'Y-m-d H:i',
@@ -153,7 +153,7 @@ class ACF_Registrar {
                 ],
                 [
                     'key' => 'field_ak_round_3_end_datetime',
-                    'label' => __('Koniec Rundy 3 (Ostateczny termin / Late)', 'ak-product-set'),
+                    'label' => __('Koniec Rundy 3 [Ostateczny termin / Late]', 'ak-product-set'),
                     'name' => 'ak_round_3_end_datetime',
                     'type' => 'date_time_picker',
                     'instructions' => __('Opcjonalnie. Jeśli puste, Runda 3 trwa do końca rekrutacji.', 'ak-product-set'),
@@ -190,6 +190,7 @@ class ACF_Registrar {
 
         // Organize pricing fields into Round Tabs (Runda 1, Runda 2, Runda 3) with a 3-column table grid (Ind / G5 / G10)
         for ($y = 1; $y <= 3; $y++) {
+            /* translators: %d: round number */
             $pricing_fields[] = [
                 'key' => 'field_tab_round_' . $y,
                 'label' => sprintf(__('Runda %d', 'ak-product-set'), $y),
@@ -200,12 +201,16 @@ class ACF_Registrar {
             for ($x = 1; $x <= 10; $x++) {
                 foreach ($tiers as $tier_key => $tier_label) {
                     $field_name = sprintf('price_%dw_round%d_%s', $x, $y, $tier_key);
+                    /* translators: %1$d: number of weekends, %2$s: tier label */
+                    $field_label = sprintf(__('Pakiet %1$d w. [%2$s]', 'ak-product-set'), $x, $tier_label);
+                    /* translators: %1$d: number of weekends, %2$d: round number, %3$s: tier label */
+                    $field_instructions = sprintf(__('Cena za 1 os. za pakiet %1$d weekendów w Rundzie %2$d [%3$s]', 'ak-product-set'), $x, $y, $tier_label);
                     $pricing_fields[] = [
                         'key' => 'field_' . $field_name,
-                        'label' => sprintf(__('Pakiet %d w. (%s)', 'ak-product-set'), $x, $tier_label),
+                        'label' => $field_label,
                         'name' => $field_name,
                         'type' => 'number',
-                        'instructions' => sprintf(__('Cena za 1 os. za pakiet %d weekendów w Rundzie %d (%s)', 'ak-product-set'), $x, $y, $tier_label),
+                        'instructions' => $field_instructions,
                         'min' => 0,
                         'step' => '0.01',
                         'wrapper' => [
@@ -218,7 +223,7 @@ class ACF_Registrar {
 
         acf_add_local_field_group([
             'key' => 'group_ak_set_pricing',
-            'title' => __('Cennik Dynamiczny Zestawu (Matrix 3D)', 'ak-product-set'),
+            'title' => __('Cennik Dynamiczny Zestawu [Matrix 3D]', 'ak-product-set'),
             'fields' => $pricing_fields,
             'location' => [
                 [

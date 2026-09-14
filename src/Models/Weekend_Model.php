@@ -167,17 +167,39 @@ class Weekend_Model {
     }
 
     /**
-     * Check if sales/recruitment is expired for this weekend.
+     * Check if this weekend event is expired (event date has passed or recruitment ended).
      *
+     * @param int|null $current_timestamp
      * @return bool
      */
-    public function is_expired() {
-        $end_datetime = $this->get_recruitment_end_datetime();
-        if (empty($end_datetime)) {
-            return false;
+    public function is_expired($current_timestamp = null) {
+        if ($current_timestamp === null) {
+            $current_timestamp = current_time('timestamp');
         }
 
-        $end_ts = strtotime($end_datetime);
-        return $end_ts !== false && current_time('timestamp') > $end_ts;
+        // 1. Check if event date has passed (past event)
+        $end_datetime = $this->get_event_end_datetime();
+        if (!empty($end_datetime)) {
+            $end_ts = strtotime($end_datetime);
+            if ($end_ts !== false && $current_timestamp > $end_ts) {
+                return true;
+            }
+        } elseif (!empty($this->get_event_start_datetime())) {
+            $start_ts = strtotime($this->get_event_start_datetime());
+            if ($start_ts !== false && $current_timestamp > $start_ts) {
+                return true;
+            }
+        }
+
+        // 2. Check if recruitment end date has passed
+        $recr_datetime = $this->get_recruitment_end_datetime();
+        if (!empty($recr_datetime)) {
+            $recr_ts = strtotime($recr_datetime);
+            if ($recr_ts !== false && $current_timestamp > $recr_ts) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
