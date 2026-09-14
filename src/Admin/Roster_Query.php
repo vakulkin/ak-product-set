@@ -16,12 +16,13 @@ class Roster_Query {
     /** @var array<int, array> */
     private static array $participants_cache = [];
 
-    // -------------------------------------------------------------------------
-    // Public API
-    // -------------------------------------------------------------------------
+    public static function reset_cache(): void {
+        self::$weekends_cache = null;
+        self::$participants_cache = [];
+    }
 
     /**
-     * Get weekend products that have at least one decomposed order item.
+     * Get weekend products that are assigned to AK Sets or have at least one decomposed order item.
      * Sorted alphabetically by product title.
      *
      * @return array<int, string>  Map of product_id => product title
@@ -31,7 +32,7 @@ class Roster_Query {
             return self::$weekends_cache;
         }
 
-        $product_ids = self::fetch_weekend_product_ids_with_orders();
+        $product_ids = self::fetch_all_weekend_product_ids();
 
         $result = [];
         foreach ($product_ids as $pid) {
@@ -173,6 +174,44 @@ class Roster_Query {
     // -------------------------------------------------------------------------
     // Private DB helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Return all weekend product IDs: both from existing orders and from all published AK Sets.
+     *
+     * @return int[]
+     */
+    private static function fetch_all_weekend_product_ids(): array {
+        $ordered_ids = self::fetch_weekend_product_ids_with_orders();
+
+        $set_product_ids = [];
+        if (function_exists('get_posts')) {
+            $set_posts = get_posts([
+                'post_type'      => 'ak_set',
+                'posts_per_page' => -1,
+                'post_status'    => 'publish',
+                'fields'         => 'ids',
+            ]);
+
+            if (!empty($set_posts) && is_array($set_posts)) {
+                foreach ($set_posts as $set_id) {
+                    if (function_exists('get_field')) {
+                        $products = get_field('set_products', $set_id);
+                        if (!empty($products) && is_array($products)) {
+                            foreach ($products as $p) {
+                                $pid = is_object($p) ? (int) $p->ID : (int) $p;
+                                if ($pid > 0) {
+                                    $set_product_ids[] = $pid;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        $all_ids = array_unique(array_merge($ordered_ids, $set_product_ids));
+        return array_values($all_ids);
+    }
 
     /**
      * Return distinct weekend product IDs present in at least one decomposed

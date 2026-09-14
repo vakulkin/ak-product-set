@@ -115,6 +115,57 @@ class Weekend_Model {
         return get_field('ak_event_location', $this->product_id);
     }
 
+    public function get_round_1_end_datetime() {
+        return get_field('ak_round_1_end_datetime', $this->product_id);
+    }
+
+    public function get_round_2_end_datetime() {
+        return get_field('ak_round_2_end_datetime', $this->product_id);
+    }
+
+    public function get_round_3_end_datetime() {
+        return get_field('ak_round_3_end_datetime', $this->product_id);
+    }
+
+    /**
+     * Resolve active round (1, 2, or 3) for this weekend product.
+     *
+     * @param int|null $current_timestamp
+     * @return int (1, 2, or 3)
+     */
+    public function get_current_round($current_timestamp = null) {
+        if ($current_timestamp === null) {
+            $current_timestamp = current_time('timestamp');
+        }
+
+        $r1_end = $this->get_round_1_end_datetime();
+        $r2_end = $this->get_round_2_end_datetime();
+
+        // If Round 1 end date is not set, Round 1 lasts forever.
+        if (empty($r1_end)) {
+            return 1;
+        }
+
+        $r1_ts = strtotime($r1_end);
+        if ($r1_ts === false || $current_timestamp <= $r1_ts) {
+            return 1;
+        }
+
+        // Round 1 has expired.
+        // If Round 2 end date is not set, Round 2 lasts forever.
+        if (empty($r2_end)) {
+            return 2;
+        }
+
+        $r2_ts = strtotime($r2_end);
+        if ($r2_ts === false || $current_timestamp <= $r2_ts) {
+            return 2;
+        }
+
+        // Round 2 has expired -> Round 3.
+        return 3;
+    }
+
     /**
      * Check if sales/recruitment is expired for this weekend.
      *

@@ -34,12 +34,17 @@ $pre_selected = is_array($pre_selected_raw) ? array_map('intval', $pre_selected_
             $end_dt       = $weekend->get_event_end_datetime();
             $recr_start   = $weekend->get_recruitment_start_datetime();
             $recr_end     = $weekend->get_recruitment_end_datetime();
+            $round_num    = $weekend->get_current_round();
+            $r1_end       = $weekend->get_round_1_end_datetime();
+            $r2_end       = $weekend->get_round_2_end_datetime();
+            $r3_end       = $weekend->get_round_3_end_datetime();
             $location     = $weekend->get_event_location();
             $image_url    = $weekend->get_image_url('woocommerce_thumbnail');
             $main_desc    = $weekend->get_description();
             ?>
             <div class="ak-weekend-card <?php echo $is_disabled ? 'disabled' : ''; ?> <?php echo $is_checked ? 'selected' : ''; ?>"
                  data-weekend-id="<?php echo esc_attr($wid); ?>"
+                 data-round="<?php echo esc_attr($round_num); ?>"
                  data-managing-stock="<?php echo esc_attr($managing_stock ? '1' : '0'); ?>"
                  data-stock="<?php echo esc_attr($stock !== null ? $stock : ''); ?>">
 
@@ -121,6 +126,22 @@ $pre_selected = is_array($pre_selected_raw) ? array_map('intval', $pre_selected_
                         <?php endif; ?>
 
                         <div class="ak-weekend-status-badge">
+                            <?php if (!$is_expired): ?>
+                                <?php if ($round_num === 1): ?>
+                                    <span class="ak-badge info" style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;">
+                                        <?php echo esc_html(!empty($r1_end) ? sprintf(__('Runda 1 do %s', 'ak-product-set'), date_i18n('d.m.Y', strtotime($r1_end))) : __('Runda 1 (Early Bird)', 'ak-product-set')); ?>
+                                    </span>
+                                <?php elseif ($round_num === 2): ?>
+                                    <span class="ak-badge info" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;">
+                                        <?php echo esc_html(!empty($r2_end) ? sprintf(__('Runda 2 do %s', 'ak-product-set'), date_i18n('d.m.Y', strtotime($r2_end))) : __('Runda 2 (Regular)', 'ak-product-set')); ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span class="ak-badge info" style="background:#f3e8ff;color:#6b21a8;border:1px solid #e9d5ff;">
+                                        <?php echo esc_html(!empty($r3_end) ? sprintf(__('Runda 3 do %s', 'ak-product-set'), date_i18n('d.m.Y', strtotime($r3_end))) : __('Runda 3', 'ak-product-set')); ?>
+                                    </span>
+                                <?php endif; ?>
+                            <?php endif; ?>
+
                             <?php if ($is_expired): ?>
                                 <span class="ak-badge danger"><?php esc_html_e('Rekrutacja zakończona', 'ak-product-set'); ?></span>
                             <?php elseif ($managing_stock && $stock !== null && $stock <= 0): ?>

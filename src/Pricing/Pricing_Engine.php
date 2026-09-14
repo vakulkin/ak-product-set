@@ -93,8 +93,12 @@ class Pricing_Engine {
 
         $headcount = max(1, (int)$requested_headcount);
 
-        // Server-side Round & Group Tier Resolution
-        $round = Round_Resolver::resolve_round($set);
+        // Server-side Round & Group Tier Resolution (Variant A: Max Round across selected weekends)
+        $weekend_rounds = [];
+        foreach ($selected_weekend_ids as $wid) {
+            $weekend_rounds[(int)$wid] = Round_Resolver::resolve_weekend_round((int)$wid);
+        }
+        $round = Round_Resolver::resolve_package_round($selected_weekend_ids);
         $tier = self::resolve_group_tier($headcount);
 
         // Look up per-person unit price from 3D Set Matrix
@@ -125,6 +129,7 @@ class Pricing_Engine {
             'set_id'              => $set->get_id(),
             'package_size'        => $package_size,
             'round'               => $round,
+            'weekend_rounds'      => $weekend_rounds,
             'tier'                => $tier,
             'headcount'           => $headcount,
             'requested_headcount' => $headcount,

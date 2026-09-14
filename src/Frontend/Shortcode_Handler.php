@@ -160,6 +160,10 @@ class Shortcode_Handler
                 'event_end'         => $w->get_event_end_datetime(),
                 'recruitment_start' => $w->get_recruitment_start_datetime(),
                 'recruitment_end'   => $w->get_recruitment_end_datetime(),
+                'round_1_end'       => $w->get_round_1_end_datetime(),
+                'round_2_end'       => $w->get_round_2_end_datetime(),
+                'round_3_end'       => $w->get_round_3_end_datetime(),
+                'current_round'     => $w->get_current_round(),
                 'location'          => $w->get_event_location(),
             ];
         }
@@ -169,8 +173,6 @@ class Shortcode_Handler
             'nonce'        => wp_create_nonce('ak_set_nonce'),
             'set_id'       => $set_id,
             'has_tshirt'   => $set->has_tshirt(),
-            'round_1_end'  => $set->get_round_1_end_date(),
-            'round_2_end'  => $set->get_round_2_end_date(),
             'matrix'       => $set_matrix,
             'tshirt_sizes' => Helper::get_tshirt_sizes(),
             'tshirt_cuts'  => Helper::get_tshirt_cuts(),

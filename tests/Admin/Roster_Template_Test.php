@@ -26,5 +26,6 @@ class Roster_Template_Test extends TestCase {
 
         $this->assertNotEmpty($output);
         $this->assertStringContainsString('Rejestr uczestników', $output);
+        $this->assertStringContainsString('Pobierz CSV', $output);
     }
 }

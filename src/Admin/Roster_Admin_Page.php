@@ -30,6 +30,16 @@ class Roster_Admin_Page {
             'dashicons-groups',
             30
         );
+
+        // Also register as submenu under AK Zestawy for direct discovery by administrators
+        add_submenu_page(
+            'edit.php?post_type=ak_set',
+            __('Rejestr i eksport uczestników', 'ak-product-set'),
+            __('Rejestr i eksport', 'ak-product-set'),
+            'ak_view_roster',
+            self::MENU_SLUG,
+            [$this, 'render_page']
+        );
     }
 
     // -------------------------------------------------------------------------

@@ -136,6 +136,31 @@ class ACF_Registrar {
                     'return_format' => 'Y-m-d H:i:s',
                 ],
                 [
+                    'key' => 'field_ak_round_1_end_datetime',
+                    'label' => __('Koniec Rundy 1 (Early Bird)', 'ak-product-set'),
+                    'name' => 'ak_round_1_end_datetime',
+                    'type' => 'date_time_picker',
+                    'display_format' => 'Y-m-d H:i',
+                    'return_format' => 'Y-m-d H:i:s',
+                ],
+                [
+                    'key' => 'field_ak_round_2_end_datetime',
+                    'label' => __('Koniec Rundy 2 (Regular)', 'ak-product-set'),
+                    'name' => 'ak_round_2_end_datetime',
+                    'type' => 'date_time_picker',
+                    'display_format' => 'Y-m-d H:i',
+                    'return_format' => 'Y-m-d H:i:s',
+                ],
+                [
+                    'key' => 'field_ak_round_3_end_datetime',
+                    'label' => __('Koniec Rundy 3 (Ostateczny termin / Late)', 'ak-product-set'),
+                    'name' => 'ak_round_3_end_datetime',
+                    'type' => 'date_time_picker',
+                    'instructions' => __('Opcjonalnie. Jeśli puste, Runda 3 trwa do końca rekrutacji.', 'ak-product-set'),
+                    'display_format' => 'Y-m-d H:i',
+                    'return_format' => 'Y-m-d H:i:s',
+                ],
+                [
                     'key' => 'field_ak_event_location',
                     'label' => __('Lokalizacja / Miejsce', 'ak-product-set'),
                     'name' => 'ak_event_location',
@@ -154,24 +179,7 @@ class ACF_Registrar {
         ]);
 
         // Group 3: Set Dynamic 3D Pricing Grid (on ak_set CPT)
-        $pricing_fields = [
-            [
-                'key' => 'field_round_1_end_date',
-                'label' => __('Koniec Rundy 1 (Early Bird)', 'ak-product-set'),
-                'name' => 'round_1_end_date',
-                'type' => 'date_time_picker',
-                'display_format' => 'Y-m-d H:i',
-                'return_format' => 'Y-m-d H:i:s',
-            ],
-            [
-                'key' => 'field_round_2_end_date',
-                'label' => __('Koniec Rundy 2 (Regular)', 'ak-product-set'),
-                'name' => 'round_2_end_date',
-                'type' => 'date_time_picker',
-                'display_format' => 'Y-m-d H:i',
-                'return_format' => 'Y-m-d H:i:s',
-            ],
-        ];
+        $pricing_fields = [];
 
         // Populate pricing grid on ak_set: X = 1..10, Y = 1..3, tier = ind, g5, g10
         $tiers = [

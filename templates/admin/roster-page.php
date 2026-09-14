@@ -138,27 +138,25 @@ $all_csv_url = wp_nonce_url($base_url . '&ak_export=all', Roster_Admin_Page::NON
         </div>
     </form>
 
-    <!-- Single toolbar row — always visible when there are any weekends ---- -->
-    <?php if (!empty($weekends)) : ?>
-        <div class="ak-roster-toolbar">
-            <?php if ($csv_url) : ?>
-                <a href="<?php echo esc_url($csv_url); ?>" class="button button-primary">
-                    <?php esc_html_e('Pobierz CSV (ten termin)', 'ak-product-set'); ?>
-                </a>
-            <?php endif; ?>
-            <a href="<?php echo esc_url($all_csv_url); ?>" class="button">
-                <?php esc_html_e('Pobierz CSV (wszystkie terminy)', 'ak-product-set'); ?>
+    <!-- Single toolbar row — always visible ---- -->
+    <div class="ak-roster-toolbar">
+        <?php if ($csv_url) : ?>
+            <a href="<?php echo esc_url($csv_url); ?>" class="button button-primary">
+                <?php esc_html_e('Pobierz CSV (ten termin)', 'ak-product-set'); ?>
             </a>
-            <?php if ($count > 0) : ?>
-                <span class="ak-roster-count">
-                    <?php echo esc_html(sprintf(
-                        _n('%d uczestnik', '%d uczestników', $count, 'ak-product-set'),
-                        $count
-                    )); ?>
-                </span>
-            <?php endif; ?>
-        </div>
-    <?php endif; ?>
+        <?php endif; ?>
+        <a href="<?php echo esc_url($all_csv_url); ?>" class="button">
+            <?php esc_html_e('Pobierz CSV (wszystkie terminy)', 'ak-product-set'); ?>
+        </a>
+        <?php if ($count > 0) : ?>
+            <span class="ak-roster-count">
+                <?php echo esc_html(sprintf(
+                    _n('%d uczestnik', '%d uczestników', $count, 'ak-product-set'),
+                    $count
+                )); ?>
+            </span>
+        <?php endif; ?>
+    </div>
 
     <?php if (!$selected_weekend) : ?>
         <!-- Prompt state -------------------------------------------------- -->
