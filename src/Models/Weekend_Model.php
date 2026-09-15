@@ -123,10 +123,6 @@ class Weekend_Model {
         return get_field('ak_round_2_end_datetime', $this->product_id);
     }
 
-    public function get_round_3_end_datetime() {
-        return get_field('ak_round_3_end_datetime', $this->product_id);
-    }
-
     /**
      * Resolve active round (1, 2, or 3) for this weekend product.
      *

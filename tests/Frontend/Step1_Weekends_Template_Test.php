@@ -37,7 +37,6 @@ class Step1_Weekends_Template_Test extends TestCase
         $pastWeekend->shouldReceive('get_current_round')->andReturn(1);
         $pastWeekend->shouldReceive('get_round_1_end_datetime')->andReturn('');
         $pastWeekend->shouldReceive('get_round_2_end_datetime')->andReturn('');
-        $pastWeekend->shouldReceive('get_round_3_end_datetime')->andReturn('');
         $pastWeekend->shouldReceive('get_event_location')->andReturn('Warszawa');
         $pastWeekend->shouldReceive('get_image_url')->andReturn('http://example.com/img.jpg');
         $pastWeekend->shouldReceive('get_description')->andReturn('Past event description');
@@ -82,7 +81,6 @@ class Step1_Weekends_Template_Test extends TestCase
         $activeWeekend->shouldReceive('get_current_round')->andReturn(1);
         $activeWeekend->shouldReceive('get_round_1_end_datetime')->andReturn('2028-05-01 23:59:59');
         $activeWeekend->shouldReceive('get_round_2_end_datetime')->andReturn('');
-        $activeWeekend->shouldReceive('get_round_3_end_datetime')->andReturn('');
         $activeWeekend->shouldReceive('get_event_location')->andReturn('Kraków');
         $activeWeekend->shouldReceive('get_image_url')->andReturn('http://example.com/img2.jpg');
         $activeWeekend->shouldReceive('get_description')->andReturn('Active event description');
@@ -108,5 +106,36 @@ class Step1_Weekends_Template_Test extends TestCase
 
         // 4. Card must not be disabled
         $this->assertStringNotContainsString('ak-weekend-card disabled', $html);
+    }
+
+    public function test_round_3_uses_recruitment_end_date_for_badge(): void
+    {
+        $r3Weekend = Mockery::mock(Weekend_Model::class);
+        $r3Weekend->shouldReceive('get_id')->andReturn(303);
+        $r3Weekend->shouldReceive('is_expired')->andReturn(false);
+        $r3Weekend->shouldReceive('managing_stock')->andReturn(false);
+        $r3Weekend->shouldReceive('get_stock_quantity')->andReturn(null);
+        $r3Weekend->shouldReceive('get_event_start_datetime')->andReturn('2028-09-01 10:00:00');
+        $r3Weekend->shouldReceive('get_event_end_datetime')->andReturn('2028-09-02 18:00:00');
+        $r3Weekend->shouldReceive('get_recruitment_start_datetime')->andReturn('2028-01-01 10:00:00');
+        $r3Weekend->shouldReceive('get_recruitment_end_datetime')->andReturn('2028-08-25 23:59:59');
+        $r3Weekend->shouldReceive('get_current_round')->andReturn(3);
+        $r3Weekend->shouldReceive('get_round_1_end_datetime')->andReturn('2028-06-01 23:59:59');
+        $r3Weekend->shouldReceive('get_round_2_end_datetime')->andReturn('2028-07-01 23:59:59');
+        $r3Weekend->shouldReceive('get_event_location')->andReturn('Gdańsk');
+        $r3Weekend->shouldReceive('get_image_url')->andReturn('');
+        $r3Weekend->shouldReceive('get_description')->andReturn('');
+        $r3Weekend->shouldReceive('get_title')->andReturn('Weekend 3');
+
+        $weekends = [$r3Weekend];
+        $pre_selected_raw = [];
+
+        $template_path = dirname(__DIR__, 2) . '/templates/frontend/step-1-weekends.php';
+        ob_start();
+        include $template_path;
+        $html = ob_get_clean();
+
+        // Round 3 badge should format using recruitment end date
+        $this->assertStringContainsString('Runda 3 do 25.08.2028', $html);
     }
 }

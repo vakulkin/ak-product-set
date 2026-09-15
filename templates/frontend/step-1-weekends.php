@@ -37,7 +37,6 @@ $pre_selected = is_array($pre_selected_raw) ? array_map('intval', $pre_selected_
             $round_num    = $weekend->get_current_round();
             $r1_end       = $weekend->get_round_1_end_datetime();
             $r2_end       = $weekend->get_round_2_end_datetime();
-            $r3_end       = $weekend->get_round_3_end_datetime();
             $location     = $weekend->get_event_location();
             $image_url    = $weekend->get_image_url('woocommerce_thumbnail');
             $main_desc    = $weekend->get_description();
@@ -146,7 +145,7 @@ $pre_selected = is_array($pre_selected_raw) ? array_map('intval', $pre_selected_
                                     <span class="ak-badge info" style="background:#f3e8ff;color:#6b21a8;border:1px solid #e9d5ff;">
                                         <?php
                                         /* translators: %s: round deadline date */
-                                        echo esc_html(!empty($r3_end) ? sprintf(__('Runda 3 do %s', 'ak-product-set'), date_i18n('d.m.Y', strtotime($r3_end))) : __('Runda 3 [Late]', 'ak-product-set'));
+                                        echo esc_html(!empty($recr_end) ? sprintf(__('Runda 3 do %s', 'ak-product-set'), date_i18n('d.m.Y', strtotime($recr_end))) : __('Runda 3 [Late]', 'ak-product-set'));
                                         ?>
                                     </span>
                                 <?php endif; ?>

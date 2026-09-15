@@ -138,49 +138,41 @@ msgid "Koniec Rundy 2 [Regular]"
 msgstr "Koniec Rundy 2 [Regular]"
 
 #: src/Admin/ACF_Registrar.php:156
-msgid "Koniec Rundy 3 [Ostateczny termin / Late]"
-msgstr "Koniec Rundy 3 [Ostateczny termin / Late]"
-
-#: src/Admin/ACF_Registrar.php:159
-msgid "Opcjonalnie. Jeśli puste, Runda 3 trwa do końca rekrutacji."
-msgstr "Opcjonalnie. Jeśli puste, Runda 3 trwa do końca rekrutacji."
-
-#: src/Admin/ACF_Registrar.php:165
 msgid "Lokalizacja / Miejsce"
 msgstr "Lokalizacja / Miejsce"
 
-#: src/Admin/ACF_Registrar.php:186
+#: src/Admin/ACF_Registrar.php:177
 msgid "1 osoba"
 msgstr "1 osoba"
 
-#: src/Admin/ACF_Registrar.php:187
+#: src/Admin/ACF_Registrar.php:178
 msgid "Grupa 5-9 os."
 msgstr "Grupa 5-9 os."
 
-#: src/Admin/ACF_Registrar.php:188
+#: src/Admin/ACF_Registrar.php:179
 msgid "Grupa 10+ os."
 msgstr "Grupa 10+ os."
 
 #. translators: %d: round number
-#: src/Admin/ACF_Registrar.php:196
+#: src/Admin/ACF_Registrar.php:187
 #: src/Frontend/Ajax_Controller.php:67
 #, php-format
 msgid "Runda %d"
 msgstr "Runda %d"
 
 #. translators: %1$d: number of weekends, %2$s: tier label
-#: src/Admin/ACF_Registrar.php:205
+#: src/Admin/ACF_Registrar.php:196
 #, php-format
 msgid "Pakiet %1$d w. [%2$s]"
 msgstr "Pakiet %1$d w. [%2$s]"
 
 #. translators: %1$d: number of weekends, %2$d: round number, %3$s: tier label
-#: src/Admin/ACF_Registrar.php:207
+#: src/Admin/ACF_Registrar.php:198
 #, php-format
 msgid "Cena za 1 os. za pakiet %1$d weekendów w Rundzie %2$d [%3$s]"
 msgstr "Cena za 1 os. za pakiet %1$d weekendów w Rundzie %2$d [%3$s]"
 
-#: src/Admin/ACF_Registrar.php:226
+#: src/Admin/ACF_Registrar.php:217
 msgid "Cennik Dynamiczny Zestawu [Matrix 3D]"
 msgstr "Cennik Dynamiczny Zestawu [Matrix 3D]"
 
@@ -232,7 +224,7 @@ msgid "Termin"
 msgstr "Termin"
 
 #: src/Admin/Roster_Admin_Page.php:175
-#: src/Frontend/Shortcode_Handler.php:189
+#: src/Frontend/Shortcode_Handler.php:188
 #: templates/admin/roster-page.php:185
 msgid "Imię i nazwisko"
 msgstr "Imię i nazwisko"
@@ -243,7 +235,7 @@ msgid "E-mail"
 msgstr "E-mail"
 
 #: src/Admin/Roster_Admin_Page.php:177
-#: src/Frontend/Shortcode_Handler.php:191
+#: src/Frontend/Shortcode_Handler.php:190
 #: templates/admin/roster-page.php:187
 msgid "Telefon"
 msgstr "Telefon"
@@ -448,7 +440,7 @@ msgid "Zestaw nie istnieje."
 msgstr "Zestaw nie istnieje."
 
 #: src/Frontend/Ajax_Controller.php:121
-#: src/Frontend/Shortcode_Handler.php:209
+#: src/Frontend/Shortcode_Handler.php:208
 msgid "Nie udało się dodać zestawu do koszyka."
 msgstr "Nie udało się dodać zestawu do koszyka."
 
@@ -462,28 +454,28 @@ msgstr "Zestaw został usunięty z koszyka."
 
 #. translators: %d: participant number
 #: src/Frontend/Ajax_Controller.php:187
-#: src/Frontend/Shortcode_Handler.php:196
+#: src/Frontend/Shortcode_Handler.php:195
 #, php-format
 msgid "Proszę podać imię i nazwisko dla Uczestnika %d."
 msgstr "Proszę podać imię i nazwisko dla Uczestnika %d."
 
 #. translators: %d: participant number
 #: src/Frontend/Ajax_Controller.php:192
-#: src/Frontend/Shortcode_Handler.php:198
+#: src/Frontend/Shortcode_Handler.php:197
 #, php-format
 msgid "Proszę podać prawidłowy adres e-mail dla Uczestnika %d [np. jan@example.com]."
 msgstr "Proszę podać prawidłowy adres e-mail dla Uczestnika %d [np. jan@example.com]."
 
 #. translators: %d: participant number
 #: src/Frontend/Ajax_Controller.php:198
-#: src/Frontend/Shortcode_Handler.php:200
+#: src/Frontend/Shortcode_Handler.php:199
 #, php-format
 msgid "Proszę podać prawidłowy numer telefonu dla Uczestnika %d [np. +48 600 000 000]."
 msgstr "Proszę podać prawidłowy numer telefonu dla Uczestnika %d [np. +48 600 000 000]."
 
 #. translators: %d: participant number
 #: src/Frontend/Ajax_Controller.php:203
-#: src/Frontend/Shortcode_Handler.php:202
+#: src/Frontend/Shortcode_Handler.php:201
 #, php-format
 msgid "Proszę wybrać rozmiar koszulki dla Uczestnika %d."
 msgstr "Proszę wybrać rozmiar koszulki dla Uczestnika %d."
@@ -497,66 +489,66 @@ msgid "Ten zestaw nie posiada jeszcze przypisanych terminów/weekendów."
 msgstr "Ten zestaw nie posiada jeszcze przypisanych terminów/weekendów."
 
 #. translators: %1$d: max limit, %2$d: declared persons, %3$d: persons to remove
-#: src/Frontend/Shortcode_Handler.php:185
+#: src/Frontend/Shortcode_Handler.php:184
 #, php-format
 msgid "Dostępność miejsc uległa zmianie. Dostępny limit wynosi %1$d miejsc [zadeklarowano %2$d os.]. Proszę usunąć %3$d uczestników, aby kontynuować."
 msgstr "Dostępność miejsc uległa zmianie. Dostępny limit wynosi %1$d miejsc [zadeklarowano %2$d os.]. Proszę usunąć %3$d uczestników, aby kontynuować."
 
 #. translators: %d: participant number
-#: src/Frontend/Shortcode_Handler.php:187
+#: src/Frontend/Shortcode_Handler.php:186
 #: src/Support/Helper.php:117
 #, php-format
 msgid "Uczestnik %d"
 msgstr "Uczestnik %d"
 
-#: src/Frontend/Shortcode_Handler.php:188
+#: src/Frontend/Shortcode_Handler.php:187
 msgid "Usuń"
 msgstr "Usuń"
 
-#: src/Frontend/Shortcode_Handler.php:190
+#: src/Frontend/Shortcode_Handler.php:189
 msgid "Adres e-mail"
 msgstr "Adres e-mail"
 
-#: src/Frontend/Shortcode_Handler.php:192
+#: src/Frontend/Shortcode_Handler.php:191
 msgid "Rozmiar koszulki"
 msgstr "Rozmiar koszulki"
 
-#: src/Frontend/Shortcode_Handler.php:193
+#: src/Frontend/Shortcode_Handler.php:192
 msgid "Wybierz rozmiar"
 msgstr "Wybierz rozmiar"
 
-#: src/Frontend/Shortcode_Handler.php:194
+#: src/Frontend/Shortcode_Handler.php:193
 msgid "Krój koszulki"
 msgstr "Krój koszulki"
 
 #. translators: %d: max limit
-#: src/Frontend/Shortcode_Handler.php:204
+#: src/Frontend/Shortcode_Handler.php:203
 #, php-format
 msgid "Nie możesz dodać kolejnego uczestnika. Osiągnięto limit miejsc [%d os.]."
 msgstr "Nie możesz dodać kolejnego uczestnika. Osiągnięto limit miejsc [%d os.]."
 
-#: src/Frontend/Shortcode_Handler.php:205
+#: src/Frontend/Shortcode_Handler.php:204
 msgid "Błąd przeliczenia ceny."
 msgstr "Błąd przeliczenia ceny."
 
-#: src/Frontend/Shortcode_Handler.php:206
+#: src/Frontend/Shortcode_Handler.php:205
 msgid "Błąd połączenia z serwerem przy przeliczaniu ceny."
 msgstr "Błąd połączenia z serwerem przy przeliczaniu ceny."
 
-#: src/Frontend/Shortcode_Handler.php:207
+#: src/Frontend/Shortcode_Handler.php:206
 msgid "Błąd środowiska: brak biblioteki jQuery."
 msgstr "Błąd środowiska: brak biblioteki jQuery."
 
-#: src/Frontend/Shortcode_Handler.php:208
+#: src/Frontend/Shortcode_Handler.php:207
 msgid "Zestaw został dodany do koszyka."
 msgstr "Zestaw został dodany do koszyka."
 
-#: src/Frontend/Shortcode_Handler.php:210
+#: src/Frontend/Shortcode_Handler.php:209
 msgid "Błąd połączenia z serwerem. Spróbuj ponownie."
 msgstr "Błąd połączenia z serwerem. Spróbuj ponownie."
 
 #. translators: %d: max limit
-#: src/Frontend/Shortcode_Handler.php:212
+#: src/Frontend/Shortcode_Handler.php:211
 #, php-format
 msgid "Dostępny limit: %d os."
 msgstr "Dostępny limit: %d os."
@@ -640,76 +632,76 @@ msgstr "Wybierz terminy"
 msgid "Zaznacz co najmniej jeden termin. Rabaty grupowe naliczają się automatycznie od 5 i 10 osób."
 msgstr "Zaznacz co najmniej jeden termin. Rabaty grupowe naliczają się automatycznie od 5 i 10 osób."
 
-#: templates/frontend/step-1-weekends.php:85
+#: templates/frontend/step-1-weekends.php:84
 msgid "Wydarzenie:"
 msgstr "Wydarzenie:"
 
-#: templates/frontend/step-1-weekends.php:101
+#: templates/frontend/step-1-weekends.php:100
 msgid "Rekrutacja:"
 msgstr "Rekrutacja:"
 
-#: templates/frontend/step-1-weekends.php:117
+#: templates/frontend/step-1-weekends.php:116
 msgid "Lokalizacja:"
 msgstr "Lokalizacja:"
 
 #. translators: %s: round deadline date
-#: templates/frontend/step-1-weekends.php:135
+#: templates/frontend/step-1-weekends.php:134
 #, php-format
 msgid "Runda 1 do %s"
 msgstr "Runda 1 do %s"
 
 #. translators: %s: round deadline date
-#: templates/frontend/step-1-weekends.php:135
+#: templates/frontend/step-1-weekends.php:134
 msgid "Runda 1 [Early Bird]"
 msgstr "Runda 1 [Early Bird]"
 
 #. translators: %s: round deadline date
-#: templates/frontend/step-1-weekends.php:142
+#: templates/frontend/step-1-weekends.php:141
 #, php-format
 msgid "Runda 2 do %s"
 msgstr "Runda 2 do %s"
 
 #. translators: %s: round deadline date
-#: templates/frontend/step-1-weekends.php:142
+#: templates/frontend/step-1-weekends.php:141
 msgid "Runda 2 [Regular]"
 msgstr "Runda 2 [Regular]"
 
 #. translators: %s: round deadline date
-#: templates/frontend/step-1-weekends.php:149
+#: templates/frontend/step-1-weekends.php:148
 #, php-format
 msgid "Runda 3 do %s"
 msgstr "Runda 3 do %s"
 
 #. translators: %s: round deadline date
-#: templates/frontend/step-1-weekends.php:149
+#: templates/frontend/step-1-weekends.php:148
 msgid "Runda 3 [Late]"
 msgstr "Runda 3 [Late]"
 
-#: templates/frontend/step-1-weekends.php:156
+#: templates/frontend/step-1-weekends.php:155
 msgid "Rekrutacja zakończona"
 msgstr "Rekrutacja zakończona"
 
-#: templates/frontend/step-1-weekends.php:158
+#: templates/frontend/step-1-weekends.php:157
 msgid "Brak miejsc"
 msgstr "Brak miejsc"
 
 #. translators: %d: number of seats left
-#: templates/frontend/step-1-weekends.php:162
+#: templates/frontend/step-1-weekends.php:161
 #, php-format
 msgid "Zostało %d miejsc"
 msgstr "Zostało %d miejsc"
 
 #. translators: %d: number of available seats
-#: templates/frontend/step-1-weekends.php:167
+#: templates/frontend/step-1-weekends.php:166
 #, php-format
 msgid "%d miejsc dostępnych"
 msgstr "%d miejsc dostępnych"
 
-#: templates/frontend/step-1-weekends.php:170
+#: templates/frontend/step-1-weekends.php:169
 msgid "Miejsca dostępne"
 msgstr "Miejsca dostępne"
 
-#: templates/frontend/step-1-weekends.php:182
+#: templates/frontend/step-1-weekends.php:181
 msgid "Dalej"
 msgstr "Dalej"
 

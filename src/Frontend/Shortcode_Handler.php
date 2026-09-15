@@ -162,7 +162,6 @@ class Shortcode_Handler
                 'recruitment_end'   => $w->get_recruitment_end_datetime(),
                 'round_1_end'       => $w->get_round_1_end_datetime(),
                 'round_2_end'       => $w->get_round_2_end_datetime(),
-                'round_3_end'       => $w->get_round_3_end_datetime(),
                 'current_round'     => $w->get_current_round(),
                 'location'          => $w->get_event_location(),
             ];

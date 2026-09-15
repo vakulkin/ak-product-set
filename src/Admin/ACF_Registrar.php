@@ -152,15 +152,6 @@ class ACF_Registrar {
                     'return_format' => 'Y-m-d H:i:s',
                 ],
                 [
-                    'key' => 'field_ak_round_3_end_datetime',
-                    'label' => __('Koniec Rundy 3 [Ostateczny termin / Late]', 'ak-product-set'),
-                    'name' => 'ak_round_3_end_datetime',
-                    'type' => 'date_time_picker',
-                    'instructions' => __('Opcjonalnie. Jeśli puste, Runda 3 trwa do końca rekrutacji.', 'ak-product-set'),
-                    'display_format' => 'Y-m-d H:i',
-                    'return_format' => 'Y-m-d H:i:s',
-                ],
-                [
                     'key' => 'field_ak_event_location',
                     'label' => __('Lokalizacja / Miejsce', 'ak-product-set'),
                     'name' => 'ak_event_location',
