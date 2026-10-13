@@ -128,9 +128,10 @@ class Plugin {
         $this->services['order_participant_manager'] = new Admin\Order_Participant_Manager();
 
         // Frontend & Shortcode
-        $this->services['catalog_excluder'] = new Frontend\Catalog_Excluder();
-        $this->services['shortcode_handler'] = new Frontend\Shortcode_Handler();
-        $this->services['ajax_controller'] = new Frontend\Ajax_Controller();
+        $this->services['catalog_excluder']      = new Frontend\Catalog_Excluder();
+        $this->services['shortcode_handler']     = new Frontend\Shortcode_Handler();
+        $this->services['ajax_controller']       = new Frontend\Ajax_Controller();
+        $this->services['checkout_nip_handler']  = new Frontend\Checkout_NIP_Handler();
 
         // Initialize services
         foreach ($this->services as $service) {

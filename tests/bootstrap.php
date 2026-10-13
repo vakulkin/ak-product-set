@@ -71,6 +71,12 @@ if (!function_exists('sanitize_text_field')) {
     }
 }
 
+if (!function_exists('sanitize_textarea_field')) {
+    function sanitize_textarea_field($str) {
+        return trim(strip_tags($str));
+    }
+}
+
 if (!function_exists('sanitize_key')) {
     function sanitize_key($key) {
         return strtolower(preg_replace('/[^a-z0-9_\-]/i', '', $key));
