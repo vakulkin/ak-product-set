@@ -160,6 +160,29 @@ if (!function_exists('update_option')) {
     }
 }
 
+if (!function_exists('get_current_user_id')) {
+    function get_current_user_id() {
+        return $GLOBALS['_wp_current_user_id'] ?? 0;
+    }
+}
+
+if (!function_exists('get_user_meta')) {
+    function get_user_meta($user_id, $key = '', $single = false) {
+        if ($key === '') {
+            return $GLOBALS['_wp_user_meta'][$user_id] ?? [];
+        }
+        $val = $GLOBALS['_wp_user_meta'][$user_id][$key] ?? ($single ? '' : []);
+        return $val;
+    }
+}
+
+if (!function_exists('update_user_meta')) {
+    function update_user_meta($user_id, $key, $value) {
+        $GLOBALS['_wp_user_meta'][$user_id][$key] = $value;
+        return true;
+    }
+}
+
 if (!function_exists('get_post_type')) {
     function get_post_type($post = null) {
         return 'product';
