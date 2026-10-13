@@ -170,3 +170,15 @@ if (!function_exists('did_action')) {
         return 0;
     }
 }
+
+if (!function_exists('maybe_unserialize')) {
+    function maybe_unserialize($original) {
+        if (is_string($original)) {
+            $unserialized = @unserialize($original);
+            if ($unserialized !== false || $original === 'b:0;') {
+                return $unserialized;
+            }
+        }
+        return $original;
+    }
+}

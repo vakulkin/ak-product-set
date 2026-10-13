@@ -92,6 +92,11 @@ class Roster_Query {
             $date_paid      = $order_info['date_paid']      ?? '';
             $payment_method = $order_info['payment_method'] ?? '';
 
+            // Hide cancelled and trashed orders from all roster listings and exports
+            if (empty($order_info) || in_array($order_status, ['cancelled', 'wc-cancelled', 'trash'], true)) {
+                continue;
+            }
+
             $set_id   = isset($item_meta['_ak_parent_set_id']) ? (int) $item_meta['_ak_parent_set_id'] : 0;
             $set      = $set_id > 0 ? new Set_Model($set_id) : null;
             $set_name = $set ? $set->get_title() : '';
