@@ -22,6 +22,25 @@ class Order_Recalculator_Test extends TestCase {
         unset($GLOBALS['_wp_options']['ak_set_tshirt_cost']);
     }
 
+    public function test_get_tshirt_cost_prefers_set_level_override(): void {
+        Functions\when('get_field')->alias(function($field, $post_id) {
+            if ($field === 'set_tshirt_cost' && $post_id === 42) {
+                return '75.00';
+            }
+            return null;
+        });
+
+        update_option('ak_set_tshirt_cost', '50.00');
+
+        $cost_set = Order_Recalculator::get_tshirt_cost(42);
+        $cost_default = Order_Recalculator::get_tshirt_cost(99);
+
+        $this->assertEquals(75.00, $cost_set);
+        $this->assertEquals(50.00, $cost_default);
+
+        unset($GLOBALS['_wp_options']['ak_set_tshirt_cost']);
+    }
+
     public function test_detect_total_headcount_counts_unique_participant_uuids(): void {
         $item1 = Mockery::mock('WC_Order_Item_Product');
         $item1->shouldReceive('get_meta')->with('_ak_participants')->andReturn([

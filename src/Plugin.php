@@ -40,6 +40,7 @@ class Plugin {
         $this->services['acf_registrar']     = new Admin\ACF_Registrar();
         $this->services['roster_page']       = new Admin\Roster_Admin_Page();
         $this->services['roster_guard']      = new Admin\Roster_Access_Guard();
+        $this->services['settings_page']     = new Admin\Plugin_Settings_Page();
 
         // Ensure roster manager role and capabilities are synced
         $roster_caps = [

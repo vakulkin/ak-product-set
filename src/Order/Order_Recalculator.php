@@ -23,10 +23,20 @@ class Order_Recalculator {
 
     /**
      * Get configured T-shirt manufacturing cost.
+     * Checks optional set-level ACF override first, then global plugin option 'ak_set_tshirt_cost',
+     * and finally defaults to DEFAULT_TSHIRT_COST (50.0).
      *
+     * @param int|null $set_id
      * @return float
      */
-    public static function get_tshirt_cost(): float {
+    public static function get_tshirt_cost(?int $set_id = null): float {
+        if ($set_id && function_exists('get_field')) {
+            $custom = get_field('set_tshirt_cost', $set_id);
+            if ($custom !== null && $custom !== '' && is_numeric($custom) && (float)$custom >= 0) {
+                return (float)$custom;
+            }
+        }
+
         $cost = get_option('ak_set_tshirt_cost', self::DEFAULT_TSHIRT_COST);
         return max(0.0, (float)$cost);
     }

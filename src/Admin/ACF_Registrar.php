@@ -86,6 +86,24 @@ class ACF_Registrar {
                     'default_value' => 0,
                     'ui' => 1,
                 ],
+                [
+                    'key' => 'field_ak_set_tshirt_cost',
+                    'label' => __('Koszt koszulki dla tego zestawu [opcjonalnie] (zł)', 'ak-product-set'),
+                    'name' => 'set_tshirt_cost',
+                    'type' => 'number',
+                    'instructions' => __('Pozostaw puste, aby zastosować domyślną kwotę z menu Ustawienia wtyczki.', 'ak-product-set'),
+                    'min' => 0,
+                    'step' => '0.01',
+                    'conditional_logic' => [
+                        [
+                            [
+                                'field' => 'field_ak_set_has_tshirt',
+                                'operator' => '==',
+                                'value' => '1',
+                            ],
+                        ],
+                    ],
+                ],
             ],
             'location' => [
                 [
