@@ -113,6 +113,7 @@ class Order_Decomposer {
 
         if ($has_decomposed) {
             $order->update_meta_data('_ak_order_decomposed', '1');
+            $order->calculate_totals(false);
             $order->save();
 
             // Record initial pricing breakdown and financial status for admin audit

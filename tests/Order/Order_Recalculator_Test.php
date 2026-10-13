@@ -46,7 +46,9 @@ class Order_Recalculator_Test extends TestCase {
         $meta = [];
         $order = Mockery::mock('WC_Order');
         $order->shouldReceive('get_total')->andReturn('4800.00');
+        $order->shouldReceive('get_meta')->with('_ak_total_paid')->andReturn('2400.00');
         $order->shouldReceive('get_meta')->with('_ak_balance_history')->andReturn('');
+        $order->shouldReceive('get_meta')->with('_ak_pricing_breakdown')->andReturn('');
         $order->shouldReceive('update_meta_data')->andReturnUsing(function($k, $v) use (&$meta) {
             $meta[$k] = $v;
         });
@@ -56,8 +58,36 @@ class Order_Recalculator_Test extends TestCase {
         Order_Recalculator::mark_settled($order, 'Wpłacono przelewem');
 
         $this->assertEquals(4800.00, $meta['_ak_total_paid']);
+        $this->assertEquals(2400.00, $meta['_ak_pre_settled_total_paid']);
+        $this->assertEquals('1', $meta['_ak_manually_settled']);
         $this->assertEquals(0.0, $meta['_ak_balance_amount']);
         $this->assertEquals(Order_Recalculator::BALANCE_SETTLED, $meta['_ak_balance_status']);
+    }
+
+    public function test_mark_unsettled_restores_pre_settled_paid(): void {
+        $meta = [];
+        $order = Mockery::mock('WC_Order');
+        $order->shouldReceive('get_id')->andReturn(777);
+        $order->shouldReceive('get_total')->andReturn('4800.00');
+        $order->shouldReceive('get_date_created')->andReturn(null);
+        $order->shouldReceive('get_meta')->with('_ak_pre_settled_total_paid')->andReturn('2400.00');
+        $order->shouldReceive('get_meta')->with('_ak_original_total')->andReturn('2400.00');
+        $order->shouldReceive('get_meta')->with('_ak_total_paid')->andReturn('2400.00');
+        $order->shouldReceive('get_meta')->with('_ak_original_headcount')->andReturn(1);
+        $order->shouldReceive('get_meta')->with('_ak_balance_history')->andReturn('');
+        $order->shouldReceive('get_items')->with('line_item')->andReturn([]);
+        $order->shouldReceive('update_meta_data')->andReturnUsing(function($k, $v) use (&$meta) {
+            $meta[$k] = $v;
+        });
+        $order->shouldReceive('delete_meta_data')->with('_ak_manually_settled')->once();
+        $order->shouldReceive('delete_meta_data')->with('_ak_pre_settled_total_paid')->once();
+        $order->shouldReceive('update_status')->once();
+        $order->shouldReceive('add_order_note')->once();
+        $order->shouldReceive('save')->once();
+
+        $result = Order_Recalculator::mark_unsettled($order);
+
+        $this->assertEquals(2400.00, $meta['_ak_total_paid']);
     }
 
     public function test_record_initial_order_state_saves_breakdown_and_balance(): void {

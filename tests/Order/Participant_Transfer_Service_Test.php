@@ -119,6 +119,44 @@ class Participant_Transfer_Service_Test extends TestCase {
         $this->assertEquals('women', $updated_meta[0]['tshirt_cut']);
     }
 
+    public function test_update_participant_data_updates_name_contact_and_tshirt(): void {
+        $updated_meta = [];
+        $item1 = Mockery::mock('WC_Order_Item_Product');
+        $item1->shouldReceive('get_meta')->with('_ak_participants')->andReturn([
+            ['id' => 'uuid-1', 'name' => 'Anton', 'email' => 'old@test.com', 'phone' => '111', 'tshirt_size' => 'M', 'tshirt_cut' => 'men'],
+        ]);
+        $item1->shouldReceive('update_meta_data')->with('_ak_participants', Mockery::on(function($val) use (&$updated_meta) {
+            $updated_meta = $val;
+            return true;
+        }))->once();
+        $item1->shouldReceive('add_meta_data')->andReturnNull();
+
+        $order = Mockery::mock('WC_Order');
+        $order->shouldReceive('get_items')->with('line_item')->andReturn([$item1]);
+        $order->shouldReceive('get_meta')->with('_ak_balance_history')->andReturn('');
+        $order->shouldReceive('update_meta_data')->with('_ak_balance_history', Mockery::any())->once();
+        $order->shouldReceive('add_order_note')->once();
+        $order->shouldReceive('save')->once();
+
+        $data = [
+            'name'        => 'Anton V',
+            'email'       => 'new@test.com',
+            'phone'       => '+48 500 600 700',
+            'tshirt_size' => 'XL',
+            'tshirt_cut'  => 'women',
+        ];
+
+        $result = Participant_Transfer_Service::update_participant_data($order, 'uuid-1', $data);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('Anton V', $result['participant_name']);
+        $this->assertEquals('Anton V', $updated_meta[0]['name']);
+        $this->assertEquals('new@test.com', $updated_meta[0]['email']);
+        $this->assertEquals('+48 500 600 700', $updated_meta[0]['phone']);
+        $this->assertEquals('XL', $updated_meta[0]['tshirt_size']);
+        $this->assertEquals('women', $updated_meta[0]['tshirt_cut']);
+    }
+
     public function test_transfer_to_existing_order_recalculates_both_orders(): void {
         $item1 = Mockery::mock('WC_Order_Item_Product');
         $item1->shouldIgnoreMissing();

@@ -26,6 +26,8 @@ class Order_Participant_Manager {
         add_action('wp_ajax_ak_reschedule_participant',       [$this, 'ajax_reschedule_participant']);
         add_action('wp_ajax_ak_transfer_participant',         [$this, 'ajax_transfer_participant']);
         add_action('wp_ajax_ak_mark_balance_settled',         [$this, 'ajax_mark_balance_settled']);
+        add_action('wp_ajax_ak_mark_balance_unsettled',       [$this, 'ajax_mark_balance_unsettled']);
+        add_action('wp_ajax_ak_update_participant',           [$this, 'ajax_update_participant']);
         add_action('wp_ajax_ak_update_participant_tshirt',    [$this, 'ajax_update_participant_tshirt']);
 
         // Backwards compatibility
@@ -227,13 +229,18 @@ class Order_Participant_Manager {
             }
         }
 
-        $balance_status   = (string) $order->get_meta('_ak_balance_status') ?: Order_Recalculator::BALANCE_SETTLED;
-        $balance_amount   = (float) $order->get_meta('_ak_balance_amount');
-        $total_paid       = (float) $order->get_meta('_ak_total_paid');
-        $current_total    = (float) $order->get_total();
+        $raw_balance_status = (string) $order->get_meta('_ak_balance_status');
+        $raw_balance_amount = $order->get_meta('_ak_balance_amount');
+        $raw_total_paid     = $order->get_meta('_ak_total_paid');
+        $current_total      = (float) $order->get_total();
 
-        // Strict normalization: if balance amount is 0 (or close to 0) or current total matches total paid, it is strictly settled
-        if (abs($balance_amount) < 0.01 || abs($current_total - ($total_paid ?: $current_total)) < 0.01) {
+        $balance_status = $raw_balance_status ?: Order_Recalculator::BALANCE_SETTLED;
+        $balance_amount = $raw_balance_amount !== '' && $raw_balance_amount !== false ? (float) $raw_balance_amount : 0.0;
+        $total_paid     = $raw_total_paid !== '' && $raw_total_paid !== false ? (float) $raw_total_paid : 0.0;
+
+        // Strict normalization:
+        // An order is only settled if balance amount is negligible and not explicitly underpaid
+        if (abs($balance_amount) < 0.01 && $balance_status !== Order_Recalculator::BALANCE_UNDERPAID) {
             $balance_status = Order_Recalculator::BALANCE_SETTLED;
             $balance_amount = 0.0;
         } else {
@@ -317,7 +324,7 @@ class Order_Participant_Manager {
                     <div class="ak-om-metrics-grid">
                         <div class="ak-om-metric-card">
                             <div class="ak-om-metric-label"><?php esc_html_e('Wpłacono', 'ak-product-set'); ?></div>
-                            <div class="ak-om-metric-value"><?php echo esc_html(number_format_i18n($total_paid ?: (float)$order->get_total(), 2)); ?> zł</div>
+                            <div class="ak-om-metric-value"><?php echo esc_html(number_format_i18n($total_paid, 2)); ?> zł</div>
                         </div>
 
                         <div class="ak-om-metric-card">
@@ -350,6 +357,17 @@ class Order_Participant_Manager {
                             <button type="button" class="button button-small ak-om-mark-settled-btn" data-order-id="<?php echo esc_attr($order->get_id()); ?>">
                                 <?php esc_html_e('Oznacz jako uregulowane', 'ak-product-set'); ?>
                             </button>
+                        <?php else : ?>
+                            <?php
+                            $can_unsettle = $order->get_meta('_ak_manually_settled') === '1'
+                                || $order->get_meta('_ak_pre_settled_total_paid') !== ''
+                                || abs((float)$order->get_meta('_ak_original_total') - (float)$order->get_total()) > 0.01;
+                            if ($can_unsettle) :
+                            ?>
+                                <button type="button" class="button button-small ak-om-mark-unsettled-btn" data-order-id="<?php echo esc_attr($order->get_id()); ?>" title="<?php esc_attr_e('Przywróć wyliczone saldo niedopłaty/nadpłaty', 'ak-product-set'); ?>">
+                                    <?php esc_html_e('Cofnij uregulowanie', 'ak-product-set'); ?>
+                                </button>
+                            <?php endif; ?>
                         <?php endif; ?>
                         <button type="button" class="button button-primary button-small ak-om-add-btn">
                             + <?php esc_html_e('Dodaj uczestnika', 'ak-product-set'); ?>
@@ -379,8 +397,7 @@ class Order_Participant_Manager {
                             <tr>
                                 <th style="width: 30px; text-align: center;">#</th>
                                 <th><?php esc_html_e('Termin', 'ak-product-set'); ?></th>
-                                <th><?php esc_html_e('Uczestnik', 'ak-product-set'); ?></th>
-                                <th><?php esc_html_e('Kontakt', 'ak-product-set'); ?></th>
+                                <th><?php esc_html_e('Uczestnik i kontakt', 'ak-product-set'); ?></th>
                                 <th><?php esc_html_e('Koszulka', 'ak-product-set'); ?></th>
                                 <th style="text-align: right; width: 220px;"><?php esc_html_e('Akcje', 'ak-product-set'); ?></th>
                             </tr>
@@ -392,27 +409,62 @@ class Order_Participant_Manager {
                                 $cut = Helper::get_tshirt_cut_label($slot['tshirt_cut'] ?? '');
                                 $shirt_btn_label = !empty($slot['tshirt_size']) ? esc_html($slot['tshirt_size']) . ' [' . esc_html($cut) . ']' : __('Wybierz koszulkę', 'ak-product-set');
                                 $enrolled = $participant_wids[$slot['uuid']] ?? [];
+                                $name_label  = !empty($slot['name']) ? $slot['name'] : __('Imię', 'ak-product-set');
+                                $phone_label = !empty($slot['phone']) ? $slot['phone'] : __('Telefon', 'ak-product-set');
+                                $email_label = !empty($slot['email']) ? $slot['email'] : __('E-mail', 'ak-product-set');
                             ?>
                                 <tr>
                                     <td style="text-align: center; color: #8c8f94;"><?php echo $idx++; ?></td>
                                     <td>
                                         <span><?php echo esc_html($slot['weekend_name']); ?></span>
+                                        <span style="color: #8c8f94; font-size: 11px; margin-left: 4px;">#<?php echo esc_html(substr($slot['uuid'], 0, 8)); ?></span>
                                     </td>
                                     <td>
-                                        <span><?php echo esc_html($slot['name']); ?></span><br>
-                                        <code style="color:#8c8f94; font-size: 11px; background: transparent; padding: 0;"><?php echo esc_html(substr($slot['uuid'], 0, 8)); ?></code>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
+                                            <button type="button" class="button button-small ak-om-edit-participant-btn"
+                                                data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
+                                                data-name="<?php echo esc_attr($slot['name']); ?>"
+                                                data-email="<?php echo esc_attr($slot['email']); ?>"
+                                                data-phone="<?php echo esc_attr($slot['phone']); ?>"
+                                                data-size="<?php echo esc_attr($slot['tshirt_size']); ?>"
+                                                data-cut="<?php echo esc_attr($slot['tshirt_cut']); ?>"
+                                                data-focus="name"
+                                                title="<?php esc_attr_e('Kliknij, aby edytować imię i nazwisko', 'ak-product-set'); ?>">
+                                                <?php echo esc_html($name_label); ?>
+                                            </button>
+                                            <button type="button" class="button button-small ak-om-edit-participant-btn"
+                                                data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
+                                                data-name="<?php echo esc_attr($slot['name']); ?>"
+                                                data-email="<?php echo esc_attr($slot['email']); ?>"
+                                                data-phone="<?php echo esc_attr($slot['phone']); ?>"
+                                                data-size="<?php echo esc_attr($slot['tshirt_size']); ?>"
+                                                data-cut="<?php echo esc_attr($slot['tshirt_cut']); ?>"
+                                                data-focus="phone"
+                                                title="<?php esc_attr_e('Kliknij, aby edytować telefon', 'ak-product-set'); ?>">
+                                                <?php echo esc_html($phone_label); ?>
+                                            </button>
+                                            <button type="button" class="button button-small ak-om-edit-participant-btn"
+                                                data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
+                                                data-name="<?php echo esc_attr($slot['name']); ?>"
+                                                data-email="<?php echo esc_attr($slot['email']); ?>"
+                                                data-phone="<?php echo esc_attr($slot['phone']); ?>"
+                                                data-size="<?php echo esc_attr($slot['tshirt_size']); ?>"
+                                                data-cut="<?php echo esc_attr($slot['tshirt_cut']); ?>"
+                                                data-focus="email"
+                                                title="<?php esc_attr_e('Kliknij, aby edytować e-mail', 'ak-product-set'); ?>">
+                                                <?php echo esc_html($email_label); ?>
+                                            </button>
+                                        </div>
                                     </td>
                                     <td>
-                                        <?php if (!empty($slot['email'])) : ?><div style="color: #2c3338;"><?php echo esc_html($slot['email']); ?></div><?php endif; ?>
-                                        <?php if (!empty($slot['phone'])) : ?><div style="color: #646970; font-size: 12px;"><?php echo esc_html($slot['phone']); ?></div><?php endif; ?>
-                                        <?php if (empty($slot['email']) && empty($slot['phone'])) : ?><span style="color: #8c8f94;">—</span><?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <button type="button" class="button button-small ak-om-edit-tshirt-btn"
+                                        <button type="button" class="button button-small ak-om-edit-participant-btn ak-om-edit-tshirt-btn"
                                             data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
                                             data-name="<?php echo esc_attr($slot['name']); ?>"
+                                            data-email="<?php echo esc_attr($slot['email']); ?>"
+                                            data-phone="<?php echo esc_attr($slot['phone']); ?>"
                                             data-size="<?php echo esc_attr($slot['tshirt_size']); ?>"
                                             data-cut="<?php echo esc_attr($slot['tshirt_cut']); ?>"
+                                            data-focus="tshirt"
                                             title="<?php esc_attr_e('Kliknij, aby zmienić rozmiar / krój koszulki', 'ak-product-set'); ?>">
                                             <?php echo $shirt_btn_label; ?>
                                         </button>
@@ -539,11 +591,27 @@ class Order_Participant_Manager {
                 </div>
             </div>
 
-            <!-- Modal: Edit T-Shirt -->
+            <!-- Modal: Edit Participant Data -->
             <div id="ak-om-modal-tshirt" class="ak-om-modal-bg">
                 <div class="ak-om-modal-content">
-                    <h3><?php esc_html_e('Zmień koszulkę uczestnika', 'ak-product-set'); ?></h3>
-                    <p id="ak-om-tshirt-desc"></p>
+                    <h3><?php esc_html_e('Edytuj dane uczestnika', 'ak-product-set'); ?></h3>
+                    <p id="ak-om-tshirt-desc" style="color: #646970; font-size: 13px; margin-bottom: 12px;"></p>
+
+                    <div style="margin-bottom: 10px;">
+                        <label><strong><?php esc_html_e('Imię i nazwisko:', 'ak-product-set'); ?></strong> *</label><br>
+                        <input type="text" id="ak-om-edit-name" class="widefat" required>
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <label><strong><?php esc_html_e('Adres e-mail:', 'ak-product-set'); ?></strong></label><br>
+                        <input type="email" id="ak-om-edit-email" class="widefat">
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <label><strong><?php esc_html_e('Telefon:', 'ak-product-set'); ?></strong></label><br>
+                        <input type="text" id="ak-om-edit-phone" class="widefat">
+                    </div>
+
                     <div style="display: flex; gap: 10px; margin-bottom: 14px;">
                         <div style="flex: 1;">
                             <label><strong><?php esc_html_e('Rozmiar koszulki:', 'ak-product-set'); ?></strong></label><br>
@@ -564,11 +632,11 @@ class Order_Participant_Manager {
                         </div>
                     </div>
                     <p style="font-size: 11px; color: #666; margin-bottom: 16px;">
-                        <?php esc_html_e('Zmiana zostanie zapisana we wszystkich terminach tego uczestnika bez wpływu na płatność zamówienia.', 'ak-product-set'); ?>
+                        <?php esc_html_e('Zmiany zostaną zapisane we wszystkich terminach tego uczestnika w zamówieniu.', 'ak-product-set'); ?>
                     </p>
                     <div style="text-align: right;">
                         <button type="button" class="button ak-om-modal-cancel"><?php esc_html_e('Anuluj', 'ak-product-set'); ?></button>
-                        <button type="button" class="button button-primary ak-om-modal-submit-tshirt"><?php esc_html_e('Zapisz koszulkę', 'ak-product-set'); ?></button>
+                        <button type="button" class="button button-primary ak-om-modal-submit-tshirt"><?php esc_html_e('Zapisz dane uczestnika', 'ak-product-set'); ?></button>
                     </div>
                 </div>
             </div>
@@ -706,26 +774,53 @@ class Order_Participant_Manager {
                 });
             });
 
-            // 2. Edit T-Shirt
-            $('.ak-om-edit-tshirt-btn').on('click', function(e) {
+            // 2. Edit Participant Data (Name, Contact, T-Shirt)
+            $('.ak-om-edit-participant-btn, .ak-om-edit-tshirt-btn').on('click', function(e) {
                 e.preventDefault();
                 activeUuid = $(this).data('uuid');
-                var name   = $(this).data('name');
+                var name   = $(this).data('name') || '';
+                var email  = $(this).data('email') || '';
+                var phone  = $(this).data('phone') || '';
                 var size   = $(this).data('size') || '';
                 var cut    = $(this).data('cut') || 'men';
+                var focus  = $(this).data('focus') || 'name';
 
-                $('#ak-om-tshirt-desc').html('Zmieniasz koszulkę dla uczestnika: <strong>' + name + '</strong>.');
+                $('#ak-om-tshirt-desc').html('Edytujesz dane uczestnika: <strong>' + name + '</strong>.');
+                $('#ak-om-edit-name').val(name);
+                $('#ak-om-edit-email').val(email);
+                $('#ak-om-edit-phone').val(phone);
                 $('#ak-om-edit-tshirt-size').val(size);
                 $('#ak-om-edit-tshirt-cut').val(cut);
                 $('#ak-om-modal-tshirt').show();
+
+                setTimeout(function() {
+                    if (focus === 'email') {
+                        $('#ak-om-edit-email').focus();
+                    } else if (focus === 'phone') {
+                        $('#ak-om-edit-phone').focus();
+                    } else if (focus === 'tshirt') {
+                        $('#ak-om-edit-tshirt-size').focus();
+                    } else {
+                        $('#ak-om-edit-name').focus();
+                    }
+                }, 50);
             });
 
             $('.ak-om-modal-submit-tshirt').on('click', function() {
+                var name = $('#ak-om-edit-name').val().trim();
+                if (!name) {
+                    alert('<?php echo esc_js(__('Imię i nazwisko jest wymagane.', 'ak-product-set')); ?>');
+                    return;
+                }
+
                 var btn = $(this).prop('disabled', true);
                 $.post(ajaxurl, {
-                    action: 'ak_update_participant_tshirt',
+                    action: 'ak_update_participant',
                     order_id: orderId,
                     uuid: activeUuid,
+                    name: name,
+                    email: $('#ak-om-edit-email').val().trim(),
+                    phone: $('#ak-om-edit-phone').val().trim(),
                     tshirt_size: $('#ak-om-edit-tshirt-size').val(),
                     tshirt_cut: $('#ak-om-edit-tshirt-cut').val(),
                     nonce: nonce
@@ -874,6 +969,26 @@ class Order_Participant_Manager {
                 var btn = $(this).prop('disabled', true);
                 $.post(ajaxurl, {
                     action: 'ak_mark_balance_settled',
+                    order_id: orderId,
+                    nonce: nonce
+                }, function(res) {
+                    if (res.success) {
+                        location.reload();
+                    } else {
+                        alert(res.data || 'Błąd');
+                        btn.prop('disabled', false);
+                    }
+                });
+            });
+
+            // 6b. Revert Settlement / Mark Unsettled
+            $('.ak-om-mark-unsettled-btn').on('click', function() {
+                if (!confirm('<?php echo esc_js(__('Czy na pewno chcesz cofnąć oznaczenie jako uregulowane i przywrócić pierwotne saldo rozliczenia?', 'ak-product-set')); ?>')) {
+                    return;
+                }
+                var btn = $(this).prop('disabled', true);
+                $.post(ajaxurl, {
+                    action: 'ak_mark_balance_unsettled',
                     order_id: orderId,
                     nonce: nonce
                 }, function(res) {
@@ -1067,6 +1182,62 @@ class Order_Participant_Manager {
         }
     }
 
+    public function ajax_update_participant(): void {
+        check_ajax_referer(self::NONCE_ACTION, 'nonce');
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(__('Brak uprawnień.', 'ak-product-set'));
+        }
+
+        $order_id = isset($_POST['order_id']) ? (int) $_POST['order_id'] : 0;
+        $uuid     = isset($_POST['uuid']) ? sanitize_text_field($_POST['uuid']) : '';
+        $name     = isset($_POST['name']) ? sanitize_text_field($_POST['name']) : '';
+
+        $order = wc_get_order($order_id);
+        if (!$order || !$uuid) {
+            wp_send_json_error(__('Nieprawidłowe dane zamówienia.', 'ak-product-set'));
+        }
+
+        if (!$name) {
+            foreach ($order->get_items('line_item') as $item) {
+                if ($item instanceof \WC_Order_Item_Product) {
+                    $participants = $item->get_meta('_ak_participants');
+                    if (is_array($participants)) {
+                        foreach ($participants as $p) {
+                            if (!empty($p['id']) && $p['id'] === $uuid && !empty($p['name'])) {
+                                $name = (string) $p['name'];
+                                break 2;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!$name) {
+            wp_send_json_error(__('Imię i nazwisko jest wymagane.', 'ak-product-set'));
+        }
+
+        $raw_size    = isset($_POST['tshirt_size']) ? sanitize_text_field($_POST['tshirt_size']) : '';
+        $raw_cut     = isset($_POST['tshirt_cut']) ? sanitize_text_field($_POST['tshirt_cut']) : '';
+        $tshirt_size = Helper::is_valid_tshirt_size($raw_size) ? $raw_size : '';
+        $tshirt_cut  = Helper::is_valid_tshirt_cut($raw_cut) ? $raw_cut : Helper::TSHIRT_CUT_DEFAULT;
+
+        $data = [
+            'name'        => $name,
+            'email'       => isset($_POST['email']) ? sanitize_email($_POST['email']) : '',
+            'phone'       => isset($_POST['phone']) ? sanitize_text_field($_POST['phone']) : '',
+            'tshirt_size' => $tshirt_size,
+            'tshirt_cut'  => $tshirt_cut,
+        ];
+
+        $result = Participant_Transfer_Service::update_participant_data($order, $uuid, $data);
+        if ($result['success']) {
+            wp_send_json_success($result);
+        } else {
+            wp_send_json_error($result['error'] ?? 'Błąd');
+        }
+    }
+
     public function ajax_update_participant_tshirt(): void {
         check_ajax_referer(self::NONCE_ACTION, 'nonce');
         if (!current_user_can('manage_woocommerce')) {
@@ -1107,5 +1278,21 @@ class Order_Participant_Manager {
 
         Order_Recalculator::mark_settled($order);
         wp_send_json_success();
+    }
+
+    public function ajax_mark_balance_unsettled(): void {
+        check_ajax_referer(self::NONCE_ACTION, 'nonce');
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(__('Brak uprawnień.', 'ak-product-set'));
+        }
+
+        $order_id = isset($_POST['order_id']) ? (int) $_POST['order_id'] : 0;
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error(__('Nie znaleziono zamówienia.', 'ak-product-set'));
+        }
+
+        $result = Order_Recalculator::mark_unsettled($order);
+        wp_send_json_success($result);
     }
 }
