@@ -4,6 +4,7 @@ namespace AK_Set\Order;
 
 use AK_Set\Models\Weekend_Model;
 use AK_Set\Support\Helper;
+use AK_Set\Order\Order_Recalculator;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -113,6 +114,9 @@ class Order_Decomposer {
         if ($has_decomposed) {
             $order->update_meta_data('_ak_order_decomposed', '1');
             $order->save();
+
+            // Record initial pricing breakdown and financial status for admin audit
+            Order_Recalculator::record_initial_order_state($order);
 
             // Trigger native WooCommerce stock reduction for the newly added single product items
             if (function_exists('wc_reduce_stock_levels')) {

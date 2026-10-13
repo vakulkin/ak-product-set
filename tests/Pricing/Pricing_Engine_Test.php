@@ -34,6 +34,23 @@ class Pricing_Engine_Test extends TestCase {
         $this->assertEquals('ind', Pricing_Engine::resolve_group_tier(-10));
     }
 
+    public function test_tier_constants_and_labels_match() {
+        $this->assertEquals('ind', Pricing_Engine::TIER_IND);
+        $this->assertEquals('g5', Pricing_Engine::TIER_G5);
+        $this->assertEquals('g10', Pricing_Engine::TIER_G10);
+        $this->assertEquals(['ind', 'g5', 'g10'], Pricing_Engine::TIERS);
+
+        $admin_labels = Pricing_Engine::get_tier_labels();
+        $this->assertArrayHasKey('ind', $admin_labels);
+        $this->assertArrayHasKey('g5', $admin_labels);
+        $this->assertArrayHasKey('g10', $admin_labels);
+
+        $display_labels = Pricing_Engine::get_tier_display_labels();
+        $this->assertArrayHasKey('ind', $display_labels);
+        $this->assertArrayHasKey('g5', $display_labels);
+        $this->assertArrayHasKey('g10', $display_labels);
+    }
+
     // -------------------------------------------------------------------------
     // calculate – invalid set / IDOR / package size guards
     // -------------------------------------------------------------------------

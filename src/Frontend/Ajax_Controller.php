@@ -5,6 +5,7 @@ namespace AK_Set\Frontend;
 use AK_Set\Cart\Composed_Cart_Manager;
 use AK_Set\Pricing\Pricing_Engine;
 use AK_Set\Models\Participant_Model;
+use AK_Set\Support\Helper;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -50,11 +51,7 @@ class Ajax_Controller {
             ]);
         }
 
-        $tier_labels = [
-            'ind' => __('1 osoba [Indywidualna]', 'ak-product-set'),
-            'g5'  => __('Grupa 5-9 osób [Rabat Grupowy]', 'ak-product-set'),
-            'g10' => __('Grupa 10+ osób [Max Rabat]', 'ak-product-set'),
-        ];
+        $tier_labels = Pricing_Engine::get_tier_display_labels();
 
         $calc['formatted'] = [
             'per_person_price'  => function_exists('wc_price') ? wc_price($calc['per_person_price']) : number_format_i18n($calc['per_person_price'], 2) . ' zł',
@@ -198,7 +195,7 @@ class Ajax_Controller {
                 return sprintf(__('Proszę podać prawidłowy numer telefonu dla Uczestnika %d [np. +48 600 000 000].', 'ak-product-set'), $p_num);
             }
 
-            if ($has_tshirt && empty($size)) {
+            if ($has_tshirt && (empty($size) || !Helper::is_valid_tshirt_size($size))) {
                 /* translators: %d: participant number */
                 return sprintf(__('Proszę wybrać rozmiar koszulki dla Uczestnika %d.', 'ak-product-set'), $p_num);
             }

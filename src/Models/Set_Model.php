@@ -119,4 +119,17 @@ class Set_Model {
 
         return $weekends;
     }
+
+    /**
+     * Get assigned weekend product IDs.
+     *
+     * @return int[]
+     */
+    public function get_weekends() {
+        $products = $this->get_weekend_products();
+        return array_map(function($w) {
+            return $w->get_id();
+        }, $products);
+    }
 }
+

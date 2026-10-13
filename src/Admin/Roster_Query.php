@@ -139,6 +139,8 @@ class Roster_Query {
                     'order_status'   => $order_status,
                     'date_paid'      => $date_paid,
                     'payment_method' => $payment_method,
+                    'balance_status' => $order_info['balance_status'] ?? 'settled',
+                    'balance_amount' => (float) ($order_info['balance_amount'] ?? 0.0),
                     'set_name'       => $set_name,
                     'name'           => $name,
                     'email'          => $email,
@@ -230,6 +232,10 @@ class Roster_Query {
     private static function fetch_weekend_product_ids_with_orders(): array {
         global $wpdb;
 
+        if (empty($wpdb)) {
+            return [];
+        }
+
         $results = $wpdb->get_col(
             "SELECT DISTINCT oim_pid.meta_value
              FROM {$wpdb->prefix}woocommerce_order_items oi
@@ -285,11 +291,29 @@ class Roster_Query {
             if (!$order) {
                 continue;
             }
-            $date_paid_obj = $order->get_date_paid();
+            $date_paid_obj = method_exists($order, 'get_date_paid') ? $order->get_date_paid() : null;
+
+            $balance_status = method_exists($order, 'get_meta') ? (string) $order->get_meta('_ak_balance_status') : '';
+            $balance_amount = method_exists($order, 'get_meta') ? (float) $order->get_meta('_ak_balance_amount') : 0.0;
+
+            if ($balance_status === '' || ($balance_status !== 'settled' && abs($balance_amount) < 0.01)) {
+                $status  = $order->get_status();
+                $is_paid = method_exists($order, 'is_paid') && $order->is_paid();
+                if ($is_paid || in_array($status, ['processing', 'completed'], true)) {
+                    $balance_status = 'settled';
+                    $balance_amount = 0.0;
+                } else {
+                    $balance_status = 'underpaid';
+                    $balance_amount = method_exists($order, 'get_total') ? (float) $order->get_total() : 0.0;
+                }
+            }
+
             $result[(int) $oid] = [
                 'status'         => $order->get_status(),
                 'date_paid'      => $date_paid_obj ? $date_paid_obj->date('Y-m-d') : '',
-                'payment_method' => $order->get_payment_method_title(),
+                'payment_method' => method_exists($order, 'get_payment_method_title') ? $order->get_payment_method_title() : '',
+                'balance_status' => $balance_status,
+                'balance_amount' => $balance_amount,
             ];
         }
         return $result;

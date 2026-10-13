@@ -28,10 +28,38 @@ class Helper_Test extends TestCase {
         $this->assertIsArray($sizes);
         $this->assertArrayHasKey('S', $sizes);
         $this->assertArrayHasKey('XL', $sizes);
+        $this->assertEquals(['XS', 'S', 'M', 'L', 'XL', 'XXL'], Helper::TSHIRT_SIZES);
 
         $this->assertIsArray($cuts);
-        $this->assertArrayHasKey('men', $cuts);
-        $this->assertArrayHasKey('women', $cuts);
+        $this->assertArrayHasKey(Helper::TSHIRT_CUT_MEN, $cuts);
+        $this->assertArrayHasKey(Helper::TSHIRT_CUT_WOMEN, $cuts);
+        $this->assertEquals('men', Helper::TSHIRT_CUT_DEFAULT);
+    }
+
+    public function test_is_valid_tshirt_size_validates_correctly() {
+        $this->assertTrue(Helper::is_valid_tshirt_size('M'));
+        $this->assertTrue(Helper::is_valid_tshirt_size('XXL'));
+        $this->assertFalse(Helper::is_valid_tshirt_size('XXXL'));
+        $this->assertFalse(Helper::is_valid_tshirt_size(''));
+        $this->assertFalse(Helper::is_valid_tshirt_size(null));
+    }
+
+    public function test_is_valid_tshirt_cut_validates_correctly() {
+        $this->assertTrue(Helper::is_valid_tshirt_cut('men'));
+        $this->assertTrue(Helper::is_valid_tshirt_cut('women'));
+        $this->assertFalse(Helper::is_valid_tshirt_cut('unisex'));
+        $this->assertFalse(Helper::is_valid_tshirt_cut(''));
+        $this->assertFalse(Helper::is_valid_tshirt_cut(null));
+    }
+
+    public function test_get_tshirt_cut_label_returns_localized_string() {
+        $this->assertEquals('Męska', Helper::get_tshirt_cut_label('men'));
+        $this->assertEquals('Damska', Helper::get_tshirt_cut_label('women'));
+        // Fallback to default
+        $this->assertEquals('Męska', Helper::get_tshirt_cut_label('unknown'));
+        // Fallback disabled
+        $this->assertEquals('', Helper::get_tshirt_cut_label('unknown', false));
+        $this->assertEquals('', Helper::get_tshirt_cut_label(null, false));
     }
 
     public function test_add_participant_meta_to_order_item_adds_formatted_meta() {

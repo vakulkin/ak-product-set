@@ -116,5 +116,49 @@ class Roster_Query_Test extends TestCase {
         $this->assertCount(1, $participants);
         $this->assertEquals('Jan Kowalski', $participants[0]['name']);
         $this->assertEquals(201, $participants[0]['order_id']);
+        $this->assertEquals('settled', $participants[0]['balance_status']);
+        $this->assertEquals(0.0, $participants[0]['balance_amount']);
+    }
+
+    public function test_get_participants_by_weekend_loads_explicit_balance_meta(): void {
+        global $wpdb;
+        $wpdb = new class {
+            public $prefix = 'wp_';
+            public function prepare($query, ...$args) { return $query; }
+            public function get_results($query) {
+                if (str_contains($query, 'woocommerce_order_items oi')) {
+                    return [(object) ['order_item_id' => 10, 'order_id' => 301]];
+                }
+                if (str_contains($query, 'woocommerce_order_itemmeta')) {
+                    return [
+                        (object) [
+                            'order_item_id' => 10,
+                            'meta_key'      => '_ak_participants',
+                            'meta_value'    => serialize([['id' => 'uuid-10', 'name' => 'Marek Nowak', 'email' => 'marek@example.com']]),
+                        ],
+                    ];
+                }
+                return [];
+            }
+        };
+
+        Functions\when('wc_get_order')->alias(function($order_id) {
+            return new class {
+                public function get_status(): string { return 'processing'; }
+                public function get_date_paid() { return null; }
+                public function get_payment_method_title(): string { return 'BLIK'; }
+                public function get_meta(string $key) {
+                    if ($key === '_ak_balance_status') return 'underpaid';
+                    if ($key === '_ak_balance_amount') return 450.50;
+                    return null;
+                }
+            };
+        });
+
+        $participants = Roster_Query::get_participants_by_weekend(101);
+
+        $this->assertCount(1, $participants);
+        $this->assertEquals('underpaid', $participants[0]['balance_status']);
+        $this->assertEquals(450.50, $participants[0]['balance_amount']);
     }
 }

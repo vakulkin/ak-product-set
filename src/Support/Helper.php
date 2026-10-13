@@ -51,33 +51,102 @@ class Helper
     }
 
     /**
+     * T-Shirt sizes available across frontend and admin
+     */
+    public const TSHIRT_SIZES = [
+        'XS',
+        'S',
+        'M',
+        'L',
+        'XL',
+        'XXL',
+    ];
+
+    /**
+     * T-Shirt cuts available across frontend and admin
+     */
+    public const TSHIRT_CUT_MEN     = 'men';
+    public const TSHIRT_CUT_WOMEN   = 'women';
+    public const TSHIRT_CUT_DEFAULT = self::TSHIRT_CUT_MEN;
+
+    /**
      * Get T-Shirt size options
      *
-     * @return array
+     * @return array<string, string> Map of size_value => size_label
      */
-    public static function get_tshirt_sizes()
+    public static function get_tshirt_sizes(): array
     {
-        return [
-            'XS'  => 'XS',
-            'S'   => 'S',
-            'M'   => 'M',
-            'L'   => 'L',
-            'XL'  => 'XL',
-            'XXL' => 'XXL',
-        ];
+        $sizes = [];
+        foreach (self::TSHIRT_SIZES as $size) {
+            $sizes[$size] = $size;
+        }
+
+        return (array) apply_filters('ak_set_tshirt_sizes', $sizes);
+    }
+
+    /**
+     * Check if a given T-Shirt size is valid
+     *
+     * @param string|null $size
+     * @return bool
+     */
+    public static function is_valid_tshirt_size(?string $size): bool
+    {
+        if ($size === null || $size === '') {
+            return false;
+        }
+        return array_key_exists($size, self::get_tshirt_sizes());
     }
 
     /**
      * Get T-Shirt cut options
      *
-     * @return array
+     * @return array<string, string> Map of cut_value => cut_label
      */
-    public static function get_tshirt_cuts()
+    public static function get_tshirt_cuts(): array
     {
-        return [
-            'men'   => __('Męska', 'ak-product-set'),
-            'women' => __('Damska', 'ak-product-set'),
+        $cuts = [
+            self::TSHIRT_CUT_MEN   => __('Męska', 'ak-product-set'),
+            self::TSHIRT_CUT_WOMEN => __('Damska', 'ak-product-set'),
         ];
+
+        return (array) apply_filters('ak_set_tshirt_cuts', $cuts);
+    }
+
+    /**
+     * Check if a given T-Shirt cut is valid
+     *
+     * @param string|null $cut
+     * @return bool
+     */
+    public static function is_valid_tshirt_cut(?string $cut): bool
+    {
+        if ($cut === null || $cut === '') {
+            return false;
+        }
+        return array_key_exists($cut, self::get_tshirt_cuts());
+    }
+
+    /**
+     * Get localized T-Shirt cut label
+     *
+     * @param string|null $cut
+     * @param bool $fallback_to_default If true and cut not found, falls back to default ('men')
+     * @return string
+     */
+    public static function get_tshirt_cut_label(?string $cut, bool $fallback_to_default = true): string
+    {
+        $cuts = self::get_tshirt_cuts();
+
+        if ($cut !== null && isset($cuts[$cut])) {
+            return $cuts[$cut];
+        }
+
+        if ($fallback_to_default && isset($cuts[self::TSHIRT_CUT_DEFAULT])) {
+            return $cuts[self::TSHIRT_CUT_DEFAULT];
+        }
+
+        return '';
     }
 
     /**
@@ -111,7 +180,7 @@ class Helper
                 $details .= ' [' . implode(', ', $contact) . ']';
             }
             if (!empty($p['tshirt_size'])) {
-                $cut = (!empty($p['tshirt_cut']) && $p['tshirt_cut'] === 'women') ? __('Damska', 'ak-product-set') : __('Męska', 'ak-product-set');
+                $cut = self::get_tshirt_cut_label($p['tshirt_cut'] ?? '');
                 $details .= ' — Koszulka: ' . $p['tshirt_size'] . ' [' . $cut . ']';
             }
             $item->add_meta_data(sprintf(__('Uczestnik %d', 'ak-product-set'), $i), $details, true);

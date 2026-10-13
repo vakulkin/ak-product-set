@@ -38,6 +38,19 @@ class Participant_Model_Test extends TestCase {
         $this->assertEquals('men', $model->tshirt_cut);
     }
 
+    public function test_field_constants_and_cut_normalization() {
+        $this->assertEquals('id', Participant_Model::FIELD_ID);
+        $this->assertEquals('name', Participant_Model::FIELD_NAME);
+        $this->assertEquals('email', Participant_Model::FIELD_EMAIL);
+        $this->assertEquals('phone', Participant_Model::FIELD_PHONE);
+        $this->assertEquals('tshirt_size', Participant_Model::FIELD_TSHIRT_SIZE);
+        $this->assertEquals('tshirt_cut', Participant_Model::FIELD_TSHIRT_CUT);
+
+        // Invalid cut should fall back to default 'men'
+        $model = new Participant_Model(['tshirt_cut' => 'invalid_cut']);
+        $this->assertEquals('men', $model->tshirt_cut);
+    }
+
     public function test_to_array_returns_correct_format() {
         $data = [
             'id' => '1234-abcd',

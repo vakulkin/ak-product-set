@@ -2,6 +2,9 @@
 
 namespace AK_Set\Admin;
 
+use AK_Set\Support\Helper;
+use AK_Set\Order\Order_Recalculator;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -180,6 +183,8 @@ class Roster_Admin_Page {
             __('Zestaw', 'ak-product-set'),
             __('Nr zamówienia', 'ak-product-set'),
             __('Status zamówienia', 'ak-product-set'),
+            __('Stan rozliczenia', 'ak-product-set'),
+            __('Bilans (zł)', 'ak-product-set'),
             __('Data płatności', 'ak-product-set'),
             __('Metoda płatności', 'ak-product-set'),
         ]);
@@ -195,11 +200,20 @@ class Roster_Admin_Page {
     private function write_csv_rows($handle, array $participants, string $weekend_label = '', int $start_index = 1): void {
         $i = $start_index;
         foreach ($participants as $row) {
-            $cut = '';
-            if ($row['tshirt_cut'] === 'women') {
-                $cut = __('Damska', 'ak-product-set');
-            } elseif ($row['tshirt_cut'] === 'men') {
-                $cut = __('Męska', 'ak-product-set');
+            $cut = !empty($row['tshirt_cut']) ? Helper::get_tshirt_cut_label($row['tshirt_cut'], false) : '';
+
+            $bal_status = $row['balance_status'] ?? Order_Recalculator::BALANCE_SETTLED;
+            $bal_amount = (float) ($row['balance_amount'] ?? 0.0);
+
+            if ($bal_status === Order_Recalculator::BALANCE_UNDERPAID) {
+                $bal_status_label = __('Niedopłata', 'ak-product-set');
+                $bal_amount_str   = '+' . number_format(abs($bal_amount), 2, '.', '');
+            } elseif ($bal_status === Order_Recalculator::BALANCE_OVERPAID) {
+                $bal_status_label = __('Nadpłata', 'ak-product-set');
+                $bal_amount_str   = number_format($bal_amount, 2, '.', '');
+            } else {
+                $bal_status_label = __('Rozliczone', 'ak-product-set');
+                $bal_amount_str   = '0.00';
             }
 
             $values = [];
@@ -220,6 +234,8 @@ class Roster_Admin_Page {
                 function_exists('wc_get_order_status_name')
                     ? wc_get_order_status_name($row['order_status'])
                     : $row['order_status'],
+                $bal_status_label,
+                $bal_amount_str,
                 $row['date_paid'],
                 $row['payment_method'],
             ]);

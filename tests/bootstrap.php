@@ -59,6 +59,12 @@ if (!function_exists('esc_url')) {
     }
 }
 
+if (!function_exists('esc_js')) {
+    function esc_js($text) {
+        return addslashes((string) $text);
+    }
+}
+
 if (!function_exists('sanitize_text_field')) {
     function sanitize_text_field($str) {
         return trim(strip_tags($str));
@@ -137,7 +143,14 @@ if (!function_exists('get_permalink')) {
 
 if (!function_exists('get_option')) {
     function get_option($option, $default = false) {
-        return $default;
+        return $GLOBALS['_wp_options'][$option] ?? $default;
+    }
+}
+
+if (!function_exists('update_option')) {
+    function update_option($option, $value) {
+        $GLOBALS['_wp_options'][$option] = $value;
+        return true;
     }
 }
 

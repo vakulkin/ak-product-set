@@ -121,10 +121,11 @@ class Plugin {
         }
 
         // Cart & Order Engine
-        $this->services['cart_manager'] = new Cart\Composed_Cart_Manager();
-        $this->services['cart_display'] = new Cart\Cart_Display_Filters();
-        $this->services['order_processor'] = new Order\Order_Processor();
-        $this->services['order_decomposer'] = new Order\Order_Decomposer();
+        $this->services['cart_manager']             = new Cart\Composed_Cart_Manager();
+        $this->services['cart_display']             = new Cart\Cart_Display_Filters();
+        $this->services['order_processor']           = new Order\Order_Processor();
+        $this->services['order_decomposer']          = new Order\Order_Decomposer();
+        $this->services['order_participant_manager'] = new Admin\Order_Participant_Manager();
 
         // Frontend & Shortcode
         $this->services['catalog_excluder'] = new Frontend\Catalog_Excluder();

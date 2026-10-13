@@ -5,6 +5,7 @@ namespace AK_Set\Cart;
 use AK_Set\Models\Set_Model;
 use AK_Set\Models\Weekend_Model;
 use AK_Set\Pricing\Pricing_Engine;
+use AK_Set\Support\Helper;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -187,9 +188,7 @@ class Cart_Display_Filters
                     $details_parts[] = esc_html($p['phone']);
                 }
                 if (!empty($p['tshirt_size'])) {
-                    $cut             = (!empty($p['tshirt_cut']) && $p['tshirt_cut'] === 'women')
-                        ? __('damska', 'ak-product-set')
-                        : __('męska', 'ak-product-set');
+                    $cut             = Helper::get_tshirt_cut_label($p['tshirt_cut'] ?? '');
                     $details_parts[] = sprintf(
                         /* translators: %1$s: t-shirt size, %2$s: t-shirt cut */
                         __('Koszulka: %1$s [%2$s]', 'ak-product-set'),

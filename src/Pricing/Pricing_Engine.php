@@ -11,6 +11,42 @@ if (!defined('ABSPATH')) {
 
 class Pricing_Engine {
 
+    public const TIER_IND = 'ind';
+    public const TIER_G5  = 'g5';
+    public const TIER_G10 = 'g10';
+
+    public const TIERS = [
+        self::TIER_IND,
+        self::TIER_G5,
+        self::TIER_G10,
+    ];
+
+    /**
+     * Get pricing tier labels for admin / ACF
+     *
+     * @return array<string, string>
+     */
+    public static function get_tier_labels(): array {
+        return [
+            self::TIER_IND => __('1 osoba', 'ak-product-set'),
+            self::TIER_G5  => __('Grupa 5-9 os.', 'ak-product-set'),
+            self::TIER_G10 => __('Grupa 10+ os.', 'ak-product-set'),
+        ];
+    }
+
+    /**
+     * Get user-facing display labels for pricing tiers (e.g. for cart / live preview)
+     *
+     * @return array<string, string>
+     */
+    public static function get_tier_display_labels(): array {
+        return [
+            self::TIER_IND => __('1 osoba [Indywidualna]', 'ak-product-set'),
+            self::TIER_G5  => __('Grupa 5-9 osób [Rabat Grupowy]', 'ak-product-set'),
+            self::TIER_G10 => __('Grupa 10+ osób [Max Rabat]', 'ak-product-set'),
+        ];
+    }
+
     /**
      * Determine group headcount tier based on headcount
      *
@@ -21,12 +57,12 @@ class Pricing_Engine {
         $headcount = max(1, (int)$headcount);
 
         if ($headcount < 5) {
-            return 'ind';
+            return self::TIER_IND;
         }
         if ($headcount <= 9) {
-            return 'g5';
+            return self::TIER_G5;
         }
-        return 'g10';
+        return self::TIER_G10;
     }
 
     /**

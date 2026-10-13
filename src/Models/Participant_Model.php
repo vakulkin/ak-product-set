@@ -9,6 +9,13 @@ if (!defined('ABSPATH')) {
 }
 
 class Participant_Model {
+    public const FIELD_ID          = 'id';
+    public const FIELD_NAME        = 'name';
+    public const FIELD_EMAIL       = 'email';
+    public const FIELD_PHONE       = 'phone';
+    public const FIELD_TSHIRT_SIZE = 'tshirt_size';
+    public const FIELD_TSHIRT_CUT  = 'tshirt_cut';
+
     /** @var string */
     public $id;
 
@@ -33,7 +40,8 @@ class Participant_Model {
         $this->email = !empty($data['email']) ? sanitize_email($data['email']) : '';
         $this->phone = !empty($data['phone']) ? sanitize_text_field($data['phone']) : '';
         $this->tshirt_size = !empty($data['tshirt_size']) ? sanitize_text_field($data['tshirt_size']) : '';
-        $this->tshirt_cut = !empty($data['tshirt_cut']) ? sanitize_text_field($data['tshirt_cut']) : '';
+        $raw_cut = !empty($data['tshirt_cut']) ? sanitize_text_field($data['tshirt_cut']) : '';
+        $this->tshirt_cut = ($raw_cut !== '' && Helper::is_valid_tshirt_cut($raw_cut)) ? $raw_cut : ($raw_cut !== '' ? Helper::TSHIRT_CUT_DEFAULT : '');
     }
 
     /**

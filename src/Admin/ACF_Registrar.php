@@ -173,11 +173,7 @@ class ACF_Registrar {
         $pricing_fields = [];
 
         // Populate pricing grid on ak_set: X = 1..10, Y = 1..3, tier = ind, g5, g10
-        $tiers = [
-            'ind' => __('1 osoba', 'ak-product-set'),
-            'g5'  => __('Grupa 5-9 os.', 'ak-product-set'),
-            'g10' => __('Grupa 10+ os.', 'ak-product-set'),
-        ];
+        $tiers = \AK_Set\Pricing\Pricing_Engine::get_tier_labels();
 
         // Organize pricing fields into Round Tabs (Runda 1, Runda 2, Runda 3) with a 3-column table grid (Ind / G5 / G10)
         for ($y = 1; $y <= 3; $y++) {
