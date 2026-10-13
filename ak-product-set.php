@@ -53,14 +53,63 @@ add_action('before_woocommerce_init', function () {
  */
 register_activation_hook(AK_SET_FILE, function () {
     add_role('ak_roster_manager', __('Menadżer rejestru', 'ak-product-set'), [
-        'read'                       => true,
-        'ak_view_roster'             => true,
-        'edit_shop_orders'           => true,
-        'read_shop_order'            => true,
-        'read_private_shop_orders'   => true,
-        'edit_others_shop_orders'    => true,
-        'edit_published_shop_orders' => true,
-        'publish_shop_orders'        => true,
+        'read'                          => true,
+        'ak_view_roster'                => true,
+        'upload_files'                  => true,
+
+        // Read-only Shop Orders
+        'edit_shop_orders'              => true,
+        'read_shop_order'               => true,
+        'read_private_shop_orders'      => true,
+        'edit_others_shop_orders'       => true,
+        'edit_published_shop_orders'    => true,
+        'publish_shop_orders'           => true,
+
+        // Courses (ak_set CPT capability_type => 'post')
+        'edit_posts'                    => true,
+        'edit_others_posts'             => true,
+        'publish_posts'                 => true,
+        'read_private_posts'            => true,
+        'delete_posts'                  => true,
+        'delete_others_posts'           => true,
+        'delete_published_posts'        => true,
+        'delete_private_posts'          => true,
+        'edit_private_posts'            => true,
+        'edit_published_posts'          => true,
+
+        // Products
+        'edit_product'                  => true,
+        'read_product'                  => true,
+        'delete_product'                => true,
+        'edit_products'                 => true,
+        'edit_others_products'          => true,
+        'publish_products'              => true,
+        'read_private_products'         => true,
+        'delete_products'               => true,
+        'delete_private_products'       => true,
+        'delete_published_products'     => true,
+        'delete_others_products'        => true,
+        'edit_private_products'         => true,
+        'edit_published_products'       => true,
+        'manage_product_terms'          => true,
+        'edit_product_terms'            => true,
+        'delete_product_terms'          => true,
+        'assign_product_terms'          => true,
+
+        // Coupons
+        'edit_shop_coupon'              => true,
+        'read_shop_coupon'              => true,
+        'delete_shop_coupon'            => true,
+        'edit_shop_coupons'             => true,
+        'edit_others_shop_coupons'      => true,
+        'publish_shop_coupons'          => true,
+        'read_private_shop_coupons'     => true,
+        'delete_shop_coupons'           => true,
+        'delete_private_shop_coupons'   => true,
+        'delete_published_shop_coupons' => true,
+        'delete_others_shop_coupons'    => true,
+        'edit_private_shop_coupons'     => true,
+        'edit_published_shop_coupons'   => true,
     ]);
 
     foreach (['administrator', 'shop_manager'] as $role_name) {

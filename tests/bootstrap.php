@@ -24,6 +24,12 @@ require_once dirname(__DIR__) . '/vendor/autoload.php';
 // 3. Patchwork must come BEFORE any stub definitions
 require_once dirname(__DIR__) . '/vendor/antecedent/patchwork/Patchwork.php';
 
+if (!class_exists('WP_User')) {
+    class WP_User {
+        public array $roles = [];
+    }
+}
+
 // 4. Static helper stubs — functions that are used but never need to be
 //    overridden via Brain\Monkey\Functions\when() in any test.
 //    DO NOT add get_post, get_field, check_ajax_referer, or WC here —

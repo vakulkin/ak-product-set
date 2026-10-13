@@ -7,8 +7,9 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Restricts users with the ak_roster_manager role to the roster page and read-only order views.
- * Redirects unauthorized admin pages, strips unrelated admin menu nodes, and blocks any POST/save mutations.
+ * Restricts users with the ak_roster_manager role to the roster page, read-only order views,
+ * and management (create, edit, remove) of courses (ak_set), products, and coupons.
+ * Redirects unauthorized admin pages, strips unrelated admin menu nodes, and blocks order mutations.
  */
 class Roster_Access_Guard {
 
@@ -73,26 +74,36 @@ class Roster_Access_Guard {
             return $caps;
         }
 
+        if (in_array($cap, ['edit_shop_order', 'read_shop_order'], true)) {
+            return ['ak_view_roster'];
+        }
+
+        // For edit_post / read_post, only map to ak_view_roster if the target post is a shop_order
         if (!empty($args[0]) && function_exists('get_post_type')) {
             $object_id = (int) $args[0];
             $post_type = get_post_type($object_id);
-            if ($post_type && $post_type !== 'shop_order') {
-                return $caps;
+            if ($post_type === 'shop_order') {
+                return ['ak_view_roster'];
             }
         }
 
-        return ['ak_view_roster'];
+        return $caps;
     }
 
     /**
-     * Dynamically grant order reading & viewing capabilities to roster manager users.
+     * Dynamically grant order reading, product, coupon, course and media capabilities to roster manager users.
      */
     public function filter_user_caps(array $allcaps, array $caps, array $args, \WP_User $user): array {
-        $has_roster_access = !empty($allcaps['ak_view_roster'])
-            || (isset($user->roles) && in_array('ak_roster_manager', (array) $user->roles, true));
+        if (in_array('administrator', (array) $user->roles, true)) {
+            return $allcaps;
+        }
 
-        if ($has_roster_access) {
-            $order_caps = [
+        $is_roster_user = in_array('ak_roster_manager', (array) $user->roles, true)
+            || !empty($allcaps['ak_view_roster']);
+
+        if ($is_roster_user) {
+            $granted_caps = [
+                // Orders (read-only view)
                 'edit_shop_order',
                 'read_shop_order',
                 'delete_shop_order',
@@ -104,15 +115,55 @@ class Roster_Access_Guard {
                 'edit_private_shop_orders',
                 'read_private_shop_orders',
                 'publish_shop_orders',
+                // Courses (ak_set custom post type)
                 'edit_post',
                 'read_post',
+                'delete_post',
                 'edit_posts',
                 'read_private_posts',
                 'edit_others_posts',
                 'edit_published_posts',
                 'edit_private_posts',
+                'publish_posts',
+                'delete_posts',
+                'delete_published_posts',
+                'delete_others_posts',
+                'delete_private_posts',
+                'upload_files',
+                // Products
+                'edit_product',
+                'read_product',
+                'delete_product',
+                'edit_products',
+                'edit_others_products',
+                'publish_products',
+                'read_private_products',
+                'delete_products',
+                'delete_private_products',
+                'delete_published_products',
+                'delete_others_products',
+                'edit_private_products',
+                'edit_published_products',
+                'manage_product_terms',
+                'edit_product_terms',
+                'delete_product_terms',
+                'assign_product_terms',
+                // Coupons
+                'edit_shop_coupon',
+                'read_shop_coupon',
+                'delete_shop_coupon',
+                'edit_shop_coupons',
+                'edit_others_shop_coupons',
+                'publish_shop_coupons',
+                'read_private_shop_coupons',
+                'delete_shop_coupons',
+                'delete_private_shop_coupons',
+                'delete_published_shop_coupons',
+                'delete_others_shop_coupons',
+                'edit_private_shop_coupons',
+                'edit_published_shop_coupons',
             ];
-            foreach ($order_caps as $cap) {
+            foreach ($granted_caps as $cap) {
                 $allcaps[$cap] = true;
             }
         }
@@ -143,7 +194,8 @@ class Roster_Access_Guard {
     // -------------------------------------------------------------------------
 
     /**
-     * Redirect the manager away from every admin page except the roster and order pages.
+     * Redirect the manager away from unauthorized admin pages.
+     * Allows roster, orders (read-only), courses (ak_set), products, coupons, and media.
      * Fires early (priority 1) so it runs before other admin_init callbacks.
      */
     public function enforce_roster_only_access(): void {
@@ -162,32 +214,65 @@ class Roster_Access_Guard {
 
         global $pagenow;
 
-        // Allow: admin.php?page=ak-roster or wc-orders
+        $allowed_post_types = ['ak_set', 'product', 'shop_coupon', 'shop_order'];
+
+        // Allow: admin.php?page=ak-roster or wc-orders or coupons-moved
         if ($pagenow === 'admin.php') {
             $page = isset($_GET['page']) ? sanitize_key($_GET['page']) : '';
-            if (in_array($page, [Roster_Admin_Page::MENU_SLUG, 'wc-orders', 'wc-orders--new'], true)) {
+            if (in_array($page, [Roster_Admin_Page::MENU_SLUG, 'wc-orders', 'wc-orders--new', 'coupons-moved'], true)) {
                 return;
             }
         }
 
-        // Allow: legacy CPT order list
-        if ($pagenow === 'edit.php' && isset($_GET['post_type']) && $_GET['post_type'] === 'shop_order') {
-            return;
+        // Allow: list screens for allowed post types
+        if ($pagenow === 'edit.php') {
+            $post_type = isset($_REQUEST['post_type']) ? sanitize_key($_REQUEST['post_type']) : 'post';
+            if (in_array($post_type, $allowed_post_types, true)) {
+                return;
+            }
         }
 
-        // Allow: single order post edit view
+        // Allow: create new post for courses, products, and coupons
+        if ($pagenow === 'post-new.php') {
+            $post_type = isset($_REQUEST['post_type']) ? sanitize_key($_REQUEST['post_type']) : 'post';
+            if (in_array($post_type, ['ak_set', 'product', 'shop_coupon'], true)) {
+                return;
+            }
+        }
+
+        // Allow: single post edit, trash, untrash, delete, and save
         if ($pagenow === 'post.php') {
-            $post_id = isset($_GET['post']) ? (int) $_GET['post'] : 0;
-            $action  = isset($_GET['action']) ? sanitize_key($_GET['action']) : '';
-            if ($post_id > 0) {
+            $post_id = isset($_REQUEST['post']) ? (int) $_REQUEST['post'] : (isset($_REQUEST['post_ID']) ? (int) $_REQUEST['post_ID'] : 0);
+            if ($post_id > 0 && function_exists('get_post_type')) {
                 $post_type = get_post_type($post_id);
-                if (!$post_type || $post_type === 'shop_order') {
+                if (in_array($post_type, $allowed_post_types, true)) {
                     return;
                 }
             }
-            if ($action === 'edit') {
+            $action = isset($_REQUEST['action']) ? sanitize_key($_REQUEST['action']) : '';
+            if (in_array($action, ['edit', 'trash', 'untrash', 'delete', 'editpost'], true)) {
                 return;
             }
+        }
+
+        // Allow: taxonomies for products and courses (e.g. product_cat, product_tag)
+        if (in_array($pagenow, ['edit-tags.php', 'term.php'], true)) {
+            $taxonomy  = isset($_REQUEST['taxonomy']) ? sanitize_key($_REQUEST['taxonomy']) : '';
+            $post_type = isset($_REQUEST['post_type']) ? sanitize_key($_REQUEST['post_type']) : '';
+            if (in_array($post_type, ['product', 'ak_set'], true)) {
+                return;
+            }
+            if ($taxonomy && function_exists('get_taxonomy')) {
+                $tax_obj = get_taxonomy($taxonomy);
+                if ($tax_obj && !empty(array_intersect((array) $tax_obj->object_type, ['product', 'ak_set']))) {
+                    return;
+                }
+            }
+        }
+
+        // Allow: media management & uploads
+        if (in_array($pagenow, ['upload.php', 'media-new.php', 'async-upload.php'], true)) {
+            return;
         }
 
         // Everything else → redirect to the roster page
@@ -204,12 +289,19 @@ class Roster_Access_Guard {
         }
 
         if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
-            global $pagenow;
             $page      = isset($_GET['page']) ? sanitize_key($_GET['page']) : '';
             $post_type = isset($_POST['post_type']) ? sanitize_key($_POST['post_type']) : '';
             $action    = isset($_POST['action']) ? sanitize_key($_POST['action']) : '';
 
-            if ($page === 'wc-orders' || $post_type === 'shop_order' || str_contains($action, 'order')) {
+            $is_order_post = ($post_type === 'shop_order');
+            if (!$is_order_post && isset($_POST['post_ID']) && function_exists('get_post_type')) {
+                $post_id = (int) $_POST['post_ID'];
+                if ($post_id > 0 && get_post_type($post_id) === 'shop_order') {
+                    $is_order_post = true;
+                }
+            }
+
+            if ($page === 'wc-orders' || $is_order_post || ($action && str_contains($action, 'order') && !in_array($post_type, ['product', 'ak_set', 'shop_coupon'], true))) {
                 wp_die(
                     esc_html__('Menadżer rejestru posiada uprawnienia tylko do podglądu zamówień. Modyfikacja danych jest zablokowana.', 'ak-product-set'),
                     esc_html__('Brak uprawnień', 'ak-product-set'),
@@ -319,7 +411,8 @@ class Roster_Access_Guard {
     }
 
     /**
-     * Remove every admin menu item except the roster and order pages.
+     * Remove admin menu items outside allowed modules.
+     * Allowed: Roster, Courses (ak_set), Products, Coupons, WooCommerce (Orders only), and Media.
      * Runs at priority 999 so all items have been registered first.
      */
     public function strip_menu_for_manager(): void {
@@ -327,18 +420,37 @@ class Roster_Access_Guard {
             return;
         }
 
-        global $menu;
+        global $menu, $submenu;
 
         $allowed_slugs = [
             Roster_Admin_Page::MENU_SLUG,
+            'edit.php?post_type=ak_set',
+            'edit.php?post_type=product',
+            'edit.php?post_type=shop_coupon',
             'woocommerce',
             'wc-orders',
             'edit.php?post_type=shop_order',
+            'upload.php',
         ];
 
         foreach ($menu as $item) {
             if (isset($item[2]) && !in_array($item[2], $allowed_slugs, true)) {
                 remove_menu_page($item[2]);
+            }
+        }
+
+        // Restrict WooCommerce submenu to Orders and Coupons only
+        if (isset($submenu['woocommerce'])) {
+            $allowed_wc_submenus = [
+                'wc-orders',
+                'edit.php?post_type=shop_order',
+                'edit.php?post_type=shop_coupon',
+                'coupons-moved',
+            ];
+            foreach ($submenu['woocommerce'] as $key => $sub_item) {
+                if (isset($sub_item[2]) && !in_array($sub_item[2], $allowed_wc_submenus, true)) {
+                    unset($submenu['woocommerce'][$key]);
+                }
             }
         }
     }
