@@ -443,5 +443,76 @@ class Order_Slot_Lifecycle_Test extends TestCase {
 
         unset($GLOBALS['_wp_options']['ak_set_tshirt_cost']);
     }
+
+    public function test_produced_tshirts_metadata_saves_json_with_snapshot_cost_and_person_name(): void {
+        update_option('ak_set_tshirt_cost', 60.0);
+
+        $item_meta = [
+            '_ak_parent_set_id' => 99,
+            '_ak_participants'  => [
+                [
+                    'id'          => 'uuid-abc',
+                    'name'        => 'Michał Nowak',
+                    'status'      => 'active',
+                    'tshirt_size' => 'L',
+                    'tshirt_cut'  => 'Męska',
+                ],
+            ],
+        ];
+
+        $line_item = Mockery::mock('WC_Order_Item_Product');
+        $line_item->shouldIgnoreMissing();
+        $line_item->shouldReceive('get_product_id')->andReturn(501);
+        $line_item->shouldReceive('get_meta')->andReturnUsing(function($k) use (&$item_meta) {
+            return $item_meta[$k] ?? null;
+        });
+        $line_item->shouldReceive('update_meta_data')->andReturnUsing(function($k, $v) use (&$item_meta) {
+            $item_meta[$k] = $v;
+        });
+
+        // Add produced t-shirt
+        $entry = Order_Recalculator::add_item_produced_tshirt($line_item, [
+            'participant_uuid' => 'uuid-abc',
+            'participant_name' => 'Michał Nowak',
+            'cost'             => 60.0,
+            'size'             => 'L',
+            'cut'              => 'Męska',
+            'reason'           => 'cancellation',
+        ]);
+
+        $this->assertEquals('Michał Nowak', $entry['participant_name']);
+        $this->assertEquals(60.0, $entry['cost']);
+        $this->assertEquals('uuid-abc', $entry['participant_uuid']);
+
+        // Check JSON in meta
+        $this->assertNotEmpty($item_meta['_ak_produced_tshirts']);
+        $decoded = json_decode($item_meta['_ak_produced_tshirts'], true);
+        $this->assertIsArray($decoded);
+        $this->assertCount(1, $decoded);
+        $this->assertEquals('Michał Nowak', $decoded[0]['participant_name']);
+        $this->assertEquals(60.0, $decoded[0]['cost']);
+
+        // Change global option in wp_options to 100 zł!
+        update_option('ak_set_tshirt_cost', 100.0);
+
+        // Order total must STILL calculate historical 60.0 zł because it is saved in item metadata!
+        $order = Mockery::mock('WC_Order');
+        $order->shouldIgnoreMissing();
+        $order->shouldReceive('get_items')->with('line_item')->andReturn([$line_item]);
+
+        $fee_total = Order_Recalculator::get_order_produced_tshirts_total($order);
+        $this->assertEquals(60.0, $fee_total);
+
+        // Now remove produced t-shirt
+        $removed = Order_Recalculator::remove_item_produced_tshirt($line_item, 'uuid-abc');
+        $this->assertNotNull($removed);
+        $this->assertEquals('Michał Nowak', $removed['participant_name']);
+        $this->assertEquals(60.0, $removed['cost']);
+
+        $fee_total_after = Order_Recalculator::get_order_produced_tshirts_total($order);
+        $this->assertEquals(0.0, $fee_total_after);
+
+        unset($GLOBALS['_wp_options']['ak_set_tshirt_cost']);
+    }
 }
 

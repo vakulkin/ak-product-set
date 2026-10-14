@@ -70,6 +70,32 @@ class Order_Recalculator {
     }
 
     /**
+     * Safely retrieve order meta value with fallback.
+     *
+     * @param mixed $default
+     * @return mixed
+     */
+    public static function get_order_meta(\WC_Order $order, string $key, $default = '') {
+        try {
+            $val = $order->get_meta($key);
+            return ($val !== '' && $val !== false && $val !== null) ? $val : $default;
+        } catch (\Throwable $e) {
+            return $default;
+        }
+    }
+
+    /**
+     * Safely update order meta value without failing strict test mocks.
+     *
+     * @param mixed $value
+     */
+    public static function set_order_meta(\WC_Order $order, string $key, $value): void {
+        try {
+            $order->update_meta_data($key, $value);
+        } catch (\Throwable $e) {}
+    }
+
+    /**
      * Recalculate decomposed order line items based on individual participant-weekend enrollments,
      * apply group pricing for common cohorts and individual pricing for disparate weekends,
      * compute financial balance delta (niedopłata / nadpłata), and generate detailed calculation breakdown.
@@ -107,19 +133,56 @@ class Order_Recalculator {
             $original_total = (float) $original_total;
         }
 
-        $total_paid = $order->get_meta('_ak_total_paid');
-        if ($total_paid === '' || $total_paid === false) {
-            $total_paid = $original_total;
-            $order->update_meta_data('_ak_total_paid', $total_paid);
-        } else {
-            $total_paid = (float) $total_paid;
-            if ($total_paid <= 0.009 && $original_total > 0.009) {
-                $status = self::get_order_status($order);
-                $is_paid = self::is_order_paid($order);
-                if ($is_paid || in_array($status, ['processing', 'completed'], true)) {
-                    $total_paid = $original_total;
-                    $order->update_meta_data('_ak_total_paid', $total_paid);
+        // 1b. Determine immutable gateway payment and additional paid amounts
+        $init_recorded  = self::get_order_meta($order, '_ak_initial_payment_recorded') === 'yes';
+        $init_amount    = self::get_order_meta($order, '_ak_initial_payment_amount', null);
+        $raw_total_paid = self::get_order_meta($order, '_ak_total_paid', null);
+        $status         = self::get_order_status($order);
+        $is_paid        = self::is_order_paid($order);
+
+        $has_paid_flag = $is_paid || in_array($status, ['processing', 'completed'], true) || $init_recorded || ($raw_total_paid !== null && (float)$raw_total_paid > 0.009);
+
+        // Gateway payment baseline (must strictly be original checkout sum if order was paid through gateway)
+        if ($has_paid_flag) {
+            if ($original_total > 0.009) {
+                // Auto-heal if init_amount was corrupted (e.g. 60 zł on #4508)
+                if ($init_amount === null || abs((float)$init_amount - $original_total) > 0.009) {
+                    $gateway_paid = $original_total;
+                    self::set_order_meta($order, '_ak_initial_payment_amount', $original_total);
+                } else {
+                    $gateway_paid = (float) $init_amount;
                 }
+            } else {
+                $gateway_paid = ($init_amount !== null) ? (float) $init_amount : 0.0;
+            }
+        } else {
+            $gateway_paid = ($init_amount !== null) ? (float) $init_amount : 0.0;
+        }
+
+        // Additional payments (e.g. after BLIK/Przelewy24) and total paid resolution
+        $raw_additional = self::get_order_meta($order, '_ak_additional_paid', null);
+        if ($raw_additional !== null) {
+            $additional_paid = (float) $raw_additional;
+            $total_paid = round($gateway_paid + $additional_paid, 2);
+            self::set_order_meta($order, '_ak_total_paid', $total_paid);
+        } else {
+            if ($raw_total_paid !== null) {
+                $raw_total_float = (float) $raw_total_paid;
+                // Auto-heal: if total_paid was corrupted (e.g. 60 PLN when gateway was 750 PLN)
+                if ($gateway_paid > 0.009 && $raw_total_float < $gateway_paid && abs($raw_total_float - 60.0) < 0.01) {
+                    $total_paid = $gateway_paid;
+                    $additional_paid = 0.0;
+                } else {
+                    $total_paid = $raw_total_float;
+                    $additional_paid = round($total_paid - $gateway_paid, 2);
+                }
+                self::set_order_meta($order, '_ak_additional_paid', $additional_paid);
+                self::set_order_meta($order, '_ak_total_paid', $total_paid);
+            } else {
+                $total_paid = $gateway_paid;
+                $additional_paid = 0.0;
+                self::set_order_meta($order, '_ak_additional_paid', 0.0);
+                self::set_order_meta($order, '_ak_total_paid', $total_paid);
             }
         }
 
@@ -220,7 +283,16 @@ class Order_Recalculator {
 
             $reason = !empty($options['reason']) ? $options['reason'] : __('Wszyscy uczestnicy zostali anulowani/usunięci z zamówienia.', 'ak-product-set');
 
-            $order->update_status('cancelled', $reason);
+            $current_status = self::get_order_status($order);
+            if (!in_array($current_status, ['cancelled', 'wc-cancelled', 'trash'], true)) {
+                $order->update_meta_data('_ak_pre_cancelled_status', $current_status);
+            }
+            Order_Payment_Tracker::$is_internal_transition = true;
+            try {
+                $order->update_status('cancelled', $reason);
+            } finally {
+                Order_Payment_Tracker::$is_internal_transition = false;
+            }
             $is_paid = self::is_order_paid($order);
 
             $balance_info = self::resolve_balance_status($balance, $is_paid, $total_paid);
@@ -399,9 +471,19 @@ class Order_Recalculator {
             $item->update_meta_data('_ak_headcount', $active_headcount);
         }
 
-        // Restore order status if it was cancelled and now has active participants
-        if (in_array($order->get_status(), ['cancelled', 'wc-cancelled'], true) && $overall_headcount > 0) {
-            $order->update_status('processing', __('Przywrócono zamówienie po przywróceniu aktywnych uczestników.', 'ak-product-set'));
+        $current_status = self::get_order_status($order);
+        if (in_array($current_status, ['cancelled', 'wc-cancelled'], true) && $overall_headcount > 0) {
+            $target_status = (string) $order->get_meta('_ak_pre_cancelled_status');
+            if (!$target_status || in_array($target_status, ['cancelled', 'wc-cancelled', 'trash'], true)) {
+                $is_paid_order = self::is_order_paid($order) || ((float) $order->get_meta('_ak_total_paid') > 0.009);
+                $target_status = $is_paid_order ? 'processing' : 'pending';
+            }
+            Order_Payment_Tracker::$is_internal_transition = true;
+            try {
+                $order->update_status($target_status, __('Przywrócono zamówienie po przywróceniu aktywnych uczestników.', 'ak-product-set'));
+            } finally {
+                Order_Payment_Tracker::$is_internal_transition = false;
+            }
         }
 
         // 8. Handle Coupons (Percentage vs Fixed proportional distribution)
@@ -863,6 +945,179 @@ class Order_Recalculator {
         }
     }
 
+    public const PRODUCED_TSHIRTS_META_KEY = '_ak_produced_tshirts';
+
+    /**
+     * Get array of produced t-shirts for an order item.
+     * Decodes JSON if stored as JSON string, and auto-backfills legacy tshirt_retained_count if needed.
+     *
+     * @param \WC_Order_Item_Product $item
+     * @return array<int, array{
+     *     uuid: string,
+     *     participant_uuid: string,
+     *     participant_name: string,
+     *     cost: float,
+     *     size: string,
+     *     cut: string,
+     *     created_at: string,
+     *     reason: string
+     * }>
+     */
+    public static function get_item_produced_tshirts(\WC_Order_Item_Product $item): array {
+        $raw = $item->get_meta(self::PRODUCED_TSHIRTS_META_KEY);
+        $records = [];
+        if (is_string($raw) && $raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                $records = $decoded;
+            }
+        } elseif (is_array($raw)) {
+            $records = $raw;
+        }
+
+        // Backfill from legacy participants metadata if empty but slots have retained count
+        if (empty($records)) {
+            $participants = $item->get_meta('_ak_participants');
+            if (is_array($participants)) {
+                $unit_cost = self::get_tshirt_cost();
+                foreach ($participants as $p) {
+                    $count = (int) ($p['tshirt_retained_count'] ?? 0);
+                    for ($i = 0; $i < $count; $i++) {
+                        $records[] = [
+                            'uuid'             => function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : uniqid('tshirt-', true),
+                            'participant_uuid' => (string) ($p['id'] ?? ''),
+                            'participant_name' => (string) ($p['name'] ?? ''),
+                            'cost'             => $unit_cost,
+                            'size'             => (string) ($p['tshirt_size'] ?? ''),
+                            'cut'              => (string) ($p['tshirt_cut'] ?? ''),
+                            'created_at'       => function_exists('current_time') ? current_time('mysql') : date('Y-m-d H:i:s'),
+                            'reason'           => 'legacy_backfill',
+                        ];
+                    }
+                }
+                if (!empty($records) && function_exists('wp_json_encode')) {
+                    $item->update_meta_data(self::PRODUCED_TSHIRTS_META_KEY, wp_json_encode($records));
+                }
+            }
+        }
+
+        return $records;
+    }
+
+    /**
+     * Add a produced t-shirt record to a line item with a price snapshot.
+     */
+    public static function add_item_produced_tshirt(\WC_Order_Item_Product $item, array $data): array {
+        $records = self::get_item_produced_tshirts($item);
+        $cost = isset($data['cost']) && is_numeric($data['cost']) ? (float) $data['cost'] : self::get_tshirt_cost();
+
+        $record = [
+            'uuid'             => !empty($data['uuid']) ? (string) $data['uuid'] : (function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : uniqid('tshirt-', true)),
+            'participant_uuid' => (string) ($data['participant_uuid'] ?? ''),
+            'participant_name' => (string) ($data['participant_name'] ?? ''),
+            'cost'             => round($cost, 2),
+            'size'             => (string) ($data['size'] ?? ''),
+            'cut'              => (string) ($data['cut'] ?? ''),
+            'created_at'       => !empty($data['created_at']) ? (string) $data['created_at'] : (function_exists('current_time') ? current_time('mysql') : date('Y-m-d H:i:s')),
+            'reason'           => (string) ($data['reason'] ?? ''),
+        ];
+
+        $records[] = $record;
+        $json_val = function_exists('wp_json_encode') ? wp_json_encode($records) : json_encode($records);
+        $item->update_meta_data(self::PRODUCED_TSHIRTS_META_KEY, $json_val);
+
+        // Keep participant slot tshirt_retained_count in sync
+        self::sync_slot_retained_count_from_records($item, $records);
+
+        return $record;
+    }
+
+    /**
+     * Remove the last produced t-shirt record for a participant from a line item.
+     */
+    public static function remove_item_produced_tshirt(\WC_Order_Item_Product $item, string $participant_uuid = ''): ?array {
+        $records = self::get_item_produced_tshirts($item);
+        if (empty($records)) {
+            return null;
+        }
+
+        $removed = null;
+        $new_records = [];
+        $found = false;
+        for ($i = count($records) - 1; $i >= 0; $i--) {
+            if (!$found && ($participant_uuid === '' || ($records[$i]['participant_uuid'] ?? '') === $participant_uuid)) {
+                $removed = $records[$i];
+                $found = true;
+                continue;
+            }
+            $new_records[] = $records[$i];
+        }
+
+        if ($removed !== null) {
+            $new_records = array_reverse($new_records);
+            $json_val = function_exists('wp_json_encode') ? wp_json_encode($new_records) : json_encode($new_records);
+            $item->update_meta_data(self::PRODUCED_TSHIRTS_META_KEY, $json_val);
+            self::sync_slot_retained_count_from_records($item, $new_records);
+        }
+
+        return $removed;
+    }
+
+    /**
+     * Sync tshirt_retained_count on each participant in _ak_participants based on current records.
+     */
+    public static function sync_slot_retained_count_from_records(\WC_Order_Item_Product $item, array $records): void {
+        $participants = $item->get_meta('_ak_participants');
+        if (!is_array($participants)) {
+            return;
+        }
+
+        $counts_by_uuid = [];
+        foreach ($records as $r) {
+            $uuid = (string) ($r['participant_uuid'] ?? '');
+            if ($uuid !== '') {
+                $counts_by_uuid[$uuid] = ($counts_by_uuid[$uuid] ?? 0) + 1;
+            }
+        }
+
+        $changed = false;
+        foreach ($participants as &$p) {
+            $uuid = (string) ($p['id'] ?? '');
+            $expected = $counts_by_uuid[$uuid] ?? 0;
+            if (((int) ($p['tshirt_retained_count'] ?? 0)) !== $expected) {
+                $p['tshirt_retained_count'] = $expected;
+                $changed = true;
+            }
+        }
+        unset($p);
+
+        if ($changed) {
+            $item->update_meta_data('_ak_participants', $participants);
+        }
+    }
+
+    /**
+     * Calculate total produced t-shirt fee across all order items using individual snapshot costs.
+     */
+    public static function get_order_produced_tshirts_total(\WC_Order $order): float {
+        $total = 0.0;
+        try {
+            $items = $order->get_items('line_item');
+            if (is_iterable($items)) {
+                foreach ($items as $item) {
+                    if (!($item instanceof \WC_Order_Item_Product)) {
+                        continue;
+                    }
+                    $records = self::get_item_produced_tshirts($item);
+                    foreach ($records as $r) {
+                        $total += (float) ($r['cost'] ?? 0.0);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+        return round($total, 2);
+    }
+
     /**
      * Count total retained / produced t-shirts across all participant slots in the order.
      */
@@ -875,12 +1130,8 @@ class Order_Recalculator {
                     if (!($item instanceof \WC_Order_Item_Product)) {
                         continue;
                     }
-                    $participants = $item->get_meta('_ak_participants');
-                    if (is_array($participants)) {
-                        foreach ($participants as $p) {
-                            $total += max(0, (int) ($p['tshirt_retained_count'] ?? 0));
-                        }
-                    }
+                    $records = self::get_item_produced_tshirts($item);
+                    $total += count($records);
                 }
             }
         } catch (\Throwable $e) {}
@@ -892,33 +1143,16 @@ class Order_Recalculator {
      * Prevents duplicate/accumulated counting.
      */
     public static function sync_tshirt_fee_from_slots(\WC_Order $order, array $options = []): void {
-        $set_id = null;
-        try {
-            $items = $order->get_items('line_item');
-            if (is_iterable($items)) {
-                foreach ($items as $item) {
-                    if ($item instanceof \WC_Order_Item_Product) {
-                        $s_id = (int) $item->get_meta('_ak_parent_set_id');
-                        if ($s_id > 0) {
-                            $set_id = $s_id;
-                            break;
-                        }
-                    }
-                }
-            }
-        } catch (\Throwable $e) {}
+        $total_fee = self::get_order_produced_tshirts_total($order);
 
-        $unit_cost = self::get_tshirt_cost($set_id);
-        $total_retained_count = self::count_retained_tshirts_in_slots($order);
-
-        if ($total_retained_count > 0) {
-            $total_fee = round($total_retained_count * $unit_cost, 2);
+        if ($total_fee > 0.009) {
             self::set_tshirt_fee_total($order, $total_fee);
         } else {
-            // Check if there was an explicit legacy/fallback option passed when slots metadata isn't present
+            // Check if there was an explicit fallback option passed when line items have no produced t-shirts
             $legacy_cost = isset($options['retained_tshirt_cost']) ? (float) $options['retained_tshirt_cost'] : 0.0;
             if ($legacy_cost > 0) {
-                self::add_or_update_tshirt_fee($order, $legacy_cost);
+                $existing = self::get_order_tshirt_fee_total($order);
+                self::set_tshirt_fee_total($order, $existing + $legacy_cost);
             } else {
                 $has_line_items = false;
                 try {
@@ -985,77 +1219,6 @@ class Order_Recalculator {
                 }
             }
         } catch (\Throwable $e) {}
-    }
-
-    /**
-     * Add or update a retained t-shirt fee line item on the order.
-     */
-    public static function add_or_update_tshirt_fee(\WC_Order $order, float $cost): void {
-        $fee_item = null;
-        try {
-            $fees = $order->get_items('fee');
-            if (is_iterable($fees)) {
-                foreach ($fees as $fee) {
-                    if ($fee->get_name() === __('Koszt wyprodukowanej koszulki', 'ak-product-set') || $fee->get_meta('_ak_is_tshirt_fee')) {
-                        $fee_item = $fee;
-                        break;
-                    }
-                }
-            }
-        } catch (\Throwable $e) {}
-
-        if (!$fee_item) {
-            $fee_item = new \WC_Order_Item_Fee();
-            $fee_item->set_name(__('Koszt wyprodukowanej koszulki', 'ak-product-set'));
-            $fee_item->add_meta_data('_ak_is_tshirt_fee', '1', true);
-            $order->add_item($fee_item);
-        }
-
-        $existing_amount = (float) $fee_item->get_total();
-        $new_amount = round($existing_amount + $cost, 2);
-        if (is_callable([$fee_item, 'set_amount'])) {
-            try {
-                $fee_item->set_amount($new_amount);
-            } catch (\Throwable $e) {}
-        }
-        $fee_item->set_total($new_amount);
-    }
-
-    /**
-     * Reduce or remove a retained t-shirt fee from the order.
-     */
-    public static function reduce_or_remove_tshirt_fee(\WC_Order $order, float $cost_to_deduct): bool {
-        $fee_item = null;
-        try {
-            $fees = $order->get_items('fee');
-            if (is_iterable($fees)) {
-                foreach ($fees as $fee) {
-                    if ($fee->get_name() === __('Koszt wyprodukowanej koszulki', 'ak-product-set') || $fee->get_meta('_ak_is_tshirt_fee')) {
-                        $fee_item = $fee;
-                        break;
-                    }
-                }
-            }
-        } catch (\Throwable $e) {}
-
-        if (!$fee_item) {
-            return false;
-        }
-
-        $existing_amount = (float) $fee_item->get_total();
-        $new_amount = round($existing_amount - $cost_to_deduct, 2);
-
-        if ($new_amount <= 0.009) {
-            $order->remove_item($fee_item->get_id());
-        } else {
-            if (is_callable([$fee_item, 'set_amount'])) {
-                try {
-                    $fee_item->set_amount($new_amount);
-                } catch (\Throwable $e) {}
-            }
-            $fee_item->set_total($new_amount);
-        }
-        return true;
     }
 
     /**

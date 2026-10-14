@@ -99,8 +99,41 @@ $transferred_from = (int) $order->get_meta('_ak_transferred_from_order');
 
             <div class="ak-om-metrics-grid">
                 <div class="ak-om-metric-card">
-                    <div class="ak-om-metric-label"><?php esc_html_e('Wpłacono', 'ak-product-set'); ?></div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                        <div class="ak-om-metric-label"><?php esc_html_e('Wpłacono', 'ak-product-set'); ?></div>
+                        <button type="button" class="button button-small ak-om-edit-total-paid-btn" style="font-size: 11px; padding: 0 6px; height: 20px; line-height: 18px;" data-gateway-paid="<?php echo esc_attr(number_format($gateway_paid ?? $total_paid, 2, '.', '')); ?>" data-additional-paid="<?php echo esc_attr(number_format($additional_paid ?? 0.0, 2, '.', '')); ?>" data-current-paid="<?php echo esc_attr(number_format($total_paid, 2, '.', '')); ?>" title="<?php esc_attr_e('Ręczna zmiana wpłaconej kwoty', 'ak-product-set'); ?>">
+                            <?php esc_html_e('Zmień', 'ak-product-set'); ?>
+                        </button>
+                    </div>
                     <div class="ak-om-metric-value"><?php echo esc_html(number_format_i18n($total_paid, 2)); ?> zł</div>
+                    <?php if (($gateway_paid ?? 0.0) > 0.009 || !empty($init_method)) : ?>
+                        <div class="ak-om-subtitle" style="margin-top: 4px; line-height: 1.4;">
+                            <div>
+                                <?php
+                                $method_display = $init_method ?: __('Bramka płatności', 'ak-product-set');
+                                printf(
+                                    esc_html__('Bramka (%s): %s zł', 'ak-product-set'),
+                                    esc_html($method_display),
+                                    esc_html(number_format_i18n($gateway_paid ?? $total_paid, 2))
+                                );
+                                if (!empty($init_txn)) {
+                                    echo ' <span style="color:#8c8f94;">#' . esc_html($init_txn) . '</span>';
+                                }
+                                ?>
+                            </div>
+                            <?php if (isset($additional_paid) && abs($additional_paid) > 0.009) : ?>
+                                <div style="margin-top: 2px; font-weight: 600; color: <?php echo $additional_paid > 0 ? '#1e7e34' : '#b32d2e'; ?>;">
+                                    <?php
+                                    if ($additional_paid > 0) {
+                                        printf(esc_html__('+ Dodatkowo wpłacono: %s zł', 'ak-product-set'), number_format_i18n($additional_paid, 2));
+                                    } else {
+                                        printf(esc_html__('Zwrot / korekta: %s zł', 'ak-product-set'), number_format_i18n($additional_paid, 2));
+                                    }
+                                    ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="ak-om-metric-card">
@@ -294,17 +327,24 @@ $transferred_from = (int) $order->get_meta('_ak_transferred_from_order');
                                 </div>
                             </td>
                             <td>
-                                <button type="button" class="button button-small ak-om-edit-participant-btn ak-om-edit-tshirt-btn"
-                                    data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
-                                    data-name="<?php echo esc_attr($slot['name']); ?>"
-                                    data-email="<?php echo esc_attr($slot['email']); ?>"
-                                    data-phone="<?php echo esc_attr($slot['phone']); ?>"
-                                    data-size="<?php echo esc_attr($slot['tshirt_size']); ?>"
-                                    data-cut="<?php echo esc_attr($slot['tshirt_cut']); ?>"
-                                    data-focus="tshirt"
-                                    title="<?php esc_attr_e('Kliknij, aby zmienić rozmiar / krój koszulki', 'ak-product-set'); ?>">
-                                    <?php echo $shirt_btn_label; ?>
-                                </button>
+                                <div style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                    <button type="button" class="button button-small ak-om-edit-participant-btn ak-om-edit-tshirt-btn"
+                                        data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
+                                        data-name="<?php echo esc_attr($slot['name']); ?>"
+                                        data-email="<?php echo esc_attr($slot['email']); ?>"
+                                        data-phone="<?php echo esc_attr($slot['phone']); ?>"
+                                        data-size="<?php echo esc_attr($slot['tshirt_size']); ?>"
+                                        data-cut="<?php echo esc_attr($slot['tshirt_cut']); ?>"
+                                        data-focus="tshirt"
+                                        title="<?php esc_attr_e('Kliknij, aby zmienić rozmiar / krój koszulki', 'ak-product-set'); ?>">
+                                        <?php echo $shirt_btn_label; ?>
+                                    </button>
+                                    <?php if ($retained_shirts > 0) : ?>
+                                        <span class="ak-om-tag" style="background:#fff3cd; color:#856404; border:1px solid #ffeeba;" title="<?php esc_attr_e('Liczba wyprodukowanych/zniszczonych koszulek dla tego terminu', 'ak-product-set'); ?>">
+                                            <?php printf(esc_html__('Koszulki: %d szt.', 'ak-product-set'), $retained_shirts); ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
                             </td>
                             <td style="text-align: right; white-space: nowrap;">
                                 <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: nowrap;">
@@ -314,12 +354,6 @@ $transferred_from = (int) $order->get_meta('_ak_transferred_from_order');
                                         <?php elseif ($is_transferred) : ?>
                                             <span class="ak-om-tag" style="background:#e7f3fe; color:#185abc; border:1px solid #c2e0ff;">
                                                 <?php printf(esc_html__('Przeniesiony (%s)', 'ak-product-set'), !empty($slot['transferred_to_order']) ? '#' . esc_html($slot['transferred_to_order']) : 'zamówienie'); ?>
-                                            </span>
-                                        <?php endif; ?>
-
-                                        <?php if ($retained_shirts > 0) : ?>
-                                            <span class="ak-om-tag" style="background:#fff3cd; color:#856404; border:1px solid #ffeeba;" title="<?php esc_attr_e('Liczba wyprodukowanych/zniszczonych koszulek dla tego terminu', 'ak-product-set'); ?>">
-                                                <?php printf(esc_html__('Koszulki: %d szt.', 'ak-product-set'), $retained_shirts); ?>
                                             </span>
                                         <?php endif; ?>
 
@@ -340,12 +374,6 @@ $transferred_from = (int) $order->get_meta('_ak_transferred_from_order');
                                             </button>
                                         <?php endif; ?>
                                     <?php else : ?>
-                                        <?php if ($retained_shirts > 0) : ?>
-                                            <span class="ak-om-tag" style="background:#fff3cd; color:#856404; border:1px solid #ffeeba;" title="<?php esc_attr_e('Liczba wyprodukowanych/zniszczonych koszulek dla tego terminu', 'ak-product-set'); ?>">
-                                                <?php printf(esc_html__('Koszulki: %d szt.', 'ak-product-set'), $retained_shirts); ?>
-                                            </span>
-                                        <?php endif; ?>
-
                                         <button type="button" class="button button-small ak-om-reschedule-btn"
                                             data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
                                             data-from-id="<?php echo esc_attr($slot['weekend_id']); ?>"
@@ -953,6 +981,40 @@ jQuery(document).ready(function($) {
                 alert(res.data || 'Błąd');
                 btn.prop('disabled', false);
             }
+        });
+    });
+
+    // 9. Manual adjust total paid
+    $('.ak-om-edit-total-paid-btn').on('click', function(e) {
+        e.preventDefault();
+        var gatewayPaid = $(this).data('gateway-paid') || '0.00';
+        var currentPaid = $(this).data('current-paid') || gatewayPaid;
+        var promptMsg = '<?php echo esc_js(__('Płatność z bramki (zablokowana kwota bazowa):', 'ak-product-set')); ?> ' + gatewayPaid + ' zł.\n\n<?php echo esc_js(__('Wprowadź łączną wpłaconą kwotę (zł):', 'ak-product-set')); ?>';
+        var newPaid = prompt(promptMsg, currentPaid);
+        if (newPaid === null) return;
+        newPaid = newPaid.replace(',', '.').trim();
+        if (isNaN(parseFloat(newPaid)) || parseFloat(newPaid) < 0) {
+            alert('<?php echo esc_js(__('Nieprawidłowa kwota.', 'ak-product-set')); ?>');
+            return;
+        }
+        var note = prompt('<?php echo esc_js(__('Opcjonalna notatka do historii zmian (np. dopłata po BLIK/Przelewy24 / zwrot):', 'ak-product-set')); ?>', '') || '';
+        var btn = $(this).prop('disabled', true);
+        $.post(ajaxurl, {
+            action: 'ak_update_total_paid',
+            order_id: orderId,
+            total_paid: newPaid,
+            note: note,
+            nonce: nonce
+        }, function(res) {
+            if (res.success) {
+                location.reload();
+            } else {
+                alert(res.data || 'Błąd');
+                btn.prop('disabled', false);
+            }
+        }).fail(function() {
+            alert('Błąd serwera');
+            btn.prop('disabled', false);
         });
     });
 });

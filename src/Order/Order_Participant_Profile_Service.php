@@ -120,7 +120,7 @@ class Order_Participant_Profile_Service {
             $tshirt_cost = Order_Recalculator::get_tshirt_cost($set_id);
             $changes[] = sprintf(__('Doliczono koszt wyprodukowanej koszulki: +%s zł', 'ak-product-set'), number_format_i18n($tshirt_cost, 2));
 
-            // Increment retained/produced t-shirt count on the first slot found for this participant
+            // Add produced t-shirt record to the first matching slot item found for this participant
             $slot_incremented = false;
             foreach ($order->get_items('line_item') as $item) {
                 if (!($item instanceof \WC_Order_Item_Product)) {
@@ -130,16 +130,21 @@ class Order_Participant_Profile_Service {
                 if (!is_array($participants)) {
                     continue;
                 }
-                foreach ($participants as &$p) {
+                foreach ($participants as $p) {
                     if (!empty($p['id']) && $p['id'] === $participant_uuid) {
-                        $p['tshirt_retained_count'] = ((int) ($p['tshirt_retained_count'] ?? 0)) + 1;
+                        Order_Recalculator::add_item_produced_tshirt($item, [
+                            'participant_uuid' => $participant_uuid,
+                            'participant_name' => $p['name'] ?? '',
+                            'cost'             => $tshirt_cost,
+                            'size'             => $new_data['tshirt_size'] ?: ($p['tshirt_size'] ?? ''),
+                            'cut'              => $new_data['tshirt_cut'] ?: ($p['tshirt_cut'] ?? ''),
+                            'reason'           => 'profile_edit',
+                        ]);
                         $slot_incremented = true;
                         break;
                     }
                 }
-                unset($p);
                 if ($slot_incremented) {
-                    $item->update_meta_data('_ak_participants', $participants);
                     break;
                 }
             }

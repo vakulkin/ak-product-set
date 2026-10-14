@@ -10,6 +10,11 @@ if (!defined('ABSPATH')) {
 
 class Order_Payment_Tracker {
 
+    /**
+     * Flag to ignore internal status transitions (such as un-cancelling or recalculation).
+     */
+    public static bool $is_internal_transition = false;
+
     public function init(): void {
         add_action('woocommerce_payment_complete', [$this, 'on_payment_complete'], 10, 1);
         add_action('woocommerce_order_status_processing', [$this, 'on_order_paid'], 10, 1);
@@ -23,6 +28,9 @@ class Order_Payment_Tracker {
      * @param int|\WC_Order $order_id
      */
     public function on_payment_complete($order_id): void {
+        if (self::$is_internal_transition) {
+            return;
+        }
         $order = $order_id instanceof \WC_Order ? $order_id : (function_exists('wc_get_order') ? wc_get_order($order_id) : null);
         if ($order) {
             $this->record_initial_payment($order);
@@ -35,6 +43,9 @@ class Order_Payment_Tracker {
      * @param int|\WC_Order $order_id
      */
     public function on_order_paid($order_id): void {
+        if (self::$is_internal_transition) {
+            return;
+        }
         $order = $order_id instanceof \WC_Order ? $order_id : (function_exists('wc_get_order') ? wc_get_order($order_id) : null);
         if ($order) {
             $this->record_initial_payment($order);
@@ -50,6 +61,9 @@ class Order_Payment_Tracker {
      * @param \WC_Order|null $order
      */
     public function on_order_status_changed($order_id, $status_from, $status_to, $order = null): void {
+        if (self::$is_internal_transition) {
+            return;
+        }
         if (!($order instanceof \WC_Order)) {
             $order = function_exists('wc_get_order') ? wc_get_order($order_id) : null;
         }
@@ -66,6 +80,9 @@ class Order_Payment_Tracker {
      * Record immutable initial payment metadata and settle order balance if previously unpaid.
      */
     public function record_initial_payment(\WC_Order $order): void {
+        if (self::$is_internal_transition) {
+            return;
+        }
         // Only track AK orders
         $is_ak_order = (bool)$order->get_meta('_ak_order_decomposed')
             || (bool)$order->get_meta('_ak_parent_set_id')
@@ -76,8 +93,15 @@ class Order_Payment_Tracker {
             return;
         }
 
-        // Avoid duplicate recording
+        // Avoid duplicate recording, but auto-heal if previously corrupted to a lower fee amount
         if ($order->get_meta('_ak_initial_payment_recorded') === 'yes') {
+            $recorded_amount = (float)$order->get_meta('_ak_initial_payment_amount');
+            $orig_total      = (float)$order->get_meta('_ak_original_total');
+            if ($orig_total > 0.009 && abs($recorded_amount - $orig_total) > 0.009) {
+                // Heal corrupted initial payment to original gateway checkout total
+                $order->update_meta_data('_ak_initial_payment_amount', $orig_total);
+                $order->save();
+            }
             return;
         }
 
@@ -102,12 +126,11 @@ class Order_Payment_Tracker {
             $method_title = __('Bramka płatności', 'ak-product-set');
         }
 
-        $total = (float)$order->get_total();
-        if ($total <= 0.009 && method_exists($order, 'get_meta')) {
-            $orig = $order->get_meta('_ak_original_total');
-            if ($orig !== '' && $orig !== false) {
-                $total = (float)$orig;
-            }
+        $orig = $order->get_meta('_ak_original_total');
+        if ($orig !== '' && $orig !== false && (float)$orig > 0.009) {
+            $total = (float)$orig;
+        } else {
+            $total = (float)$order->get_total();
         }
 
         $date_paid = '';
@@ -137,6 +160,9 @@ class Order_Payment_Tracker {
         $current_paid = (float)$order->get_meta('_ak_total_paid');
         if ($current_paid < 0.009) {
             $order->update_meta_data('_ak_total_paid', $total);
+        }
+        if ($order->get_meta('_ak_additional_paid') === '' || $order->get_meta('_ak_additional_paid') === false) {
+            $order->update_meta_data('_ak_additional_paid', 0.0);
         }
 
         // If order was in unpaid state, settle it and update breakdown text

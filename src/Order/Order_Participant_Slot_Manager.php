@@ -19,6 +19,11 @@ class Order_Participant_Slot_Manager {
         $participant_name = '';
         $found = false;
         $before_snapshot = $recalculate ? Order_Recalculator::get_order_state_snapshot($order) : null;
+        $tshirt_cost = 0.0;
+        if ($tshirt_retained) {
+            $set_id = (int) $order->get_meta('_ak_parent_set_id');
+            $tshirt_cost = Order_Recalculator::get_tshirt_cost($set_id);
+        }
 
         foreach ($order->get_items('line_item') as $item) {
             if (!($item instanceof \WC_Order_Item_Product) || (int) $item->get_product_id() !== $weekend_id) {
@@ -44,6 +49,14 @@ class Order_Participant_Slot_Manager {
                     $p['cancelled_at'] = current_time('mysql');
                     if ($tshirt_retained) {
                         $p['tshirt_retained_count'] = ((int) ($p['tshirt_retained_count'] ?? 0)) + 1;
+                        Order_Recalculator::add_item_produced_tshirt($item, [
+                            'participant_uuid' => $participant_uuid,
+                            'participant_name' => $participant_name,
+                            'cost'             => $tshirt_cost,
+                            'size'             => $p['tshirt_size'] ?? '',
+                            'cut'              => $p['tshirt_cut'] ?? '',
+                            'reason'           => 'cancellation',
+                        ]);
                     }
                 }
             }
@@ -91,9 +104,8 @@ class Order_Participant_Slot_Manager {
         }
 
         $recalc_result = Order_Recalculator::recalculate($order, [
-            'reason'               => $reason,
-            'retained_tshirt_cost' => $tshirt_cost,
-            'before_snapshot'      => $before_snapshot,
+            'reason'          => $reason,
+            'before_snapshot' => $before_snapshot,
         ]);
 
         return [
@@ -191,12 +203,23 @@ class Order_Participant_Slot_Manager {
             ];
         }
 
-        if (in_array($order->get_status(), ['cancelled', 'wc-cancelled', 'trash'], true)) {
-            $order->update_status('processing', sprintf(
-                /* translators: %s: participant name */
-                __('Przywrócono zamówienie po przywróceniu terminu dla %s', 'ak-product-set'),
-                $participant_name
-            ));
+        $current_status = Order_Recalculator::get_order_status($order);
+        if (in_array($current_status, ['cancelled', 'wc-cancelled', 'trash'], true)) {
+            $target_status = (string) $order->get_meta('_ak_pre_cancelled_status');
+            if (!$target_status || in_array($target_status, ['cancelled', 'wc-cancelled', 'trash'], true)) {
+                $is_paid_order = Order_Recalculator::is_order_paid($order) || ((float) $order->get_meta('_ak_total_paid') > 0.009);
+                $target_status = $is_paid_order ? 'processing' : 'pending';
+            }
+            Order_Payment_Tracker::$is_internal_transition = true;
+            try {
+                $order->update_status($target_status, sprintf(
+                    /* translators: %s: participant name */
+                    __('Przywrócono zamówienie po przywróceniu terminu dla %s', 'ak-product-set'),
+                    $participant_name
+                ));
+            } finally {
+                Order_Payment_Tracker::$is_internal_transition = false;
+            }
         }
 
         $w_prod = wc_get_product($weekend_id);
@@ -239,40 +262,24 @@ class Order_Participant_Slot_Manager {
         $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
         $deduct = min($cost, $existing_fee);
 
-        // Decrement tshirt_retained_count on corresponding slot or first available slot
-        $decremented = false;
+        // Decrement / remove produced t-shirt record
+        $removed_record = null;
         foreach ($order->get_items('line_item') as $item) {
             if (!($item instanceof \WC_Order_Item_Product)) {
                 continue;
             }
-            if ($weekend_id && (int)$item->get_product_id() !== $weekend_id) {
+            if ($weekend_id && (int) $item->get_product_id() !== $weekend_id) {
                 continue;
             }
-            $participants = $item->get_meta('_ak_participants');
-            if (!is_array($participants)) {
-                continue;
-            }
-            foreach ($participants as &$p) {
-                if ($participant_uuid && ($p['id'] ?? '') !== $participant_uuid) {
-                    continue;
-                }
-                if (!empty($p['tshirt_retained_count']) && (int)$p['tshirt_retained_count'] > 0) {
-                    $p['tshirt_retained_count'] = (int)$p['tshirt_retained_count'] - 1;
-                    $decremented = true;
-                    break;
-                }
-            }
-            unset($p);
-            if ($decremented) {
-                $item->update_meta_data('_ak_participants', $participants);
+            $removed_record = Order_Recalculator::remove_item_produced_tshirt($item, $participant_uuid ?: '');
+            if ($removed_record !== null) {
                 break;
             }
         }
 
-        // Only call manual fee reduction if slot decrement did not happen (legacy fallback)
-        if (!$decremented) {
-            Order_Recalculator::reduce_or_remove_tshirt_fee($order, $deduct);
-        }
+        $deduct = ($removed_record !== null && isset($removed_record['cost']))
+            ? (float) $removed_record['cost']
+            : min($cost, $existing_fee);
 
         $reason = sprintf(
             /* translators: %s: formatted cost */
@@ -298,6 +305,11 @@ class Order_Participant_Slot_Manager {
         $before_snapshot = null;
         $participant_name = '';
         $removed_count = 0;
+        $tshirt_cost = 0.0;
+        if ($tshirt_retained) {
+            $set_id = (int) $order->get_meta('_ak_parent_set_id');
+            $tshirt_cost = Order_Recalculator::get_tshirt_cost($set_id);
+        }
 
         foreach ($order->get_items('line_item') as $item) {
             if (!($item instanceof \WC_Order_Item_Product)) {
@@ -321,6 +333,14 @@ class Order_Participant_Slot_Manager {
                     $p['cancelled_at'] = current_time('mysql');
                     if ($tshirt_retained) {
                         $p['tshirt_retained_count'] = ((int) ($p['tshirt_retained_count'] ?? 0)) + 1;
+                        Order_Recalculator::add_item_produced_tshirt($item, [
+                            'participant_uuid' => $participant_uuid,
+                            'participant_name' => $participant_name,
+                            'cost'             => $tshirt_cost,
+                            'size'             => $p['tshirt_size'] ?? '',
+                            'cut'              => $p['tshirt_cut'] ?? '',
+                            'reason'           => 'cancellation',
+                        ]);
                     }
                 }
             }
@@ -360,9 +380,8 @@ class Order_Participant_Slot_Manager {
         }
 
         $recalc_result = Order_Recalculator::recalculate($order, [
-            'reason'               => $reason,
-            'retained_tshirt_cost' => $tshirt_cost,
-            'before_snapshot'      => $before_snapshot,
+            'reason'          => $reason,
+            'before_snapshot' => $before_snapshot,
         ]);
 
         return [
@@ -441,12 +460,23 @@ class Order_Participant_Slot_Manager {
         $order->update_meta_data('_ak_parent_set_id', $set_id);
         $order->update_meta_data('_ak_order_decomposed', '1');
 
-        if (in_array($order->get_status(), ['cancelled', 'wc-cancelled', 'trash'], true)) {
-            $order->update_status('processing', sprintf(
-                /* translators: %s: participant name */
-                __('Przywrócono zamówienie po dodaniu uczestnika %s', 'ak-product-set'),
-                $p_model->name ?: $p_model->id
-            ));
+        $current_status = Order_Recalculator::get_order_status($order);
+        if (in_array($current_status, ['cancelled', 'wc-cancelled', 'trash'], true)) {
+            $target_status = (string) $order->get_meta('_ak_pre_cancelled_status');
+            if (!$target_status || in_array($target_status, ['cancelled', 'wc-cancelled', 'trash'], true)) {
+                $is_paid_order = Order_Recalculator::is_order_paid($order) || ((float) $order->get_meta('_ak_total_paid') > 0.009);
+                $target_status = $is_paid_order ? 'processing' : 'pending';
+            }
+            Order_Payment_Tracker::$is_internal_transition = true;
+            try {
+                $order->update_status($target_status, sprintf(
+                    /* translators: %s: participant name */
+                    __('Przywrócono zamówienie po dodaniu uczestnika %s', 'ak-product-set'),
+                    $p_model->name ?: $p_model->id
+                ));
+            } finally {
+                Order_Payment_Tracker::$is_internal_transition = false;
+            }
         }
 
         $reason = sprintf(
