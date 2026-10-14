@@ -47,12 +47,7 @@ class Participant_Transfer_Service {
 
         $source_before_snapshot = Order_Recalculator::get_order_state_snapshot($source_order);
 
-        // 1. Remove transferred weekend(s) from source order (without intermediate recalculations)
-        foreach ($weekends_to_transfer as $wid) {
-            Order_Participant_Slot_Manager::remove_weekend_for_participant($source_order, $participant_uuid, $wid, false, false);
-        }
-
-        // 2. Create new WC Order with identical billing customer details
+        // 1. Create new WC Order with identical billing customer details
         $new_order = wc_create_order([
             'status'        => $source_order->get_status(),
             'customer_id'   => $source_order->get_customer_id(),
@@ -66,11 +61,20 @@ class Participant_Transfer_Service {
             ];
         }
 
+        // 2. Mark transferred weekend(s) on source order
+        foreach ($weekends_to_transfer as $wid) {
+            Order_Participant_Slot_Manager::mark_weekend_transferred($source_order, $participant_uuid, $wid, $new_order->get_id());
+        }
+
         // Copy billing & shipping addresses
         $new_order->set_address($source_order->get_address('billing'), 'billing');
         $new_order->set_address($source_order->get_address('shipping'), 'shipping');
         $new_order->set_payment_method($source_order->get_payment_method());
         $new_order->set_payment_method_title($source_order->get_payment_method_title());
+
+        $dest_participant_data = $participant_data;
+        $dest_participant_data['status'] = 'active';
+        unset($dest_participant_data['cancelled_at'], $dest_participant_data['transferred_to_order'], $dest_participant_data['transferred_at']);
 
         // 3. Add decomposed line items for transferred weekend(s)
         foreach ($weekends_to_transfer as $wid) {
@@ -84,8 +88,8 @@ class Participant_Transfer_Service {
             $new_item->set_quantity(1);
             $new_item->add_meta_data('_ak_parent_set_id', $set_id, true);
             $new_item->add_meta_data('_ak_headcount', 1, true);
-            $new_item->add_meta_data('_ak_participants', [$participant_data], true);
-            Helper::add_participant_meta_to_order_item([$participant_data], $new_item);
+            $new_item->add_meta_data('_ak_participants', [$dest_participant_data], true);
+            Helper::add_participant_meta_to_order_item([$dest_participant_data], $new_item);
             $new_order->add_item($new_item);
 
             if (function_exists('wc_update_product_stock')) {
@@ -193,12 +197,16 @@ class Participant_Transfer_Service {
             }
         }
 
-        // 1. Remove from source order (without intermediate recalculations)
+        // 1. Mark transferred in source order
         $source_before_snapshot = Order_Recalculator::get_order_state_snapshot($source_order);
         $target_before_snapshot = Order_Recalculator::get_order_state_snapshot($target_order);
         foreach ($weekends_to_transfer as $wid) {
-            Order_Participant_Slot_Manager::remove_weekend_for_participant($source_order, $participant_uuid, $wid, false, false);
+            Order_Participant_Slot_Manager::mark_weekend_transferred($source_order, $participant_uuid, $wid, $target_order->get_id());
         }
+
+        $dest_participant_data = $participant_data;
+        $dest_participant_data['status'] = 'active';
+        unset($dest_participant_data['cancelled_at'], $dest_participant_data['transferred_to_order'], $dest_participant_data['transferred_at']);
 
         // 2. Add to target order
         foreach ($weekends_to_transfer as $wid) {
@@ -212,7 +220,7 @@ class Participant_Transfer_Service {
 
             if ($target_item) {
                 $target_participants = (array) $target_item->get_meta('_ak_participants');
-                $target_participants[] = $participant_data;
+                $target_participants[] = $dest_participant_data;
                 $target_item->update_meta_data('_ak_participants', $target_participants);
                 Helper::add_participant_meta_to_order_item($target_participants, $target_item);
             } else {
@@ -222,8 +230,8 @@ class Participant_Transfer_Service {
                     $new_item->set_product($wc_product);
                     $new_item->set_quantity(1);
                     $new_item->add_meta_data('_ak_parent_set_id', $set_id, true);
-                    $new_item->add_meta_data('_ak_participants', [$participant_data], true);
-                    Helper::add_participant_meta_to_order_item([$participant_data], $new_item);
+                    $new_item->add_meta_data('_ak_participants', [$dest_participant_data], true);
+                    Helper::add_participant_meta_to_order_item([$dest_participant_data], $new_item);
                     $target_order->add_item($new_item);
                 }
             }

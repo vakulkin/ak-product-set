@@ -113,7 +113,39 @@ class Order_Participant_Profile_Service {
             );
         }
 
-        if ($has_size_change && $has_cut_change && !$has_name_change && !$has_email_change && !$has_phone_change) {
+        $tshirt_produced = !empty($data['tshirt_produced']);
+        $tshirt_cost = 0.0;
+        if ($tshirt_produced) {
+            $set_id = (int) $order->get_meta('_ak_parent_set_id');
+            $tshirt_cost = Order_Recalculator::get_tshirt_cost($set_id);
+            $changes[] = sprintf(__('Doliczono koszt wyprodukowanej koszulki: +%s zł', 'ak-product-set'), number_format_i18n($tshirt_cost, 2));
+
+            // Increment retained/produced t-shirt count on the first slot found for this participant
+            $slot_incremented = false;
+            foreach ($order->get_items('line_item') as $item) {
+                if (!($item instanceof \WC_Order_Item_Product)) {
+                    continue;
+                }
+                $participants = $item->get_meta('_ak_participants');
+                if (!is_array($participants)) {
+                    continue;
+                }
+                foreach ($participants as &$p) {
+                    if (!empty($p['id']) && $p['id'] === $participant_uuid) {
+                        $p['tshirt_retained_count'] = ((int) ($p['tshirt_retained_count'] ?? 0)) + 1;
+                        $slot_incremented = true;
+                        break;
+                    }
+                }
+                unset($p);
+                if ($slot_incremented) {
+                    $item->update_meta_data('_ak_participants', $participants);
+                    break;
+                }
+            }
+        }
+
+        if ($has_size_change && $has_cut_change && !$has_name_change && !$has_email_change && !$has_phone_change && !$tshirt_produced) {
             $old_cut_label = Helper::get_tshirt_cut_label($old_data['tshirt_cut'] ?? '');
             $new_cut_label = Helper::get_tshirt_cut_label($new_data['tshirt_cut'] ?? '');
             $log_entry = sprintf(
@@ -137,22 +169,36 @@ class Order_Participant_Profile_Service {
         Order_Recalculator::append_audit_log($order, $log_entry);
         $order->save();
 
+        $recalc_result = null;
+        if ($tshirt_produced) {
+            $recalc_result = Order_Recalculator::recalculate($order, [
+                'reason' => sprintf(
+                    /* translators: 1: participant name, 2: cost */
+                    __('Doliczono koszt wyprodukowanej koszulki (+%2$s zł) przy edycji danych uczestnika: %1$s', 'ak-product-set'),
+                    $participant_name ?: $participant_uuid,
+                    number_format_i18n($tshirt_cost, 2)
+                ),
+            ]);
+        }
+
         return [
             'success'          => true,
             'participant_name' => $participant_name,
             'new_size'         => $new_data['tshirt_size'] ?? '',
             'new_cut'          => $new_data['tshirt_cut'] ?? '',
             'participant_data' => $new_data,
+            'recalculation'    => $recalc_result,
         ];
     }
 
     /**
      * Update participant's T-shirt size and cut across all line items in an order without price recalculation.
      */
-    public static function update_participant_tshirt(\WC_Order $order, string $participant_uuid, string $new_size, string $new_cut): array {
+    public static function update_participant_tshirt(\WC_Order $order, string $participant_uuid, string $new_size, string $new_cut, bool $tshirt_produced = false): array {
         return self::update_participant_data($order, $participant_uuid, [
-            'tshirt_size' => $new_size,
-            'tshirt_cut'  => $new_cut,
+            'tshirt_size'     => $new_size,
+            'tshirt_cut'      => $new_cut,
+            'tshirt_produced' => $tshirt_produced,
         ]);
     }
 }

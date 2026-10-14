@@ -297,5 +297,99 @@ class Order_Recalculator_Test extends TestCase {
         $this->assertStringContainsString('120', $meta['_ak_pricing_breakdown']);
         $this->assertStringContainsString('Nieopłacone', $meta['_ak_pricing_breakdown']);
     }
+
+    public function test_recalculate_multi_cohorts_sorted_by_package_size_and_priced_independently(): void {
+        $meta = [];
+        $order = Mockery::mock('WC_Order');
+        $order->shouldReceive('get_id')->andReturn(888);
+        $order->shouldReceive('get_status')->andReturn('processing');
+        $order->shouldReceive('get_date_created')->andReturn(null);
+        $order->shouldReceive('get_meta')->with('_ak_total_paid')->andReturn('3550.00');
+        $order->shouldReceive('get_meta')->with('_ak_original_total')->andReturn('3550.00');
+        $order->shouldReceive('get_meta')->with('_ak_original_headcount')->andReturn(3);
+        $order->shouldReceive('get_meta')->with('_ak_balance_history')->andReturn('');
+        $order->shouldReceive('calculate_totals')->with(false)->andReturnNull();
+        $order->shouldReceive('get_total')->andReturn('3550.00');
+        $order->shouldReceive('get_items')->with('fee')->andReturn([]);
+        $order->shouldReceive('get_items')->with('coupon')->andReturn([]);
+        $order->shouldReceive('update_meta_data')->andReturnUsing(function($k, $v) use (&$meta) {
+            $meta[$k] = $v;
+        });
+        $order->shouldReceive('add_order_note')->once();
+        $order->shouldReceive('save')->once();
+
+        // Line item 1: Weekend 101 has Alice, Bob, Charlie
+        $item101 = Mockery::mock('WC_Order_Item_Product');
+        $item101->shouldReceive('get_id')->andReturn(1);
+        $item101->shouldReceive('get_product_id')->andReturn(101);
+        $item101->shouldReceive('get_name')->andReturn('Weekend 1');
+        $item101->shouldReceive('get_meta')->with('_ak_parent_set_id')->andReturn(10);
+        $item101->shouldReceive('get_meta')->with('_ak_participants')->andReturn([
+            ['id' => 'uuid-charlie', 'name' => 'Charlie'], // 1 weekend only
+            ['id' => 'uuid-alice', 'name' => 'Alice'],
+            ['id' => 'uuid-bob', 'name' => 'Bob'],
+        ]);
+        $item101->shouldReceive('set_quantity')->with(3)->once();
+        $item101->shouldReceive('set_subtotal')->once();
+        $item101->shouldReceive('set_total')->once();
+        $item101->shouldReceive('update_meta_data')->with('_ak_headcount', 3)->once();
+
+        // Line item 2: Weekend 102 has only Alice and Bob
+        $item102 = Mockery::mock('WC_Order_Item_Product');
+        $item102->shouldReceive('get_id')->andReturn(2);
+        $item102->shouldReceive('get_product_id')->andReturn(102);
+        $item102->shouldReceive('get_name')->andReturn('Weekend 2');
+        $item102->shouldReceive('get_meta')->with('_ak_parent_set_id')->andReturn(10);
+        $item102->shouldReceive('get_meta')->with('_ak_participants')->andReturn([
+            ['id' => 'uuid-alice', 'name' => 'Alice'],
+            ['id' => 'uuid-bob', 'name' => 'Bob'],
+        ]);
+        $item102->shouldReceive('set_quantity')->with(2)->once();
+        $item102->shouldReceive('set_subtotal')->once();
+        $item102->shouldReceive('set_total')->once();
+        $item102->shouldReceive('update_meta_data')->with('_ak_headcount', 2)->once();
+
+        $order->shouldReceive('get_items')->with('line_item')->andReturn([$item101, $item102]);
+
+        Functions\when('wc_get_product')->alias(function($id) {
+            $prod = Mockery::mock('WC_Product');
+            $prod->shouldReceive('get_name')->andReturn('Termin #' . $id);
+            return $prod;
+        });
+        Functions\when('get_field')->justReturn(null);
+        Functions\when('get_post')->justReturn((object)['ID' => 10, 'post_title' => 'Obóz Gimnastyczny']);
+        Functions\when('get_post_meta')->alias(function($post_id, $key) {
+            // Price matrix:
+            // 2 weekends package: 1400.00 PLN per person
+            // 1 weekend package: 750.00 PLN per person
+            if (str_starts_with($key, 'price_2w_round1_ind')) {
+                return '1400.00';
+            }
+            if (str_starts_with($key, 'price_1w_round1_ind')) {
+                return '750.00';
+            }
+            return null;
+        });
+
+        $result = Order_Recalculator::recalculate($order, ['reason' => 'Przeliczenie wielu pakietów']);
+
+        // Check headcounts and totals:
+        $this->assertEquals(Order_Recalculator::BALANCE_SETTLED, $result['status']);
+        $this->assertEquals(3, $result['headcount']);
+        $this->assertEquals(3550.00, $result['recalculated_total']); // (2 * 1400) + (1 * 750) = 3550
+
+        // Verify that Pakiet 1 is the 2-weekend package (Alice, Bob) and Pakiet 2 is 1-weekend (Charlie)
+        $breakdown = $meta['_ak_pricing_breakdown'];
+        $pakiet1_pos = strpos($breakdown, 'Pakiet 1');
+        $pakiet2_pos = strpos($breakdown, 'Pakiet 2');
+        $this->assertNotFalse($pakiet1_pos);
+        $this->assertNotFalse($pakiet2_pos);
+        $this->assertTrue($pakiet1_pos < $pakiet2_pos);
+
+        // Pakiet 1 should have 2 weekends and Alice, Bob
+        $this->assertMatchesRegularExpression('/Pakiet 1:.*Liczba weekendów: 2/s', $breakdown);
+        // Pakiet 2 should have 1 weekend and Charlie
+        $this->assertMatchesRegularExpression('/Pakiet 2:.*Liczba weekendów: 1/s', $breakdown);
+    }
 }
 

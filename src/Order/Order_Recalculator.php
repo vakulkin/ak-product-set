@@ -29,10 +29,12 @@ class Order_Recalculator {
      */
     public static function get_tshirt_cost(?int $set_id = null): float {
         if ($set_id && function_exists('get_field')) {
-            $custom = get_field('set_tshirt_cost', $set_id);
-            if ($custom !== null && $custom !== '' && is_numeric($custom) && (float)$custom >= 0) {
-                return (float)$custom;
-            }
+            try {
+                $custom = get_field('set_tshirt_cost', $set_id);
+                if ($custom !== null && $custom !== '' && is_numeric($custom) && (float)$custom >= 0) {
+                    return (float)$custom;
+                }
+            } catch (\Throwable $e) {}
         }
 
         $cost = get_option('ak_set_tshirt_cost', self::DEFAULT_TSHIRT_COST);
@@ -154,6 +156,9 @@ class Order_Recalculator {
                         if (!$uuid) {
                             continue;
                         }
+                        if (($p['status'] ?? 'active') !== 'active') {
+                            continue;
+                        }
                         if (!isset($participant_enrollments[$uuid])) {
                             $participant_enrollments[$uuid] = [
                                 'data'     => $p,
@@ -169,17 +174,22 @@ class Order_Recalculator {
 
         $overall_headcount = count($participant_enrollments);
 
-        // 4. Handle Retained T-Shirt Manufacturing Cost (if specified for this cancellation)
-        $retained_tshirt = isset($options['retained_tshirt_cost']) ? (float)$options['retained_tshirt_cost'] : 0.0;
-        if ($retained_tshirt > 0) {
-            self::add_or_update_tshirt_fee($order, $retained_tshirt);
-        }
+        // 4. Synchronize Retained T-Shirt Manufacturing Cost strictly from slot elements (single source of truth)
+        self::sync_tshirt_fee_from_slots($order, $options);
 
         // 5. Handle cancellation of entire order if headcount is 0
         if ($overall_headcount <= 0) {
-            // Remove empty line items
+            // Keep line items if they contain inactive participants, otherwise remove truly empty items
             foreach ($weekend_items_map as $item) {
-                $order->remove_item($item->get_id());
+                $p_list = $item->get_meta('_ak_participants');
+                if (empty($p_list)) {
+                    $order->remove_item($item->get_id());
+                } else {
+                    $item->set_quantity(0);
+                    $item->set_subtotal(0.0);
+                    $item->set_total(0.0);
+                    $item->update_meta_data('_ak_headcount', 0);
+                }
             }
 
             // Remove coupons since no products remain
@@ -274,11 +284,21 @@ class Order_Recalculator {
             $cohorts[$cohort_key]['participants'][$uuid] = $info['data'];
         }
 
-        // 6. Calculate pricing per cohort and accumulate shares per weekend item
+        // 6. Sort cohorts: largest package first (package_size DESC), then highest headcount (headcount DESC)
+        uasort($cohorts, function (array $a, array $b): int {
+            if ($b['package_size'] !== $a['package_size']) {
+                return $b['package_size'] <=> $a['package_size'];
+            }
+            return count($b['participants']) <=> count($a['participants']);
+        });
+
+        // 7. Calculate pricing per cohort and accumulate shares per weekend item
         $weekend_item_totals = []; // wid => float
         $breakdown_sections = [];
         $total_recalculated_base = 0.0;
         $cohort_index = 1;
+        $set_models = [];
+        $product_titles = [];
 
         foreach ($cohorts as $cohort) {
             $set_id       = $cohort['set_id'];
@@ -287,11 +307,14 @@ class Order_Recalculator {
             $participants = $cohort['participants'];
             $headcount    = count($participants);
 
-            if ($headcount <= 0) {
+            if ($headcount <= 0 || $package_size <= 0) {
                 continue;
             }
 
-            $set = new Set_Model($set_id);
+            if (!isset($set_models[$set_id])) {
+                $set_models[$set_id] = new Set_Model($set_id);
+            }
+            $set = $set_models[$set_id];
             $set_title = $set->get_title() ?: sprintf(__('Zestaw #%d', 'ak-product-set'), $set_id);
 
             // Resolve round based on parent order date
@@ -324,8 +347,11 @@ class Order_Recalculator {
             // Build breakdown text for this cohort
             $weekend_titles = [];
             foreach ($wids as $wid) {
-                $p = wc_get_product($wid);
-                $weekend_titles[] = $p ? $p->get_name() : sprintf(__('Termin #%d', 'ak-product-set'), $wid);
+                if (!isset($product_titles[$wid])) {
+                    $p = wc_get_product($wid);
+                    $product_titles[$wid] = $p ? $p->get_name() : sprintf(__('Termin #%d', 'ak-product-set'), $wid);
+                }
+                $weekend_titles[] = $product_titles[$wid];
             }
 
             $participant_names = array_map(fn($p) => $p['name'] ?: $p['id'], $participants);
@@ -347,19 +373,35 @@ class Order_Recalculator {
         // 7. Update line items in order
         foreach ($weekend_items_map as $wid => $item) {
             $item_participants = $item->get_meta('_ak_participants');
-            $item_headcount = is_array($item_participants) ? count($item_participants) : 0;
+            $active_participants = is_array($item_participants)
+                ? array_filter($item_participants, fn($p) => ($p['status'] ?? 'active') === 'active')
+                : [];
+            $active_headcount = count($active_participants);
 
-            if ($item_headcount <= 0 || !isset($weekend_item_totals[$wid])) {
-                // No participants in this weekend: remove line item completely
-                $order->remove_item($item->get_id());
+            if ($active_headcount <= 0 || !isset($weekend_item_totals[$wid])) {
+                if (empty($item_participants)) {
+                    // No participants in this weekend: remove line item completely
+                    $order->remove_item($item->get_id());
+                } else {
+                    // Has inactive (cancelled / transferred) participants: keep item with zero total
+                    $item->set_quantity(0);
+                    $item->set_subtotal(0.0);
+                    $item->set_total(0.0);
+                    $item->update_meta_data('_ak_headcount', 0);
+                }
                 continue;
             }
 
             $item_total = $weekend_item_totals[$wid];
-            $item->set_quantity(max(1, $item_headcount));
+            $item->set_quantity($active_headcount);
             $item->set_subtotal($item_total);
             $item->set_total($item_total);
-            $item->update_meta_data('_ak_headcount', $item_headcount);
+            $item->update_meta_data('_ak_headcount', $active_headcount);
+        }
+
+        // Restore order status if it was cancelled and now has active participants
+        if (in_array($order->get_status(), ['cancelled', 'wc-cancelled'], true) && $overall_headcount > 0) {
+            $order->update_status('processing', __('Przywrócono zamówienie po przywróceniu aktywnych uczestników.', 'ak-product-set'));
         }
 
         // 8. Handle Coupons (Percentage vs Fixed proportional distribution)
@@ -516,7 +558,7 @@ class Order_Recalculator {
             $participants = $item->get_meta('_ak_participants');
             if (is_array($participants)) {
                 foreach ($participants as $p) {
-                    if (!empty($p['id'])) {
+                    if (!empty($p['id']) && ($p['status'] ?? 'active') === 'active') {
                         $uuids[$p['id']] = true;
                     }
                 }
@@ -607,6 +649,9 @@ class Order_Recalculator {
                         if (!$uuid) {
                             continue;
                         }
+                        if (($p['status'] ?? 'active') !== 'active') {
+                            continue;
+                        }
                         if (!isset($participant_enrollments[$uuid])) {
                             $participant_enrollments[$uuid] = [
                                 'data'     => $p,
@@ -637,8 +682,16 @@ class Order_Recalculator {
             $cohorts[$cohort_key]['participants'][$uuid] = $info['data'];
         }
 
+        uasort($cohorts, function (array $a, array $b): int {
+            if ($b['package_size'] !== $a['package_size']) {
+                return $b['package_size'] <=> $a['package_size'];
+            }
+            return count($b['participants']) <=> count($a['participants']);
+        });
+
         $date_created = $order->get_date_created();
         $order_timestamp = $date_created ? $date_created->getTimestamp() : current_time('timestamp');
+        $set_models = [];
 
         foreach ($cohorts as $cohort) {
             $set_id       = $cohort['set_id'];
@@ -647,7 +700,14 @@ class Order_Recalculator {
             $participants = $cohort['participants'];
             $headcount    = count($participants);
 
-            $set = new Set_Model($set_id);
+            if ($headcount <= 0 || $package_size <= 0) {
+                continue;
+            }
+
+            if (!isset($set_models[$set_id])) {
+                $set_models[$set_id] = new Set_Model($set_id);
+            }
+            $set = $set_models[$set_id];
             $set_title = $set->get_title() ?: sprintf(__('Zestaw #%d', 'ak-product-set'), $set_id);
 
             $round = Round_Resolver::resolve_package_round($wids, $order_timestamp);
@@ -727,6 +787,9 @@ class Order_Recalculator {
                         if (!$uuid) {
                             continue;
                         }
+                        if (($p['status'] ?? 'active') !== 'active') {
+                            continue;
+                        }
                         if (!isset($participants_map[$uuid])) {
                             $participants_map[$uuid] = [
                                 'name'     => $p['name'] ?? $uuid,
@@ -801,9 +864,133 @@ class Order_Recalculator {
     }
 
     /**
+     * Count total retained / produced t-shirts across all participant slots in the order.
+     */
+    public static function count_retained_tshirts_in_slots(\WC_Order $order): int {
+        $total = 0;
+        try {
+            $items = $order->get_items('line_item');
+            if (is_iterable($items)) {
+                foreach ($items as $item) {
+                    if (!($item instanceof \WC_Order_Item_Product)) {
+                        continue;
+                    }
+                    $participants = $item->get_meta('_ak_participants');
+                    if (is_array($participants)) {
+                        foreach ($participants as $p) {
+                            $total += max(0, (int) ($p['tshirt_retained_count'] ?? 0));
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+        return $total;
+    }
+
+    /**
+     * Synchronize the retained t-shirt fee item strictly from the slot elements.
+     * Prevents duplicate/accumulated counting.
+     */
+    public static function sync_tshirt_fee_from_slots(\WC_Order $order, array $options = []): void {
+        $set_id = null;
+        try {
+            $items = $order->get_items('line_item');
+            if (is_iterable($items)) {
+                foreach ($items as $item) {
+                    if ($item instanceof \WC_Order_Item_Product) {
+                        $s_id = (int) $item->get_meta('_ak_parent_set_id');
+                        if ($s_id > 0) {
+                            $set_id = $s_id;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        $unit_cost = self::get_tshirt_cost($set_id);
+        $total_retained_count = self::count_retained_tshirts_in_slots($order);
+
+        if ($total_retained_count > 0) {
+            $total_fee = round($total_retained_count * $unit_cost, 2);
+            self::set_tshirt_fee_total($order, $total_fee);
+        } else {
+            // Check if there was an explicit legacy/fallback option passed when slots metadata isn't present
+            $legacy_cost = isset($options['retained_tshirt_cost']) ? (float) $options['retained_tshirt_cost'] : 0.0;
+            if ($legacy_cost > 0) {
+                self::add_or_update_tshirt_fee($order, $legacy_cost);
+            } else {
+                $has_line_items = false;
+                try {
+                    $items = $order->get_items('line_item');
+                    $has_line_items = is_iterable($items) && !empty($items);
+                } catch (\Throwable $e) {}
+
+                if ($has_line_items) {
+                    self::remove_tshirt_fee($order);
+                }
+            }
+        }
+    }
+
+    /**
+     * Set the t-shirt fee item amount strictly to the given total.
+     */
+    public static function set_tshirt_fee_total(\WC_Order $order, float $total): void {
+        $fee_item = null;
+        try {
+            $fees = $order->get_items('fee');
+            if (is_iterable($fees)) {
+                foreach ($fees as $fee) {
+                    if ($fee->get_name() === __('Koszt wyprodukowanej koszulki', 'ak-product-set') || $fee->get_meta('_ak_is_tshirt_fee')) {
+                        $fee_item = $fee;
+                        break;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        if (!$fee_item) {
+            $fee_item = new \WC_Order_Item_Fee();
+            $fee_item->set_name(__('Koszt wyprodukowanej koszulki', 'ak-product-set'));
+            $fee_item->add_meta_data('_ak_is_tshirt_fee', '1', true);
+            $order->add_item($fee_item);
+        }
+
+        $new_amount = round($total, 2);
+        $existing_amount = (float) $fee_item->get_total();
+        if (abs($existing_amount - $new_amount) < 0.009) {
+            return;
+        }
+
+        if (is_callable([$fee_item, 'set_amount'])) {
+            try {
+                $fee_item->set_amount($new_amount);
+            } catch (\Throwable $e) {}
+        }
+        $fee_item->set_total($new_amount);
+    }
+
+    /**
+     * Remove the t-shirt fee item completely from the order.
+     */
+    public static function remove_tshirt_fee(\WC_Order $order): void {
+        try {
+            $fees = $order->get_items('fee');
+            if (is_iterable($fees)) {
+                foreach ($fees as $fee) {
+                    if ($fee->get_name() === __('Koszt wyprodukowanej koszulki', 'ak-product-set') || $fee->get_meta('_ak_is_tshirt_fee')) {
+                        $order->remove_item($fee->get_id());
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+    }
+
+    /**
      * Add or update a retained t-shirt fee line item on the order.
      */
-    private static function add_or_update_tshirt_fee(\WC_Order $order, float $cost): void {
+    public static function add_or_update_tshirt_fee(\WC_Order $order, float $cost): void {
         $fee_item = null;
         try {
             $fees = $order->get_items('fee');
@@ -832,6 +1019,60 @@ class Order_Recalculator {
             } catch (\Throwable $e) {}
         }
         $fee_item->set_total($new_amount);
+    }
+
+    /**
+     * Reduce or remove a retained t-shirt fee from the order.
+     */
+    public static function reduce_or_remove_tshirt_fee(\WC_Order $order, float $cost_to_deduct): bool {
+        $fee_item = null;
+        try {
+            $fees = $order->get_items('fee');
+            if (is_iterable($fees)) {
+                foreach ($fees as $fee) {
+                    if ($fee->get_name() === __('Koszt wyprodukowanej koszulki', 'ak-product-set') || $fee->get_meta('_ak_is_tshirt_fee')) {
+                        $fee_item = $fee;
+                        break;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        if (!$fee_item) {
+            return false;
+        }
+
+        $existing_amount = (float) $fee_item->get_total();
+        $new_amount = round($existing_amount - $cost_to_deduct, 2);
+
+        if ($new_amount <= 0.009) {
+            $order->remove_item($fee_item->get_id());
+        } else {
+            if (is_callable([$fee_item, 'set_amount'])) {
+                try {
+                    $fee_item->set_amount($new_amount);
+                } catch (\Throwable $e) {}
+            }
+            $fee_item->set_total($new_amount);
+        }
+        return true;
+    }
+
+    /**
+     * Get total t-shirt fee amount on the order.
+     */
+    public static function get_order_tshirt_fee_total(\WC_Order $order): float {
+        try {
+            $fees = $order->get_items('fee');
+            if (is_iterable($fees)) {
+                foreach ($fees as $fee) {
+                    if ($fee->get_name() === __('Koszt wyprodukowanej koszulki', 'ak-product-set') || $fee->get_meta('_ak_is_tshirt_fee')) {
+                        return (float) $fee->get_total();
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+        return 0.0;
     }
 
     /**

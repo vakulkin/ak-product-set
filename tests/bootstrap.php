@@ -244,3 +244,9 @@ if (!function_exists('maybe_unserialize')) {
         return $original;
     }
 }
+
+if (!function_exists('wc_update_product_stock')) {
+    function wc_update_product_stock($product_id_with_stock, $quantity = 1, $action = 'decrease') {
+        return true;
+    }
+}

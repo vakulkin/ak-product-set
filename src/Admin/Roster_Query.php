@@ -110,6 +110,9 @@ class Roster_Query {
             }
 
             foreach ($participants_raw as $p) {
+                if (($p['status'] ?? 'active') !== 'active') {
+                    continue;
+                }
                 $name  = isset($p['name'])  ? (string) $p['name']  : '';
                 $email = isset($p['email']) ? (string) $p['email'] : '';
 

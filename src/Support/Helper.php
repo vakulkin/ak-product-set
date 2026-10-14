@@ -157,7 +157,14 @@ class Helper
             if (empty($p['name'])) {
                 continue;
             }
-            $details = $p['name'];
+            $status_suffix = '';
+            if (($p['status'] ?? 'active') === 'cancelled') {
+                $status_suffix = ' [ANULOWANY]';
+            } elseif (($p['status'] ?? 'active') === 'transferred') {
+                $to_id = !empty($p['transferred_to_order']) ? ' #' . $p['transferred_to_order'] : '';
+                $status_suffix = ' [PRZENIESIONY' . $to_id . ']';
+            }
+            $details = $p['name'] . $status_suffix;
             $contact = [];
             if (!empty($p['email'])) {
                 $contact[] = $p['email'];

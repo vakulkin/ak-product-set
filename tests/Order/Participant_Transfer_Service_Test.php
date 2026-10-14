@@ -168,8 +168,9 @@ class Participant_Transfer_Service_Test extends TestCase {
         $item1->shouldReceive('get_meta')->with('_ak_participants')->andReturn([
             ['id' => 'uuid-1', 'name' => 'Anton', 'tshirt_size' => 'M', 'tshirt_cut' => 'men'],
         ]);
-        $item1->shouldReceive('get_meta')->with('_ak_parent_set_id')->andReturn(10);
-        $item1->shouldReceive('update_meta_data')->with('_ak_participants', [])->once();
+        $item1->shouldReceive('update_meta_data')->with('_ak_participants', Mockery::on(function($val) {
+            return is_array($val) && isset($val[0]['status']) && $val[0]['status'] === 'transferred' && $val[0]['transferred_to_order'] === 200;
+        }))->once();
         $item1->shouldReceive('add_meta_data')->andReturnNull();
 
         $source_order = Mockery::mock('WC_Order');

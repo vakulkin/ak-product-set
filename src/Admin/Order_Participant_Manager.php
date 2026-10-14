@@ -23,14 +23,16 @@ class Order_Participant_Manager {
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
 
         // Atomic Slot AJAX Handlers
-        add_action('wp_ajax_ak_remove_weekend_participant',  [$this, 'ajax_remove_weekend_participant']);
-        add_action('wp_ajax_ak_add_participant',              [$this, 'ajax_add_participant']);
-        add_action('wp_ajax_ak_reschedule_participant',       [$this, 'ajax_reschedule_participant']);
-        add_action('wp_ajax_ak_transfer_participant',         [$this, 'ajax_transfer_participant']);
-        add_action('wp_ajax_ak_mark_balance_settled',         [$this, 'ajax_mark_balance_settled']);
-        add_action('wp_ajax_ak_mark_balance_unsettled',       [$this, 'ajax_mark_balance_unsettled']);
-        add_action('wp_ajax_ak_update_participant',           [$this, 'ajax_update_participant']);
-        add_action('wp_ajax_ak_update_participant_tshirt',    [$this, 'ajax_update_participant_tshirt']);
+        add_action('wp_ajax_ak_remove_weekend_participant',   [$this, 'ajax_remove_weekend_participant']);
+        add_action('wp_ajax_ak_restore_weekend_participant',  [$this, 'ajax_restore_weekend_participant']);
+        add_action('wp_ajax_ak_revert_tshirt_fee',             [$this, 'ajax_revert_tshirt_fee']);
+        add_action('wp_ajax_ak_add_participant',               [$this, 'ajax_add_participant']);
+        add_action('wp_ajax_ak_reschedule_participant',        [$this, 'ajax_reschedule_participant']);
+        add_action('wp_ajax_ak_transfer_participant',          [$this, 'ajax_transfer_participant']);
+        add_action('wp_ajax_ak_mark_balance_settled',          [$this, 'ajax_mark_balance_settled']);
+        add_action('wp_ajax_ak_mark_balance_unsettled',        [$this, 'ajax_mark_balance_unsettled']);
+        add_action('wp_ajax_ak_update_participant',            [$this, 'ajax_update_participant']);
+        add_action('wp_ajax_ak_update_participant_tshirt',     [$this, 'ajax_update_participant_tshirt']);
 
         // Backwards compatibility
         add_action('wp_ajax_ak_remove_participant_completely',[$this, 'ajax_remove_participant_completely']);
@@ -218,14 +220,18 @@ class Order_Participant_Manager {
                     $participant_wids[$uuid][] = $wid;
 
                     $slots[] = [
-                        'uuid'         => $uuid,
-                        'name'         => !empty($p['name']) ? $p['name'] : $uuid,
-                        'email'        => $p['email'] ?? '',
-                        'phone'        => $p['phone'] ?? '',
-                        'tshirt_size'  => $p['tshirt_size'] ?? '',
-                        'tshirt_cut'   => $p['tshirt_cut'] ?? '',
-                        'weekend_id'   => $wid,
-                        'weekend_name' => $wtitle,
+                        'uuid'                  => $uuid,
+                        'name'                  => !empty($p['name']) ? $p['name'] : $uuid,
+                        'email'                 => $p['email'] ?? '',
+                        'phone'                 => $p['phone'] ?? '',
+                        'tshirt_size'           => $p['tshirt_size'] ?? '',
+                        'tshirt_cut'            => $p['tshirt_cut'] ?? '',
+                        'weekend_id'            => $wid,
+                        'weekend_name'          => $wtitle,
+                        'status'                => $p['status'] ?? 'active',
+                        'cancelled_at'          => $p['cancelled_at'] ?? null,
+                        'transferred_to_order'  => $p['transferred_to_order'] ?? null,
+                        'tshirt_retained_count' => (int) ($p['tshirt_retained_count'] ?? 0),
                     ];
                 }
             }
@@ -305,7 +311,8 @@ class Order_Participant_Manager {
 
         $breakdown        = (string) $order->get_meta('_ak_pricing_breakdown');
         $history          = (string) $order->get_meta('_ak_balance_history');
-        $tshirt_cost      = Order_Recalculator::get_tshirt_cost();
+        $tshirt_cost      = Order_Recalculator::get_tshirt_cost($set_id > 0 ? $set_id : null);
+        $tshirt_fee_total = Order_Recalculator::get_order_tshirt_fee_total($order);
         $all_weekends     = Roster_Query::get_weekends_for_selector();
         $nonce            = wp_create_nonce(self::NONCE_ACTION);
 
@@ -536,11 +543,12 @@ class Order_Participant_Manager {
         $tshirt_cut  = Helper::is_valid_tshirt_cut($raw_cut) ? $raw_cut : Helper::TSHIRT_CUT_DEFAULT;
 
         $data = [
-            'name'        => $name,
-            'email'       => isset($_POST['email']) ? sanitize_email($_POST['email']) : '',
-            'phone'       => isset($_POST['phone']) ? sanitize_text_field($_POST['phone']) : '',
-            'tshirt_size' => $tshirt_size,
-            'tshirt_cut'  => $tshirt_cut,
+            'name'            => $name,
+            'email'           => isset($_POST['email']) ? sanitize_email($_POST['email']) : '',
+            'phone'           => isset($_POST['phone']) ? sanitize_text_field($_POST['phone']) : '',
+            'tshirt_size'     => $tshirt_size,
+            'tshirt_cut'      => $tshirt_cut,
+            'tshirt_produced' => !empty($_POST['tshirt_produced']),
         ];
 
         $result = Order_Participant_Profile_Service::update_participant_data($order, $uuid, $data);
@@ -557,19 +565,66 @@ class Order_Participant_Manager {
             wp_send_json_error(__('Brak uprawnień.', 'ak-product-set'));
         }
 
-        $order_id    = isset($_POST['order_id']) ? (int) $_POST['order_id'] : 0;
-        $uuid        = isset($_POST['uuid']) ? sanitize_text_field($_POST['uuid']) : '';
-        $raw_size    = isset($_POST['tshirt_size']) ? sanitize_text_field($_POST['tshirt_size']) : '';
-        $raw_cut     = isset($_POST['tshirt_cut']) ? sanitize_text_field($_POST['tshirt_cut']) : '';
-        $tshirt_size = Helper::is_valid_tshirt_size($raw_size) ? $raw_size : '';
-        $tshirt_cut  = Helper::is_valid_tshirt_cut($raw_cut) ? $raw_cut : Helper::TSHIRT_CUT_DEFAULT;
+        $order_id        = isset($_POST['order_id']) ? (int) $_POST['order_id'] : 0;
+        $uuid            = isset($_POST['uuid']) ? sanitize_text_field($_POST['uuid']) : '';
+        $raw_size        = isset($_POST['tshirt_size']) ? sanitize_text_field($_POST['tshirt_size']) : '';
+        $raw_cut         = isset($_POST['tshirt_cut']) ? sanitize_text_field($_POST['tshirt_cut']) : '';
+        $tshirt_size     = Helper::is_valid_tshirt_size($raw_size) ? $raw_size : '';
+        $tshirt_cut      = Helper::is_valid_tshirt_cut($raw_cut) ? $raw_cut : Helper::TSHIRT_CUT_DEFAULT;
+        $tshirt_produced = !empty($_POST['tshirt_produced']);
 
         $order = wc_get_order($order_id);
         if (!$order || !$uuid) {
             wp_send_json_error(__('Nieprawidłowe dane zamówienia.', 'ak-product-set'));
         }
 
-        $result = Order_Participant_Profile_Service::update_participant_tshirt($order, $uuid, $tshirt_size, $tshirt_cut);
+        $result = Order_Participant_Profile_Service::update_participant_tshirt($order, $uuid, $tshirt_size, $tshirt_cut, $tshirt_produced);
+        if ($result['success']) {
+            wp_send_json_success($result);
+        } else {
+            wp_send_json_error($result['error'] ?? 'Błąd');
+        }
+    }
+
+    public function ajax_restore_weekend_participant(): void {
+        check_ajax_referer(self::NONCE_ACTION, 'nonce');
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(__('Brak uprawnień.', 'ak-product-set'));
+        }
+
+        $order_id   = isset($_POST['order_id']) ? (int) $_POST['order_id'] : 0;
+        $uuid       = isset($_POST['uuid']) ? sanitize_text_field($_POST['uuid']) : '';
+        $weekend_id = isset($_POST['weekend_id']) ? (int) $_POST['weekend_id'] : 0;
+
+        $order = wc_get_order($order_id);
+        if (!$order || !$uuid || !$weekend_id) {
+            wp_send_json_error(__('Nieprawidłowe parametry przywracania terminu.', 'ak-product-set'));
+        }
+
+        $result = Order_Participant_Slot_Manager::restore_weekend_for_participant($order, $uuid, $weekend_id);
+        if ($result['success']) {
+            wp_send_json_success($result);
+        } else {
+            wp_send_json_error($result['error'] ?? 'Błąd');
+        }
+    }
+
+    public function ajax_revert_tshirt_fee(): void {
+        check_ajax_referer(self::NONCE_ACTION, 'nonce');
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(__('Brak uprawnień.', 'ak-product-set'));
+        }
+
+        $order_id   = isset($_POST['order_id']) ? (int) $_POST['order_id'] : 0;
+        $uuid       = isset($_POST['uuid']) ? sanitize_text_field($_POST['uuid']) : null;
+        $weekend_id = isset($_POST['weekend_id']) ? (int) $_POST['weekend_id'] : null;
+
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error(__('Nieprawidłowe dane zamówienia.', 'ak-product-set'));
+        }
+
+        $result = Order_Participant_Slot_Manager::revert_tshirt_fee($order, $uuid, $weekend_id);
         if ($result['success']) {
             wp_send_json_success($result);
         } else {

@@ -29,24 +29,27 @@ class Order_Participant_Slot_Manager {
                 continue;
             }
 
-            $remaining = [];
-            foreach ($participants as $p) {
+            foreach ($participants as &$p) {
                 if (!empty($p['id']) && $p['id'] === $participant_uuid) {
                     $found = true;
                     if ($participant_name === '' && !empty($p['name'])) {
                         $participant_name = (string) $p['name'];
                     }
-                } else {
-                    $remaining[] = $p;
+                    $p['status'] = 'cancelled';
+                    $p['cancelled_at'] = current_time('mysql');
+                    if ($tshirt_retained) {
+                        $p['tshirt_retained_count'] = ((int) ($p['tshirt_retained_count'] ?? 0)) + 1;
+                    }
                 }
             }
+            unset($p);
 
             if ($found) {
                 if ($recalculate) {
                     $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
                 }
-                $item->update_meta_data('_ak_participants', $remaining);
-                Helper::add_participant_meta_to_order_item($remaining, $item);
+                $item->update_meta_data('_ak_participants', $participants);
+                Helper::add_participant_meta_to_order_item($participants, $item);
 
                 // Restore stock for this single weekend
                 if (function_exists('wc_update_product_stock')) {
@@ -99,6 +102,194 @@ class Order_Participant_Slot_Manager {
     }
 
     /**
+     * Mark a participant weekend enrollment as transferred to another order.
+     */
+    public static function mark_weekend_transferred(\WC_Order $order, string $participant_uuid, int $weekend_id, int $target_order_id): bool {
+        $found = false;
+        foreach ($order->get_items('line_item') as $item) {
+            if (!($item instanceof \WC_Order_Item_Product) || (int) $item->get_product_id() !== $weekend_id) {
+                continue;
+            }
+
+            $participants = $item->get_meta('_ak_participants');
+            if (!is_array($participants)) {
+                continue;
+            }
+
+            foreach ($participants as &$p) {
+                if (!empty($p['id']) && $p['id'] === $participant_uuid) {
+                    $p['status'] = 'transferred';
+                    $p['transferred_to_order'] = $target_order_id;
+                    $p['transferred_at'] = current_time('mysql');
+                    $found = true;
+                }
+            }
+            unset($p);
+
+            if ($found) {
+                $item->update_meta_data('_ak_participants', $participants);
+                Helper::add_participant_meta_to_order_item($participants, $item);
+
+                if (function_exists('wc_update_product_stock')) {
+                    wc_update_product_stock($weekend_id, 1, 'increase');
+                }
+                break;
+            }
+        }
+        return $found;
+    }
+
+    /**
+     * Restore a cancelled or transferred weekend for a participant back to active.
+     */
+    public static function restore_weekend_for_participant(\WC_Order $order, string $participant_uuid, int $weekend_id): array {
+        $found = false;
+        $participant_name = '';
+        $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
+
+        foreach ($order->get_items('line_item') as $item) {
+            if (!($item instanceof \WC_Order_Item_Product) || (int) $item->get_product_id() !== $weekend_id) {
+                continue;
+            }
+
+            $participants = $item->get_meta('_ak_participants');
+            if (!is_array($participants)) {
+                continue;
+            }
+
+            foreach ($participants as &$p) {
+                if (!empty($p['id']) && $p['id'] === $participant_uuid) {
+                    $found = true;
+                    $participant_name = (string) ($p['name'] ?? $participant_uuid);
+                    $p['status'] = 'active';
+                    unset($p['cancelled_at'], $p['transferred_to_order'], $p['transferred_at']);
+                    break;
+                }
+            }
+            unset($p);
+
+            if ($found) {
+                $item->update_meta_data('_ak_participants', $participants);
+                Helper::add_participant_meta_to_order_item($participants, $item);
+
+                // Reserve seat again if stock management is active (never reject, per requirements)
+                if (function_exists('wc_update_product_stock')) {
+                    try {
+                        wc_update_product_stock($weekend_id, 1, 'decrease');
+                    } catch (\Throwable $e) {}
+                }
+                break;
+            }
+        }
+
+        if (!$found) {
+            return [
+                'success' => false,
+                'error'   => __('Uczestnik / termin nie został odnaleziony w tym zamówieniu.', 'ak-product-set'),
+            ];
+        }
+
+        if (in_array($order->get_status(), ['cancelled', 'wc-cancelled', 'trash'], true)) {
+            $order->update_status('processing', sprintf(
+                /* translators: %s: participant name */
+                __('Przywrócono zamówienie po przywróceniu terminu dla %s', 'ak-product-set'),
+                $participant_name
+            ));
+        }
+
+        $w_prod = wc_get_product($weekend_id);
+        $w_title = $w_prod ? $w_prod->get_name() : (string) $weekend_id;
+
+        $reason = sprintf(
+            /* translators: 1: participant name, 2: weekend title */
+            __('Przywrócenie terminu "%2$s" dla uczestnika: %1$s', 'ak-product-set'),
+            $participant_name,
+            $w_title
+        );
+
+        $recalc_result = Order_Recalculator::recalculate($order, [
+            'reason'          => $reason,
+            'before_snapshot' => $before_snapshot,
+        ]);
+
+        return [
+            'success'          => true,
+            'participant_name' => $participant_name,
+            'recalculation'    => $recalc_result,
+        ];
+    }
+
+    /**
+     * Revert / cancel a single 60 zł (or configured unit cost) t-shirt fee on the order.
+     */
+    public static function revert_tshirt_fee(\WC_Order $order, ?string $participant_uuid = null, ?int $weekend_id = null): array {
+        $set_id = (int) $order->get_meta('_ak_parent_set_id');
+        $cost = Order_Recalculator::get_tshirt_cost($set_id);
+        $existing_fee = Order_Recalculator::get_order_tshirt_fee_total($order);
+
+        if ($existing_fee <= 0.009) {
+            return [
+                'success' => false,
+                'error'   => __('Brak naliczonej opłaty za koszulki w tym zamówieniu.', 'ak-product-set'),
+            ];
+        }
+
+        $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
+        $deduct = min($cost, $existing_fee);
+
+        // Decrement tshirt_retained_count on corresponding slot or first available slot
+        $decremented = false;
+        foreach ($order->get_items('line_item') as $item) {
+            if (!($item instanceof \WC_Order_Item_Product)) {
+                continue;
+            }
+            if ($weekend_id && (int)$item->get_product_id() !== $weekend_id) {
+                continue;
+            }
+            $participants = $item->get_meta('_ak_participants');
+            if (!is_array($participants)) {
+                continue;
+            }
+            foreach ($participants as &$p) {
+                if ($participant_uuid && ($p['id'] ?? '') !== $participant_uuid) {
+                    continue;
+                }
+                if (!empty($p['tshirt_retained_count']) && (int)$p['tshirt_retained_count'] > 0) {
+                    $p['tshirt_retained_count'] = (int)$p['tshirt_retained_count'] - 1;
+                    $decremented = true;
+                    break;
+                }
+            }
+            unset($p);
+            if ($decremented) {
+                $item->update_meta_data('_ak_participants', $participants);
+                break;
+            }
+        }
+
+        // Only call manual fee reduction if slot decrement did not happen (legacy fallback)
+        if (!$decremented) {
+            Order_Recalculator::reduce_or_remove_tshirt_fee($order, $deduct);
+        }
+
+        $reason = sprintf(
+            /* translators: %s: formatted cost */
+            __('Cofnięto opłatę za wyprodukowaną koszulkę (-%s zł)', 'ak-product-set'),
+            number_format_i18n($deduct, 2)
+        );
+
+        $recalc_result = Order_Recalculator::recalculate($order, [
+            'reason'          => $reason,
+            'before_snapshot' => $before_snapshot,
+        ]);
+
+        return [
+            'success'       => true,
+            'recalculation' => $recalc_result,
+        ];
+    }
+
+    /**
      * Remove a participant completely from all weekends in an order.
      */
     public static function remove_participant_completely(\WC_Order $order, string $participant_uuid, bool $tshirt_retained = false): array {
@@ -116,27 +307,30 @@ class Order_Participant_Slot_Manager {
                 continue;
             }
 
-            $remaining = [];
             $found_in_item = false;
 
-            foreach ($participants as $p) {
-                if (!empty($p['id']) && $p['id'] === $participant_uuid) {
+            foreach ($participants as &$p) {
+                if (!empty($p['id']) && $p['id'] === $participant_uuid && ($p['status'] ?? 'active') === 'active') {
                     $found_in_item = true;
                     if ($participant_name === '' && !empty($p['name'])) {
                         $participant_name = (string) $p['name'];
                     }
-                } else {
-                    $remaining[] = $p;
+                    $p['status'] = 'cancelled';
+                    $p['cancelled_at'] = current_time('mysql');
+                    if ($tshirt_retained) {
+                        $p['tshirt_retained_count'] = ((int) ($p['tshirt_retained_count'] ?? 0)) + 1;
+                    }
                 }
             }
+            unset($p);
 
             if ($found_in_item) {
                 if ($before_snapshot === null) {
                     $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
                 }
                 $removed_count++;
-                $item->update_meta_data('_ak_participants', $remaining);
-                Helper::add_participant_meta_to_order_item($remaining, $item);
+                $item->update_meta_data('_ak_participants', $participants);
+                Helper::add_participant_meta_to_order_item($participants, $item);
 
                 $product_id = (int) $item->get_product_id();
                 if ($product_id > 0 && function_exists('wc_update_product_stock')) {
