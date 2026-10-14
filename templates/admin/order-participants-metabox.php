@@ -128,15 +128,43 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
             align-items: center;
             justify-content: flex-end;
             gap: 6px;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
+            white-space: nowrap;
         }
-        .ak-om-slot-produced-row {
-            display: flex;
+        .ak-om-produced-badge {
+            display: inline-flex;
             align-items: center;
-            justify-content: flex-end;
-            gap: 6px;
-            flex-wrap: wrap;
-            margin-top: -2px;
+            gap: 5px;
+            background: #fff8e5;
+            color: #856404;
+            border: 1px solid #ffeeba;
+            border-radius: 3px;
+            padding: 2px 7px;
+            font-size: 11px;
+            line-height: 1.4;
+            white-space: nowrap;
+            flex-wrap: nowrap;
+            flex-shrink: 0;
+        }
+        .ak-om-delete-produced-tshirt-btn {
+            background: none !important;
+            border: none !important;
+            cursor: pointer;
+            color: #b32d2e;
+            font-weight: bold;
+            font-size: 14px;
+            line-height: 1;
+            padding: 0 0 0 2px !important;
+            margin: 0 0 0 2px !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            vertical-align: middle;
+            text-decoration: none;
+            box-shadow: none !important;
+        }
+        .ak-om-delete-produced-tshirt-btn:hover {
+            color: #8c2425;
         }
 
         .ak-om-pre-box { background: transparent; border: none; padding: 0; font-size: 11px; white-space: pre-wrap; font-family: Consolas, Monaco, "Courier New", monospace; line-height: 1.5; margin: 0; color: #2c3338; }
@@ -477,7 +505,7 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
                                         $prod_cost = isset($produced['cost']) ? (float) $produced['cost'] : $tshirt_cost;
                                         $person_name = !empty($produced['participant_name']) ? $produced['participant_name'] : (!empty($slot['name']) ? $slot['name'] : __('Uczestnik', 'ak-product-set'));
                                     ?>
-                                        <div class="ak-om-produced-badge" style="display: inline-flex; align-items: center; gap: 5px; background: #fff8e5; color: #856404; border: 1px solid #ffeeba; border-radius: 3px; padding: 2px 7px; font-size: 11px; line-height: 1.4; white-space: nowrap;">
+                                        <div class="ak-om-produced-badge">
                                             <span style="font-weight: 600; color: #553c02;"><?php echo esc_html($person_name); ?></span>
                                             <span style="color: #6d5203;"><?php echo esc_html($prod_type_desc); ?> (+<?php echo esc_html(number_format_i18n($prod_cost, 0)); ?> zł)</span>
                                             <button type="button" class="ak-om-delete-produced-tshirt-btn"
@@ -486,10 +514,7 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
                                                 data-order-id="<?php echo esc_attr($order->get_id()); ?>"
                                                 data-cost="<?php echo esc_attr($prod_cost); ?>"
                                                 data-desc="<?php echo esc_attr($prod_type_desc); ?>"
-                                                style="background: none; border: none; cursor: pointer; color: #b32d2e; font-weight: bold; font-size: 14px; line-height: 1; padding: 0 0 0 2px; margin-left: 2px;"
-                                                title="<?php esc_attr_e('Anuluj opłatę za tę wyprodukowaną koszulkę', 'ak-product-set'); ?>">
-                                                &times;
-                                            </button>
+                                                title="<?php esc_attr_e('Anuluj opłatę za tę wyprodukowaną koszulkę', 'ak-product-set'); ?>">&times;</button>
                                         </div>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
@@ -509,7 +534,7 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
                         $prod_cost = isset($produced['cost']) ? (float) $produced['cost'] : $tshirt_cost;
                         $person_name = !empty($produced['participant_name']) ? $produced['participant_name'] : __('Uczestnik', 'ak-product-set');
                     ?>
-                        <div class="ak-om-produced-badge" style="display: inline-flex; align-items: center; gap: 5px; background: #fff; color: #856404; border: 1px solid #ffeeba; border-radius: 3px; padding: 2px 7px; font-size: 11px; line-height: 1.4; white-space: nowrap;">
+                        <div class="ak-om-produced-badge" style="background: #fff;">
                             <span style="font-weight: 600; color: #553c02;"><?php echo esc_html($person_name); ?></span>
                             <span style="color: #6d5203;"><?php echo esc_html($prod_type_desc); ?> (+<?php echo esc_html(number_format_i18n($prod_cost, 0)); ?> zł)</span>
                             <button type="button" class="ak-om-delete-produced-tshirt-btn"
@@ -518,10 +543,7 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
                                 data-order-id="<?php echo esc_attr($order->get_id()); ?>"
                                 data-cost="<?php echo esc_attr($prod_cost); ?>"
                                 data-desc="<?php echo esc_attr($prod_type_desc); ?>"
-                                style="background: none; border: none; cursor: pointer; color: #b32d2e; font-weight: bold; font-size: 14px; line-height: 1; padding: 0 0 0 2px; margin-left: 2px;"
-                                title="<?php esc_attr_e('Anuluj opłatę za tę wyprodukowaną koszulkę', 'ak-product-set'); ?>">
-                                &times;
-                            </button>
+                                title="<?php esc_attr_e('Anuluj opłatę za tę wyprodukowaną koszulkę', 'ak-product-set'); ?>">&times;</button>
                         </div>
                     <?php endforeach; ?>
                 </div>
