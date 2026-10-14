@@ -181,7 +181,7 @@ class Participant_Transfer_Service {
                 if ((int)$item->get_product_id() === $wid) {
                     $target_participants = (array) $item->get_meta('_ak_participants');
                     foreach ($target_participants as $p) {
-                        if (!empty($p['id']) && $p['id'] === $participant_uuid) {
+                        if (!empty($p['id']) && $p['id'] === $participant_uuid && ($p['status'] ?? 'active') === 'active') {
                             $p_name = $participant_data['name'] ?? $participant_uuid;
                             return [
                                 'success' => false,
@@ -302,7 +302,7 @@ class Participant_Transfer_Service {
      *
      * @return array{participant_data: ?array, set_id: int, weekends: int[]}
      */
-    private static function find_participant_weekends_in_order(\WC_Order $order, string $participant_uuid, ?int $specific_weekend_id = null): array {
+    public static function find_participant_weekends_in_order(\WC_Order $order, string $participant_uuid, ?int $specific_weekend_id = null): array {
         $participant_data = null;
         $set_id = 0;
         $weekends = [];
@@ -320,7 +320,7 @@ class Participant_Transfer_Service {
             $participants = $item->get_meta('_ak_participants');
             if (is_array($participants)) {
                 foreach ($participants as $p) {
-                    if (!empty($p['id']) && $p['id'] === $participant_uuid) {
+                    if (!empty($p['id']) && $p['id'] === $participant_uuid && ($p['status'] ?? 'active') === 'active') {
                         $participant_data = $p;
                         $set_id = (int) $item->get_meta('_ak_parent_set_id');
                         $weekends[] = $wid;

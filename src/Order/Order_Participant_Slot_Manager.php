@@ -18,6 +18,7 @@ class Order_Participant_Slot_Manager {
         $before_snapshot = null;
         $participant_name = '';
         $found = false;
+        $before_snapshot = $recalculate ? Order_Recalculator::get_order_state_snapshot($order) : null;
 
         foreach ($order->get_items('line_item') as $item) {
             if (!($item instanceof \WC_Order_Item_Product) || (int) $item->get_product_id() !== $weekend_id) {
@@ -29,11 +30,15 @@ class Order_Participant_Slot_Manager {
                 continue;
             }
 
+            $was_active = false;
             foreach ($participants as &$p) {
                 if (!empty($p['id']) && $p['id'] === $participant_uuid) {
                     $found = true;
                     if ($participant_name === '' && !empty($p['name'])) {
                         $participant_name = (string) $p['name'];
+                    }
+                    if (($p['status'] ?? 'active') === 'active') {
+                        $was_active = true;
                     }
                     $p['status'] = 'cancelled';
                     $p['cancelled_at'] = current_time('mysql');
@@ -45,14 +50,11 @@ class Order_Participant_Slot_Manager {
             unset($p);
 
             if ($found) {
-                if ($recalculate) {
-                    $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
-                }
                 $item->update_meta_data('_ak_participants', $participants);
                 Helper::add_participant_meta_to_order_item($participants, $item);
 
-                // Restore stock for this single weekend
-                if (function_exists('wc_update_product_stock')) {
+                // Restore stock for this single weekend only if it was active
+                if ($was_active && function_exists('wc_update_product_stock')) {
                     wc_update_product_stock($weekend_id, 1, 'increase');
                 }
                 break;
@@ -117,7 +119,7 @@ class Order_Participant_Slot_Manager {
             }
 
             foreach ($participants as &$p) {
-                if (!empty($p['id']) && $p['id'] === $participant_uuid) {
+                if (!empty($p['id']) && $p['id'] === $participant_uuid && ($p['status'] ?? 'active') === 'active') {
                     $p['status'] = 'transferred';
                     $p['transferred_to_order'] = $target_order_id;
                     $p['transferred_at'] = current_time('mysql');
@@ -158,7 +160,7 @@ class Order_Participant_Slot_Manager {
             }
 
             foreach ($participants as &$p) {
-                if (!empty($p['id']) && $p['id'] === $participant_uuid) {
+                if (!empty($p['id']) && $p['id'] === $participant_uuid && ($p['status'] ?? 'active') !== 'active') {
                     $found = true;
                     $participant_name = (string) ($p['name'] ?? $participant_uuid);
                     $p['status'] = 'active';
@@ -495,7 +497,7 @@ class Order_Participant_Slot_Manager {
                 $participants = $item->get_meta('_ak_participants');
                 if (is_array($participants)) {
                     foreach ($participants as $p) {
-                        if (!empty($p['id']) && $p['id'] === $participant_uuid) {
+                        if (!empty($p['id']) && $p['id'] === $participant_uuid && ($p['status'] ?? 'active') === 'active') {
                             $participant_data = $p;
                             $set_id = (int) $item->get_meta('_ak_parent_set_id');
                             break;
@@ -518,7 +520,7 @@ class Order_Participant_Slot_Manager {
         if ($to_item) {
             $to_participants = (array) $to_item->get_meta('_ak_participants');
             foreach ($to_participants as $p) {
-                if (!empty($p['id']) && $p['id'] === $participant_uuid) {
+                if (!empty($p['id']) && $p['id'] === $participant_uuid && ($p['status'] ?? 'active') === 'active') {
                     $p_name = $participant_data['name'] ?? $participant_uuid;
                     return [
                         'success' => false,

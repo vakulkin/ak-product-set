@@ -217,7 +217,9 @@ class Order_Participant_Manager {
                     if (!isset($participant_wids[$uuid])) {
                         $participant_wids[$uuid] = [];
                     }
-                    $participant_wids[$uuid][] = $wid;
+                    if (($p['status'] ?? 'active') === 'active') {
+                        $participant_wids[$uuid][] = $wid;
+                    }
 
                     $slots[] = [
                         'uuid'                  => $uuid,

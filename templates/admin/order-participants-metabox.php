@@ -221,7 +221,7 @@ $transferred_from = (int) $order->get_meta('_ak_transferred_from_order');
                         <th><?php esc_html_e('Termin', 'ak-product-set'); ?></th>
                         <th><?php esc_html_e('Uczestnik i kontakt', 'ak-product-set'); ?></th>
                         <th><?php esc_html_e('Koszulka', 'ak-product-set'); ?></th>
-                        <th style="text-align: right; width: 220px;"><?php esc_html_e('Akcje', 'ak-product-set'); ?></th>
+                        <th style="text-align: right; min-width: 240px;"><?php esc_html_e('Akcje', 'ak-product-set'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -255,20 +255,6 @@ $transferred_from = (int) $order->get_meta('_ak_transferred_from_order');
                                     <?php echo esc_html($slot['weekend_name']); ?>
                                 </span>
                                 <span style="color: #8c8f94; font-size: 11px; margin-left: 4px;">#<?php echo esc_html(substr($slot['uuid'], 0, 8)); ?></span>
-
-                                <?php if ($is_cancelled) : ?>
-                                    <span class="ak-om-tag ak-tag-underpaid" style="margin-left: 6px;"><?php esc_html_e('Anulowany', 'ak-product-set'); ?></span>
-                                <?php elseif ($is_transferred) : ?>
-                                    <span class="ak-om-tag" style="background:#e7f3fe; color:#185abc; border:1px solid #c2e0ff; margin-left: 6px;">
-                                        <?php printf(esc_html__('Przeniesiony (%s)', 'ak-product-set'), !empty($slot['transferred_to_order']) ? '#' . esc_html($slot['transferred_to_order']) : 'zamówienie'); ?>
-                                    </span>
-                                <?php endif; ?>
-
-                                <?php if ($retained_shirts > 0) : ?>
-                                    <span class="ak-om-tag" style="background:#fff3cd; color:#856404; border:1px solid #ffeeba; margin-left: 4px;" title="<?php esc_attr_e('Liczba wyprodukowanych/zniszczonych koszulek dla tego terminu', 'ak-product-set'); ?>">
-                                        <?php printf(esc_html__('Koszulki: %d szt.', 'ak-product-set'), $retained_shirts); ?>
-                                    </span>
-                                <?php endif; ?>
                             </td>
                             <td>
                                 <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
@@ -321,58 +307,80 @@ $transferred_from = (int) $order->get_meta('_ak_transferred_from_order');
                                 </button>
                             </td>
                             <td style="text-align: right; white-space: nowrap;">
-                                <?php if ($is_inactive) : ?>
-                                    <button type="button" class="button button-small button-primary ak-om-restore-btn"
-                                        data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
-                                        data-wid="<?php echo esc_attr($slot['weekend_id']); ?>"
-                                        data-name="<?php echo esc_attr($slot['name']); ?>"
-                                        data-title="<?php echo esc_attr($slot['weekend_name']); ?>"
-                                        title="<?php esc_attr_e('Przywróć ten termin do aktywnych', 'ak-product-set'); ?>">
-                                        <?php esc_html_e('Przywróć termin', 'ak-product-set'); ?>
-                                    </button>
-                                    <?php if ($retained_shirts > 0) : ?>
-                                        <button type="button" class="button button-small ak-om-revert-fee-btn"
+                                <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: nowrap;">
+                                    <?php if ($is_inactive) : ?>
+                                        <?php if ($is_cancelled) : ?>
+                                            <span class="ak-om-tag ak-tag-underpaid"><?php esc_html_e('Anulowany', 'ak-product-set'); ?></span>
+                                        <?php elseif ($is_transferred) : ?>
+                                            <span class="ak-om-tag" style="background:#e7f3fe; color:#185abc; border:1px solid #c2e0ff;">
+                                                <?php printf(esc_html__('Przeniesiony (%s)', 'ak-product-set'), !empty($slot['transferred_to_order']) ? '#' . esc_html($slot['transferred_to_order']) : 'zamówienie'); ?>
+                                            </span>
+                                        <?php endif; ?>
+
+                                        <?php if ($retained_shirts > 0) : ?>
+                                            <span class="ak-om-tag" style="background:#fff3cd; color:#856404; border:1px solid #ffeeba;" title="<?php esc_attr_e('Liczba wyprodukowanych/zniszczonych koszulek dla tego terminu', 'ak-product-set'); ?>">
+                                                <?php printf(esc_html__('Koszulki: %d szt.', 'ak-product-set'), $retained_shirts); ?>
+                                            </span>
+                                        <?php endif; ?>
+
+                                        <button type="button" class="button button-small button-primary ak-om-restore-btn"
                                             data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
                                             data-wid="<?php echo esc_attr($slot['weekend_id']); ?>"
-                                            title="<?php esc_attr_e('Cofnij opłatę za koszulkę (-60 zł)', 'ak-product-set'); ?>">
-                                            <?php printf(esc_html__('Cofnij -%s zł', 'ak-product-set'), number_format_i18n($tshirt_cost, 0)); ?>
+                                            data-name="<?php echo esc_attr($slot['name']); ?>"
+                                            data-title="<?php echo esc_attr($slot['weekend_name']); ?>"
+                                            title="<?php esc_attr_e('Przywróć ten termin do aktywnych', 'ak-product-set'); ?>">
+                                            <?php esc_html_e('Przywróć termin', 'ak-product-set'); ?>
                                         </button>
-                                    <?php endif; ?>
-                                <?php else : ?>
-                                    <button type="button" class="button button-small ak-om-reschedule-btn"
-                                        data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
-                                        data-from-id="<?php echo esc_attr($slot['weekend_id']); ?>"
-                                        data-name="<?php echo esc_attr($slot['name']); ?>"
-                                        data-title="<?php echo esc_attr($slot['weekend_name']); ?>"
-                                        data-enrolled-wids="<?php echo esc_attr(json_encode($enrolled)); ?>"
-                                        title="<?php esc_attr_e('Zmień ten termin na inny', 'ak-product-set'); ?>">
-                                        <?php esc_html_e('Zmień termin', 'ak-product-set'); ?>
-                                    </button>
-                                    <button type="button" class="button button-small ak-om-transfer-btn"
-                                        data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
-                                        data-wid="<?php echo esc_attr($slot['weekend_id']); ?>"
-                                        data-name="<?php echo esc_attr($slot['name']); ?>"
-                                        data-title="<?php echo esc_attr($slot['weekend_name']); ?>"
-                                        title="<?php esc_attr_e('Przenieś ten termin do innego zamówienia', 'ak-product-set'); ?>">
-                                        <?php esc_html_e('Przenieś', 'ak-product-set'); ?>
-                                    </button>
-                                    <button type="button" class="button button-small button-link-delete ak-om-cancel-btn"
-                                        data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
-                                        data-wid="<?php echo esc_attr($slot['weekend_id']); ?>"
-                                        data-name="<?php echo esc_attr($slot['name']); ?>"
-                                        data-title="<?php echo esc_attr($slot['weekend_name']); ?>"
-                                        title="<?php esc_attr_e('Anuluj ten termin dla uczestnika', 'ak-product-set'); ?>">
-                                        <?php esc_html_e('Anuluj', 'ak-product-set'); ?>
-                                    </button>
-                                    <?php if ($retained_shirts > 0) : ?>
-                                        <button type="button" class="button button-small ak-om-revert-fee-btn"
+                                        <?php if ($retained_shirts > 0) : ?>
+                                            <button type="button" class="button button-small ak-om-revert-fee-btn"
+                                                data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
+                                                data-wid="<?php echo esc_attr($slot['weekend_id']); ?>"
+                                                title="<?php esc_attr_e('Cofnij opłatę za koszulkę (-60 zł)', 'ak-product-set'); ?>">
+                                                <?php printf(esc_html__('Cofnij -%s zł', 'ak-product-set'), number_format_i18n($tshirt_cost, 0)); ?>
+                                            </button>
+                                        <?php endif; ?>
+                                    <?php else : ?>
+                                        <?php if ($retained_shirts > 0) : ?>
+                                            <span class="ak-om-tag" style="background:#fff3cd; color:#856404; border:1px solid #ffeeba;" title="<?php esc_attr_e('Liczba wyprodukowanych/zniszczonych koszulek dla tego terminu', 'ak-product-set'); ?>">
+                                                <?php printf(esc_html__('Koszulki: %d szt.', 'ak-product-set'), $retained_shirts); ?>
+                                            </span>
+                                        <?php endif; ?>
+
+                                        <button type="button" class="button button-small ak-om-reschedule-btn"
+                                            data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
+                                            data-from-id="<?php echo esc_attr($slot['weekend_id']); ?>"
+                                            data-name="<?php echo esc_attr($slot['name']); ?>"
+                                            data-title="<?php echo esc_attr($slot['weekend_name']); ?>"
+                                            data-enrolled-wids="<?php echo esc_attr(json_encode($enrolled)); ?>"
+                                            title="<?php esc_attr_e('Zmień ten termin na inny', 'ak-product-set'); ?>">
+                                            <?php esc_html_e('Zmień termin', 'ak-product-set'); ?>
+                                        </button>
+                                        <button type="button" class="button button-small ak-om-transfer-btn"
                                             data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
                                             data-wid="<?php echo esc_attr($slot['weekend_id']); ?>"
-                                            title="<?php esc_attr_e('Cofnij opłatę za koszulkę (-60 zł)', 'ak-product-set'); ?>">
-                                            <?php printf(esc_html__('Cofnij -%s zł', 'ak-product-set'), number_format_i18n($tshirt_cost, 0)); ?>
+                                            data-name="<?php echo esc_attr($slot['name']); ?>"
+                                            data-title="<?php echo esc_attr($slot['weekend_name']); ?>"
+                                            title="<?php esc_attr_e('Przenieś ten termin do innego zamówienia', 'ak-product-set'); ?>">
+                                            <?php esc_html_e('Przenieś', 'ak-product-set'); ?>
                                         </button>
+                                        <button type="button" class="button button-small button-link-delete ak-om-cancel-btn"
+                                            data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
+                                            data-wid="<?php echo esc_attr($slot['weekend_id']); ?>"
+                                            data-name="<?php echo esc_attr($slot['name']); ?>"
+                                            data-title="<?php echo esc_attr($slot['weekend_name']); ?>"
+                                            title="<?php esc_attr_e('Anuluj ten termin dla uczestnika', 'ak-product-set'); ?>">
+                                            <?php esc_html_e('Anuluj', 'ak-product-set'); ?>
+                                        </button>
+                                        <?php if ($retained_shirts > 0) : ?>
+                                            <button type="button" class="button button-small ak-om-revert-fee-btn"
+                                                data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
+                                                data-wid="<?php echo esc_attr($slot['weekend_id']); ?>"
+                                                title="<?php esc_attr_e('Cofnij opłatę za koszulkę (-60 zł)', 'ak-product-set'); ?>">
+                                                <?php printf(esc_html__('Cofnij -%s zł', 'ak-product-set'), number_format_i18n($tshirt_cost, 0)); ?>
+                                            </button>
+                                        <?php endif; ?>
                                     <?php endif; ?>
-                                <?php endif; ?>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>

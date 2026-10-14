@@ -369,4 +369,75 @@ class Participant_Transfer_Service_Test extends TestCase {
         $this->assertArrayHasKey('new', $choices);
         $this->assertArrayHasKey('existing', $choices);
     }
+
+    public function test_transfer_to_existing_order_allows_transfer_when_target_slot_is_cancelled(): void {
+        $source_item = Mockery::mock('WC_Order_Item_Product');
+        $source_item->shouldIgnoreMissing();
+        $source_item->shouldReceive('get_product_id')->andReturn(101);
+        $source_item->shouldReceive('get_meta')->with('_ak_parent_set_id')->andReturn(50);
+        $source_item->shouldReceive('get_meta')->with('_ak_participants')->andReturn([
+            ['id' => 'uuid-1', 'name' => 'Jan Kowalski', 'status' => 'active'],
+        ]);
+
+        $source_order = Mockery::mock('WC_Order');
+        $source_order->shouldIgnoreMissing();
+        $source_order->shouldReceive('get_id')->andReturn(1001);
+        $source_order->shouldReceive('get_items')->with('line_item')->andReturn([$source_item]);
+
+        // Target order already has uuid-1 in weekend 101, BUT it is marked cancelled
+        $target_item = Mockery::mock('WC_Order_Item_Product');
+        $target_item->shouldIgnoreMissing();
+        $target_item->shouldReceive('get_product_id')->andReturn(101);
+        $target_item->shouldReceive('get_meta')->with('_ak_participants')->andReturn([
+            ['id' => 'uuid-1', 'name' => 'Jan Kowalski', 'status' => 'cancelled'],
+        ]);
+
+        $target_order = Mockery::mock('WC_Order');
+        $target_order->shouldIgnoreMissing();
+        $target_order->shouldReceive('get_id')->andReturn(1002);
+        $target_order->shouldReceive('get_items')->with('line_item')->andReturn([$target_item]);
+
+        // When finding participant weekends, it should find Jan (active)
+        $search = Participant_Transfer_Service::find_participant_weekends_in_order($source_order, 'uuid-1', 101);
+        $this->assertEquals(['uuid-1' => 'Jan Kowalski'], [$search['participant_data']['id'] => $search['participant_data']['name']]);
+        $this->assertEquals([101], $search['weekends']);
+
+        // It does not block because status is cancelled on target
+        $target_participants = (array) $target_item->get_meta('_ak_participants');
+        $active_duplicate = false;
+        foreach ($target_participants as $p) {
+            if (!empty($p['id']) && $p['id'] === 'uuid-1' && ($p['status'] ?? 'active') === 'active') {
+                $active_duplicate = true;
+            }
+        }
+        $this->assertFalse($active_duplicate);
+    }
+
+    public function test_find_participant_weekends_ignores_cancelled_and_transferred_slots(): void {
+        $item1 = Mockery::mock('WC_Order_Item_Product');
+        $item1->shouldIgnoreMissing();
+        $item1->shouldReceive('get_product_id')->andReturn(101);
+        $item1->shouldReceive('get_meta')->with('_ak_parent_set_id')->andReturn(50);
+        $item1->shouldReceive('get_meta')->with('_ak_participants')->andReturn([
+            ['id' => 'uuid-x', 'name' => 'Cancelled Jan', 'status' => 'cancelled'],
+        ]);
+
+        $item2 = Mockery::mock('WC_Order_Item_Product');
+        $item2->shouldIgnoreMissing();
+        $item2->shouldReceive('get_product_id')->andReturn(102);
+        $item2->shouldReceive('get_meta')->with('_ak_parent_set_id')->andReturn(50);
+        $item2->shouldReceive('get_meta')->with('_ak_participants')->andReturn([
+            ['id' => 'uuid-x', 'name' => 'Transferred Jan', 'status' => 'transferred'],
+        ]);
+
+        $order = Mockery::mock('WC_Order');
+        $order->shouldIgnoreMissing();
+        $order->shouldReceive('get_id')->andReturn(2001);
+        $order->shouldReceive('get_items')->with('line_item')->andReturn([$item1, $item2]);
+
+        $search = Participant_Transfer_Service::find_participant_weekends_in_order($order, 'uuid-x');
+        $this->assertNull($search['participant_data']);
+        $this->assertEmpty($search['weekends']);
+    }
 }
+
