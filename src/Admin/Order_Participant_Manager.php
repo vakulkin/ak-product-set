@@ -32,12 +32,7 @@ class Order_Participant_Manager {
         add_action('wp_ajax_ak_mark_balance_settled',          [$this, 'ajax_mark_balance_settled']);
         add_action('wp_ajax_ak_mark_balance_unsettled',        [$this, 'ajax_mark_balance_unsettled']);
         add_action('wp_ajax_ak_update_participant',            [$this, 'ajax_update_participant']);
-        add_action('wp_ajax_ak_update_participant_tshirt',     [$this, 'ajax_update_participant_tshirt']);
         add_action('wp_ajax_ak_update_total_paid',             [$this, 'ajax_update_total_paid']);
-
-        // Backwards compatibility
-        add_action('wp_ajax_ak_remove_participant_completely',[$this, 'ajax_remove_participant_completely']);
-        add_action('wp_ajax_ak_remove_participant',           [$this, 'ajax_remove_participant_completely']);
     }
 
     /**
@@ -314,7 +309,7 @@ class Order_Participant_Manager {
                 $init_method = __('Bramka płatności', 'ak-product-set');
             }
             $init_amount = $gateway_paid > 0.009 ? $gateway_paid : ($total_paid > 0.009 ? $total_paid : (float) $order->get_total());
-            $gateway_paid = (float) $init_amount;
+            $gateway_paid = $init_amount;
             if (method_exists($order, 'get_date_paid') && $order->get_date_paid()) {
                 $init_date = $order->get_date_paid()->date('Y-m-d H:i');
             } elseif ($order->get_date_created()) {
@@ -387,28 +382,7 @@ class Order_Participant_Manager {
         }
     }
 
-    public function ajax_remove_participant_completely(): void {
-        check_ajax_referer(self::NONCE_ACTION, 'nonce');
-        if (!current_user_can('manage_woocommerce')) {
-            wp_send_json_error(__('Brak uprawnień.', 'ak-product-set'));
-        }
 
-        $order_id      = isset($_POST['order_id']) ? (int) $_POST['order_id'] : 0;
-        $uuid          = isset($_POST['uuid']) ? sanitize_text_field($_POST['uuid']) : '';
-        $retain_tshirt = !empty($_POST['retain_tshirt']);
-
-        $order = wc_get_order($order_id);
-        if (!$order || !$uuid) {
-            wp_send_json_error(__('Nie znaleziono zamówienia lub uczestnika.', 'ak-product-set'));
-        }
-
-        $result = Order_Participant_Slot_Manager::remove_participant_completely($order, $uuid, $retain_tshirt);
-        if ($result['success']) {
-            wp_send_json_success($result);
-        } else {
-            wp_send_json_error($result['error'] ?? 'Błąd');
-        }
-    }
 
     public function ajax_add_participant(): void {
         check_ajax_referer(self::NONCE_ACTION, 'nonce');
@@ -593,32 +567,7 @@ class Order_Participant_Manager {
         }
     }
 
-    public function ajax_update_participant_tshirt(): void {
-        check_ajax_referer(self::NONCE_ACTION, 'nonce');
-        if (!current_user_can('manage_woocommerce')) {
-            wp_send_json_error(__('Brak uprawnień.', 'ak-product-set'));
-        }
 
-        $order_id        = isset($_POST['order_id']) ? (int) $_POST['order_id'] : 0;
-        $uuid            = isset($_POST['uuid']) ? sanitize_text_field($_POST['uuid']) : '';
-        $raw_size        = isset($_POST['tshirt_size']) ? sanitize_text_field($_POST['tshirt_size']) : '';
-        $raw_cut         = isset($_POST['tshirt_cut']) ? sanitize_text_field($_POST['tshirt_cut']) : '';
-        $tshirt_size     = Helper::is_valid_tshirt_size($raw_size) ? $raw_size : '';
-        $tshirt_cut      = Helper::is_valid_tshirt_cut($raw_cut) ? $raw_cut : Helper::TSHIRT_CUT_DEFAULT;
-        $tshirt_produced = !empty($_POST['tshirt_produced']);
-
-        $order = wc_get_order($order_id);
-        if (!$order || !$uuid) {
-            wp_send_json_error(__('Nieprawidłowe dane zamówienia.', 'ak-product-set'));
-        }
-
-        $result = Order_Participant_Profile_Service::update_participant_tshirt($order, $uuid, $tshirt_size, $tshirt_cut, $tshirt_produced);
-        if ($result['success']) {
-            wp_send_json_success($result);
-        } else {
-            wp_send_json_error($result['error'] ?? 'Błąd');
-        }
-    }
 
     public function ajax_restore_weekend_participant(): void {
         check_ajax_referer(self::NONCE_ACTION, 'nonce');
@@ -713,7 +662,6 @@ class Order_Participant_Manager {
         $new_paid = isset($_POST['total_paid']) ? round((float) $_POST['total_paid'], 2) : 0.0;
         $note = isset($_POST['note']) ? sanitize_text_field($_POST['note']) : '';
 
-        $old_paid = (float) $order->get_meta('_ak_total_paid');
         $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
 
         $gateway_paid = (float) $order->get_meta('_ak_initial_payment_amount');

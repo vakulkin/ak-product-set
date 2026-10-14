@@ -379,7 +379,7 @@ class Order_Recalculator {
             $participants = $cohort['participants'];
             $headcount    = count($participants);
 
-            if ($headcount <= 0 || $package_size <= 0) {
+            if ($package_size <= 0) {
                 continue;
             }
 
@@ -782,7 +782,7 @@ class Order_Recalculator {
             $participants = $cohort['participants'];
             $headcount    = count($participants);
 
-            if ($headcount <= 0 || $package_size <= 0) {
+            if ($package_size <= 0) {
                 continue;
             }
 
@@ -950,8 +950,6 @@ class Order_Recalculator {
     /**
      * Get array of produced t-shirts for an order item.
      * Decodes JSON if stored as JSON string, and auto-backfills legacy tshirt_retained_count if needed.
-     *
-     * @param \WC_Order_Item_Product $item
      * @return array<int, array{
      *     uuid: string,
      *     participant_uuid: string,
@@ -1118,25 +1116,6 @@ class Order_Recalculator {
         return round($total, 2);
     }
 
-    /**
-     * Count total retained / produced t-shirts across all participant slots in the order.
-     */
-    public static function count_retained_tshirts_in_slots(\WC_Order $order): int {
-        $total = 0;
-        try {
-            $items = $order->get_items('line_item');
-            if (is_iterable($items)) {
-                foreach ($items as $item) {
-                    if (!($item instanceof \WC_Order_Item_Product)) {
-                        continue;
-                    }
-                    $records = self::get_item_produced_tshirts($item);
-                    $total += count($records);
-                }
-            }
-        } catch (\Throwable $e) {}
-        return $total;
-    }
 
     /**
      * Synchronize the retained t-shirt fee item strictly from the slot elements.

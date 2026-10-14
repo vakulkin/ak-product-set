@@ -11,8 +11,9 @@ use Brain\Monkey\Functions;
 
 class Participant_Transfer_Service_Test extends TestCase {
 
-    public function test_remove_participant_returns_error_when_uuid_not_found(): void {
+    public function test_remove_weekend_returns_error_when_uuid_not_found(): void {
         $item = Mockery::mock('WC_Order_Item_Product');
+        $item->shouldReceive('get_product_id')->andReturn(101);
         $item->shouldReceive('get_meta')->with('_ak_participants')->andReturn([
             ['id' => 'uuid-other', 'name' => 'Alice'],
         ]);
@@ -20,7 +21,7 @@ class Participant_Transfer_Service_Test extends TestCase {
         $order = Mockery::mock('WC_Order');
         $order->shouldReceive('get_items')->with('line_item')->andReturn([$item]);
 
-        $result = Order_Participant_Slot_Manager::remove_participant_completely($order, 'uuid-non-existent');
+        $result = Order_Participant_Slot_Manager::remove_weekend_for_participant($order, 'uuid-non-existent', 101);
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('nie został znaleziony', $result['error']);
