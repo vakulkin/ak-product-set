@@ -63,6 +63,75 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
         .ak-om-table tr:last-child td { border-bottom: none; }
         .ak-om-table tr:hover td { background: #fcfcfc; }
 
+        .ak-om-slots-list { display: flex; flex-direction: column; }
+        .ak-om-slot-item {
+            padding: 11px 16px;
+            border-bottom: 1px solid #f0f0f1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: background 0.15s ease;
+        }
+        .ak-om-slot-item:last-child { border-bottom: none; }
+        .ak-om-slot-item:hover { background: #fafafa; }
+        .ak-om-slot-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .ak-om-slot-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            font-size: 13px;
+        }
+        .ak-om-slot-idx {
+            background: #f0f0f1;
+            color: #646970;
+            border-radius: 3px;
+            padding: 1px 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .ak-om-slot-name {
+            font-weight: 600;
+            color: #1d2327;
+            font-size: 13px;
+        }
+        .ak-om-slot-uuid {
+            color: #8c8f94;
+            font-size: 11px;
+        }
+        .ak-om-slot-actions {
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .ak-om-slot-actions .button,
+        .ak-om-slot-participant .button,
+        .ak-om-slot-tshirts .button {
+            white-space: nowrap;
+            margin: 0;
+        }
+        .ak-om-slot-participant {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .ak-om-slot-tshirts {
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
         .ak-om-pre-box { background: transparent; border: none; padding: 0; font-size: 11px; white-space: pre-wrap; font-family: Consolas, Monaco, "Courier New", monospace; line-height: 1.5; margin: 0; color: #2c3338; }
 
         .ak-om-modal-bg { display: none; position: fixed; z-index: 100000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
@@ -240,200 +309,189 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
                 </button>
             </div>
         <?php else : ?>
-            <table class="ak-om-table">
-                <thead>
-                    <tr>
-                        <th style="width: 30px; text-align: center;">#</th>
-                        <th><?php esc_html_e('Termin', 'ak-product-set'); ?></th>
-                        <th><?php esc_html_e('Uczestnik i kontakt', 'ak-product-set'); ?></th>
-                        <th><?php esc_html_e('Koszulka', 'ak-product-set'); ?></th>
-                        <th style="text-align: right; min-width: 240px;"><?php esc_html_e('Akcje', 'ak-product-set'); ?></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    $idx = 1;
-                    foreach ($slots as $slot) :
-                        $status           = $slot['status'] ?? 'active';
-                        $is_cancelled     = ($status === 'cancelled');
-                        $is_transferred   = ($status === 'transferred');
-                        $is_inactive      = ($is_cancelled || $is_transferred);
-                        $can_edit         = (!$is_order_cancelled && !$is_inactive);
-                        $produced_tshirts = $slot['produced_tshirts'] ?? [];
+            <div class="ak-om-slots-list">
+                <?php
+                $idx = 1;
+                foreach ($slots as $slot) :
+                    $status           = $slot['status'] ?? 'active';
+                    $is_cancelled     = ($status === 'cancelled');
+                    $is_transferred   = ($status === 'transferred');
+                    $is_inactive      = ($is_cancelled || $is_transferred);
+                    $can_edit         = (!$is_order_cancelled && !$is_inactive);
+                    $produced_tshirts = $slot['produced_tshirts'] ?? [];
 
-                        $cut = Helper::get_tshirt_cut_label($slot['tshirt_cut'] ?? '');
-                        $shirt_btn_label = !empty($slot['tshirt_size']) ? esc_html($slot['tshirt_size']) . ' [' . esc_html($cut) . ']' : __('Wybierz koszulkę', 'ak-product-set');
-                        $enrolled = $participant_wids[$slot['uuid']] ?? [];
-                        $name_label  = !empty($slot['name']) ? $slot['name'] : __('Imię', 'ak-product-set');
-                        $phone_label = !empty($slot['phone']) ? $slot['phone'] : __('Telefon', 'ak-product-set');
-                        $email_label = !empty($slot['email']) ? $slot['email'] : __('E-mail', 'ak-product-set');
+                    $cut = Helper::get_tshirt_cut_label($slot['tshirt_cut'] ?? '');
+                    $shirt_btn_label = !empty($slot['tshirt_size']) ? esc_html($slot['tshirt_size']) . ' [' . esc_html($cut) . ']' : __('Wybierz koszulkę', 'ak-product-set');
+                    $enrolled = $participant_wids[$slot['uuid']] ?? [];
+                    $name_label  = !empty($slot['name']) ? $slot['name'] : __('Imię', 'ak-product-set');
+                    $phone_label = !empty($slot['phone']) ? $slot['phone'] : __('Telefon', 'ak-product-set');
+                    $email_label = !empty($slot['email']) ? $slot['email'] : __('E-mail', 'ak-product-set');
 
-                        $row_style = '';
-                        if ($is_cancelled) {
-                            $row_style = 'background: #fff8f8; opacity: 0.88;';
-                        } elseif ($is_transferred) {
-                            $row_style = 'background: #f0f6fc; opacity: 0.88;';
-                        }
-                    ?>
-                        <tr style="<?php echo esc_attr($row_style); ?>">
-                            <td style="text-align: center; color: #8c8f94;"><?php echo $idx++; ?></td>
-                            <td>
-                                <span style="<?php echo $is_inactive ? 'text-decoration: line-through; color: #8c8f94;' : ''; ?>">
+                    $item_style = '';
+                    if ($is_cancelled) {
+                        $item_style = 'background: #fff8f8; opacity: 0.92;';
+                    } elseif ($is_transferred) {
+                        $item_style = 'background: #f0f6fc; opacity: 0.92;';
+                    }
+                ?>
+                    <div class="ak-om-slot-item" style="<?php echo esc_attr($item_style); ?>">
+                        <!-- Row 1: Title on left, Action buttons on right -->
+                        <div class="ak-om-slot-row ak-om-slot-header-row">
+                            <div class="ak-om-slot-title">
+                                <span class="ak-om-slot-idx">#<?php echo $idx++; ?></span>
+                                <span class="ak-om-slot-name" style="<?php echo $is_inactive ? 'text-decoration: line-through; color: #8c8f94;' : ''; ?>">
                                     <?php echo esc_html($slot['weekend_name']); ?>
                                 </span>
-                                <span style="color: #8c8f94; font-size: 11px; margin-left: 4px;">#<?php echo esc_html(substr($slot['uuid'], 0, 8)); ?></span>
-                            </td>
-                            <td>
+                                <span class="ak-om-slot-uuid">#<?php echo esc_html(substr($slot['uuid'], 0, 8)); ?></span>
+                            </div>
+                            <div class="ak-om-slot-actions">
+                                <?php if ($is_inactive) : ?>
+                                    <?php if ($is_cancelled) : ?>
+                                        <span class="ak-om-tag ak-tag-underpaid"><?php esc_html_e('Anulowany', 'ak-product-set'); ?></span>
+                                    <?php elseif ($is_transferred) : ?>
+                                        <span class="ak-om-tag" style="background:#e7f3fe; color:#185abc; border:1px solid #c2e0ff;">
+                                            <?php printf(esc_html__('Przeniesiony (%s)', 'ak-product-set'), !empty($slot['transferred_to_order']) ? '#' . esc_html($slot['transferred_to_order']) : 'zamówienie'); ?>
+                                        </span>
+                                    <?php endif; ?>
+
+                                    <button type="button" class="button button-small button-primary ak-om-restore-btn"
+                                        data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
+                                        data-wid="<?php echo esc_attr($slot['weekend_id']); ?>"
+                                        data-name="<?php echo esc_attr($slot['name']); ?>"
+                                        data-title="<?php echo esc_attr($slot['weekend_name']); ?>"
+                                        title="<?php esc_attr_e('Przywróć ten termin do aktywnych', 'ak-product-set'); ?>">
+                                        <?php esc_html_e('Przywróć termin', 'ak-product-set'); ?>
+                                    </button>
+                                <?php elseif (!$is_order_cancelled) : ?>
+                                    <button type="button" class="button button-small ak-om-reschedule-btn"
+                                        data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
+                                        data-from-id="<?php echo esc_attr($slot['weekend_id']); ?>"
+                                        data-name="<?php echo esc_attr($slot['name']); ?>"
+                                        data-title="<?php echo esc_attr($slot['weekend_name']); ?>"
+                                        data-enrolled-wids="<?php echo esc_attr(json_encode($enrolled)); ?>"
+                                        title="<?php esc_attr_e('Zmień ten termin na inny', 'ak-product-set'); ?>">
+                                        <?php esc_html_e('Zmień termin', 'ak-product-set'); ?>
+                                    </button>
+                                    <button type="button" class="button button-small ak-om-transfer-btn"
+                                        data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
+                                        data-wid="<?php echo esc_attr($slot['weekend_id']); ?>"
+                                        data-name="<?php echo esc_attr($slot['name']); ?>"
+                                        data-title="<?php echo esc_attr($slot['weekend_name']); ?>"
+                                        title="<?php esc_attr_e('Przenieś ten termin do innego zamówienia', 'ak-product-set'); ?>">
+                                        <?php esc_html_e('Przenieś', 'ak-product-set'); ?>
+                                    </button>
+                                    <button type="button" class="button button-small button-link-delete ak-om-cancel-btn"
+                                        data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
+                                        data-wid="<?php echo esc_attr($slot['weekend_id']); ?>"
+                                        data-name="<?php echo esc_attr($slot['name']); ?>"
+                                        data-title="<?php echo esc_attr($slot['weekend_name']); ?>"
+                                        title="<?php esc_attr_e('Anuluj ten termin dla uczestnika', 'ak-product-set'); ?>">
+                                        <?php esc_html_e('Anuluj', 'ak-product-set'); ?>
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Participant data on left, T-shirt data on right -->
+                        <div class="ak-om-slot-row ak-om-slot-details-row">
+                            <div class="ak-om-slot-participant">
                                 <?php if ($can_edit) : ?>
-                                    <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
-                                        <button type="button" class="button button-small ak-om-edit-participant-btn"
-                                            data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
-                                            data-name="<?php echo esc_attr($slot['name']); ?>"
-                                            data-email="<?php echo esc_attr($slot['email']); ?>"
-                                            data-phone="<?php echo esc_attr($slot['phone']); ?>"
-                                            data-size="<?php echo esc_attr($slot['tshirt_size']); ?>"
-                                            data-cut="<?php echo esc_attr($slot['tshirt_cut']); ?>"
-                                            data-focus="name"
-                                            title="<?php esc_attr_e('Kliknij, aby edytować imię i nazwisko', 'ak-product-set'); ?>">
-                                            <?php echo esc_html($name_label); ?>
-                                        </button>
-                                        <button type="button" class="button button-small ak-om-edit-participant-btn"
-                                            data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
-                                            data-name="<?php echo esc_attr($slot['name']); ?>"
-                                            data-email="<?php echo esc_attr($slot['email']); ?>"
-                                            data-phone="<?php echo esc_attr($slot['phone']); ?>"
-                                            data-size="<?php echo esc_attr($slot['tshirt_size']); ?>"
-                                            data-cut="<?php echo esc_attr($slot['tshirt_cut']); ?>"
-                                            data-focus="phone"
-                                            title="<?php esc_attr_e('Kliknij, aby edytować telefon', 'ak-product-set'); ?>">
-                                            <?php echo esc_html($phone_label); ?>
-                                        </button>
-                                        <button type="button" class="button button-small ak-om-edit-participant-btn"
-                                            data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
-                                            data-name="<?php echo esc_attr($slot['name']); ?>"
-                                            data-email="<?php echo esc_attr($slot['email']); ?>"
-                                            data-phone="<?php echo esc_attr($slot['phone']); ?>"
-                                            data-size="<?php echo esc_attr($slot['tshirt_size']); ?>"
-                                            data-cut="<?php echo esc_attr($slot['tshirt_cut']); ?>"
-                                            data-focus="email"
-                                            title="<?php esc_attr_e('Kliknij, aby edytować e-mail', 'ak-product-set'); ?>">
-                                            <?php echo esc_html($email_label); ?>
-                                        </button>
-                                    </div>
+                                    <button type="button" class="button button-small ak-om-edit-participant-btn"
+                                        data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
+                                        data-name="<?php echo esc_attr($slot['name']); ?>"
+                                        data-email="<?php echo esc_attr($slot['email']); ?>"
+                                        data-phone="<?php echo esc_attr($slot['phone']); ?>"
+                                        data-size="<?php echo esc_attr($slot['tshirt_size']); ?>"
+                                        data-cut="<?php echo esc_attr($slot['tshirt_cut']); ?>"
+                                        data-focus="name"
+                                        title="<?php esc_attr_e('Kliknij, aby edytować imię i nazwisko', 'ak-product-set'); ?>">
+                                        <?php echo esc_html($name_label); ?>
+                                    </button>
+                                    <button type="button" class="button button-small ak-om-edit-participant-btn"
+                                        data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
+                                        data-name="<?php echo esc_attr($slot['name']); ?>"
+                                        data-email="<?php echo esc_attr($slot['email']); ?>"
+                                        data-phone="<?php echo esc_attr($slot['phone']); ?>"
+                                        data-size="<?php echo esc_attr($slot['tshirt_size']); ?>"
+                                        data-cut="<?php echo esc_attr($slot['tshirt_cut']); ?>"
+                                        data-focus="phone"
+                                        title="<?php esc_attr_e('Kliknij, aby edytować telefon', 'ak-product-set'); ?>">
+                                        <?php echo esc_html($phone_label); ?>
+                                    </button>
+                                    <button type="button" class="button button-small ak-om-edit-participant-btn"
+                                        data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
+                                        data-name="<?php echo esc_attr($slot['name']); ?>"
+                                        data-email="<?php echo esc_attr($slot['email']); ?>"
+                                        data-phone="<?php echo esc_attr($slot['phone']); ?>"
+                                        data-size="<?php echo esc_attr($slot['tshirt_size']); ?>"
+                                        data-cut="<?php echo esc_attr($slot['tshirt_cut']); ?>"
+                                        data-focus="email"
+                                        title="<?php esc_attr_e('Kliknij, aby edytować e-mail', 'ak-product-set'); ?>">
+                                        <?php echo esc_html($email_label); ?>
+                                    </button>
                                 <?php else : ?>
-                                    <div style="display: flex; flex-direction: column; gap: 2px; color: #50575e; font-size: 12px;">
-                                        <span style="font-weight: 600; color: #2c3338;"><?php echo esc_html($name_label); ?></span>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                                        <span style="font-weight: 600; color: #2c3338; font-size: 12px;"><?php echo esc_html($name_label); ?></span>
                                         <?php if (!empty($slot['phone'])) : ?>
-                                            <span><?php echo esc_html($slot['phone']); ?></span>
+                                            <span style="color: #50575e; font-size: 12px;"><?php echo esc_html($slot['phone']); ?></span>
                                         <?php endif; ?>
                                         <?php if (!empty($slot['email'])) : ?>
-                                            <span style="color: #646970;"><?php echo esc_html($slot['email']); ?></span>
+                                            <span style="color: #646970; font-size: 12px;"><?php echo esc_html($slot['email']); ?></span>
                                         <?php endif; ?>
                                     </div>
                                 <?php endif; ?>
-                            </td>
-                            <td>
-                                <div>
-                                    <?php if ($can_edit) : ?>
-                                        <button type="button" class="button button-small ak-om-edit-participant-btn ak-om-edit-tshirt-btn"
-                                            data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
-                                            data-name="<?php echo esc_attr($slot['name']); ?>"
-                                            data-email="<?php echo esc_attr($slot['email']); ?>"
-                                            data-phone="<?php echo esc_attr($slot['phone']); ?>"
-                                            data-size="<?php echo esc_attr($slot['tshirt_size']); ?>"
-                                            data-cut="<?php echo esc_attr($slot['tshirt_cut']); ?>"
-                                            data-focus="tshirt"
-                                            title="<?php esc_attr_e('Kliknij, aby zmienić rozmiar / krój koszulki', 'ak-product-set'); ?>">
-                                            <?php echo $shirt_btn_label; ?>
-                                        </button>
-                                    <?php else : ?>
-                                        <span style="color: #50575e; font-size: 12px; font-weight: 500;"><?php echo $shirt_btn_label; ?></span>
-                                    <?php endif; ?>
+                            </div>
 
-                                    <?php if (!empty($produced_tshirts)) : ?>
-                                        <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 3px;">
-                                            <?php foreach ($produced_tshirts as $produced) :
-                                                $prod_cut_label = Helper::get_tshirt_cut_label($produced['cut'] ?? '');
-                                                $prod_size = $produced['size'] ?: '—';
-                                                $prod_type_desc = $prod_size . ($prod_cut_label ? ' [' . $prod_cut_label . ']' : '');
-                                                $prod_cost = isset($produced['cost']) ? (float) $produced['cost'] : $tshirt_cost;
-                                                $person_name = !empty($produced['participant_name']) ? $produced['participant_name'] : (!empty($slot['name']) ? $slot['name'] : __('Uczestnik', 'ak-product-set'));
-                                            ?>
-                                                <div class="ak-om-produced-badge" style="display: inline-flex; align-items: center; justify-content: space-between; gap: 6px; background: #fff8e5; color: #856404; border: 1px solid #ffeeba; border-radius: 3px; padding: 3px 6px; font-size: 10px; line-height: 1.25;">
-                                                    <div style="display: flex; flex-direction: column; text-align: left;">
-                                                        <span style="font-weight: 600; color: #553c02;"><?php echo esc_html($person_name); ?></span>
-                                                        <span style="color: #6d5203;">
-                                                            <?php echo esc_html($prod_type_desc); ?> (+<?php echo esc_html(number_format_i18n($prod_cost, 0)); ?> zł)
-                                                        </span>
-                                                    </div>
-                                                    <button type="button" class="ak-om-delete-produced-tshirt-btn"
-                                                        data-uuid="<?php echo esc_attr($produced['uuid']); ?>"
-                                                        data-item-id="<?php echo esc_attr($slot['item_id'] ?? 0); ?>"
-                                                        data-order-id="<?php echo esc_attr($order->get_id()); ?>"
-                                                        data-cost="<?php echo esc_attr($prod_cost); ?>"
-                                                        data-desc="<?php echo esc_attr($prod_type_desc); ?>"
-                                                        style="background: none; border: none; cursor: pointer; color: #b32d2e; font-weight: bold; font-size: 13px; line-height: 1; padding: 0 2px;"
-                                                        title="<?php esc_attr_e('Anuluj opłatę za tę wyprodukowaną koszulkę', 'ak-product-set'); ?>">
-                                                        &times;
-                                                    </button>
-                                                </div>
-                                            <?php endforeach; ?>
+                            <div class="ak-om-slot-tshirts">
+                                <?php if ($can_edit) : ?>
+                                    <button type="button" class="button button-small ak-om-edit-participant-btn ak-om-edit-tshirt-btn"
+                                        data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
+                                        data-name="<?php echo esc_attr($slot['name']); ?>"
+                                        data-email="<?php echo esc_attr($slot['email']); ?>"
+                                        data-phone="<?php echo esc_attr($slot['phone']); ?>"
+                                        data-size="<?php echo esc_attr($slot['tshirt_size']); ?>"
+                                        data-cut="<?php echo esc_attr($slot['tshirt_cut']); ?>"
+                                        data-focus="tshirt"
+                                        title="<?php esc_attr_e('Kliknij, aby zmienić rozmiar / krój koszulki', 'ak-product-set'); ?>">
+                                        <?php echo $shirt_btn_label; ?>
+                                    </button>
+                                <?php else : ?>
+                                    <span style="color: #50575e; font-size: 12px; font-weight: 500;"><?php echo $shirt_btn_label; ?></span>
+                                <?php endif; ?>
+
+                                <?php if (!empty($produced_tshirts)) : ?>
+                                    <?php foreach ($produced_tshirts as $produced) :
+                                        $prod_cut_label = Helper::get_tshirt_cut_label($produced['cut'] ?? '');
+                                        $prod_size = $produced['size'] ?: '—';
+                                        $prod_type_desc = $prod_size . ($prod_cut_label ? ' [' . $prod_cut_label . ']' : '');
+                                        $prod_cost = isset($produced['cost']) ? (float) $produced['cost'] : $tshirt_cost;
+                                        $person_name = !empty($produced['participant_name']) ? $produced['participant_name'] : (!empty($slot['name']) ? $slot['name'] : __('Uczestnik', 'ak-product-set'));
+                                    ?>
+                                        <div class="ak-om-produced-badge" style="display: inline-flex; align-items: center; justify-content: space-between; gap: 6px; background: #fff8e5; color: #856404; border: 1px solid #ffeeba; border-radius: 3px; padding: 3px 6px; font-size: 10px; line-height: 1.25;">
+                                            <div style="display: flex; flex-direction: column; text-align: left;">
+                                                <span style="font-weight: 600; color: #553c02;"><?php echo esc_html($person_name); ?></span>
+                                                <span style="color: #6d5203;">
+                                                    <?php echo esc_html($prod_type_desc); ?> (+<?php echo esc_html(number_format_i18n($prod_cost, 0)); ?> zł)
+                                                </span>
+                                            </div>
+                                            <button type="button" class="ak-om-delete-produced-tshirt-btn"
+                                                data-uuid="<?php echo esc_attr($produced['uuid']); ?>"
+                                                data-item-id="<?php echo esc_attr($slot['item_id'] ?? 0); ?>"
+                                                data-order-id="<?php echo esc_attr($order->get_id()); ?>"
+                                                data-cost="<?php echo esc_attr($prod_cost); ?>"
+                                                data-desc="<?php echo esc_attr($prod_type_desc); ?>"
+                                                style="background: none; border: none; cursor: pointer; color: #b32d2e; font-weight: bold; font-size: 13px; line-height: 1; padding: 0 2px;"
+                                                title="<?php esc_attr_e('Anuluj opłatę za tę wyprodukowaną koszulkę', 'ak-product-set'); ?>">
+                                                &times;
+                                            </button>
                                         </div>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                            <td style="text-align: right; white-space: nowrap;">
-                                <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: nowrap;">
-                                    <?php if ($is_inactive) : ?>
-                                        <?php if ($is_cancelled) : ?>
-                                            <span class="ak-om-tag ak-tag-underpaid"><?php esc_html_e('Anulowany', 'ak-product-set'); ?></span>
-                                        <?php elseif ($is_transferred) : ?>
-                                            <span class="ak-om-tag" style="background:#e7f3fe; color:#185abc; border:1px solid #c2e0ff;">
-                                                <?php printf(esc_html__('Przeniesiony (%s)', 'ak-product-set'), !empty($slot['transferred_to_order']) ? '#' . esc_html($slot['transferred_to_order']) : 'zamówienie'); ?>
-                                            </span>
-                                        <?php endif; ?>
-
-                                        <button type="button" class="button button-small button-primary ak-om-restore-btn"
-                                            data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
-                                            data-wid="<?php echo esc_attr($slot['weekend_id']); ?>"
-                                            data-name="<?php echo esc_attr($slot['name']); ?>"
-                                            data-title="<?php echo esc_attr($slot['weekend_name']); ?>"
-                                            title="<?php esc_attr_e('Przywróć ten termin do aktywnych', 'ak-product-set'); ?>">
-                                            <?php esc_html_e('Przywróć termin', 'ak-product-set'); ?>
-                                        </button>
-                                    <?php elseif (!$is_order_cancelled) : ?>
-                                        <button type="button" class="button button-small ak-om-reschedule-btn"
-                                            data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
-                                            data-from-id="<?php echo esc_attr($slot['weekend_id']); ?>"
-                                            data-name="<?php echo esc_attr($slot['name']); ?>"
-                                            data-title="<?php echo esc_attr($slot['weekend_name']); ?>"
-                                            data-enrolled-wids="<?php echo esc_attr(json_encode($enrolled)); ?>"
-                                            title="<?php esc_attr_e('Zmień ten termin na inny', 'ak-product-set'); ?>">
-                                            <?php esc_html_e('Zmień termin', 'ak-product-set'); ?>
-                                        </button>
-                                        <button type="button" class="button button-small ak-om-transfer-btn"
-                                            data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
-                                            data-wid="<?php echo esc_attr($slot['weekend_id']); ?>"
-                                            data-name="<?php echo esc_attr($slot['name']); ?>"
-                                            data-title="<?php echo esc_attr($slot['weekend_name']); ?>"
-                                            title="<?php esc_attr_e('Przenieś ten termin do innego zamówienia', 'ak-product-set'); ?>">
-                                            <?php esc_html_e('Przenieś', 'ak-product-set'); ?>
-                                        </button>
-                                        <button type="button" class="button button-small button-link-delete ak-om-cancel-btn"
-                                            data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
-                                            data-wid="<?php echo esc_attr($slot['weekend_id']); ?>"
-                                            data-name="<?php echo esc_attr($slot['name']); ?>"
-                                            data-title="<?php echo esc_attr($slot['weekend_name']); ?>"
-                                            title="<?php esc_attr_e('Anuluj ten termin dla uczestnika', 'ak-product-set'); ?>">
-                                            <?php esc_html_e('Anuluj', 'ak-product-set'); ?>
-                                        </button>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
 
             <?php if (!empty($unassigned_produced_tshirts)) : ?>
                 <div style="padding: 10px 14px; background: #fff8e5; border-top: 1px solid #ffeeba; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
