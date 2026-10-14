@@ -150,5 +150,97 @@ class Order_Participant_Manager_Test extends TestCase {
         // Must display top primary add participant button
         $this->assertStringContainsString('+ Dodaj uczestnika', $output);
     }
+
+    public function test_render_meta_box_displays_unpaid_badge_and_method_subtitle(): void {
+        Functions\stubs([
+            'admin_url'       => 'http://example.com/wp-admin/admin.php',
+            'esc_attr'        => function($v) { return $v; },
+            'esc_html_e'      => function($v) { echo $v; },
+            'esc_attr_e'      => function($v) { echo $v; },
+            'wp_create_nonce' => function() { return 'test-nonce'; },
+            'get_post'        => function($id) { return (object)['ID' => $id, 'post_title' => 'Test Set']; },
+            'get_field'       => function($f, $id) { return []; },
+        ]);
+
+        $order = Mockery::mock('WC_Order');
+        $order->shouldIgnoreMissing();
+        $order->shouldReceive('get_id')->andReturn(400);
+        $order->shouldReceive('get_total')->andReturn('3000.00');
+        $order->shouldReceive('get_items')->with('line_item')->andReturn([]);
+        $order->shouldReceive('get_meta')->with('_ak_order_decomposed')->andReturn('1');
+        $order->shouldReceive('get_meta')->with('_ak_original_total')->andReturn('3000.00');
+        $order->shouldReceive('get_meta')->with('_ak_total_paid')->andReturn('0.00');
+        $order->shouldReceive('get_meta')->with('_ak_balance_status')->andReturn(Order_Recalculator::BALANCE_UNPAID);
+        $order->shouldReceive('get_meta')->with('_ak_balance_amount')->andReturn(3000.00);
+        $order->shouldReceive('get_meta')->with('_ak_pricing_breakdown')->andReturn('');
+        $order->shouldReceive('get_meta')->with('_ak_transferred_to_orders')->andReturn([]);
+        $order->shouldReceive('get_meta')->with('_ak_transferred_to_order')->andReturn(0);
+        $order->shouldReceive('get_meta')->with('_ak_transferred_from_order')->andReturn(0);
+        $order->shouldReceive('get_meta')->with('_ak_balance_history')->andReturn('');
+        $order->shouldReceive('get_meta')->with('_ak_parent_set_id')->andReturn(10);
+        $order->shouldReceive('get_meta')->with('_ak_initial_payment_recorded')->andReturn('');
+        $order->shouldReceive('get_meta')->with('_ak_initial_payment_method')->andReturn('');
+        $order->shouldReceive('get_meta')->with('_ak_initial_payment_amount')->andReturn('');
+        $order->shouldReceive('get_meta')->with('_ak_initial_payment_date')->andReturn('');
+        $order->shouldReceive('get_meta')->with('_ak_initial_payment_txn_id')->andReturn('');
+        $order->shouldReceive('get_payment_method_title')->andReturn('Przelewy24');
+        $order->shouldReceive('is_paid')->andReturn(false);
+
+        $manager = new Order_Participant_Manager();
+
+        ob_start();
+        $manager->render_meta_box($order);
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString('Nieopłacone (oczekuje na płatność)', $output);
+        $this->assertStringContainsString('Wybrana metoda: Przelewy24 (brak potwierdzenia wpłaty z bramki)', $output);
+        $this->assertStringNotContainsString('Rozliczone (brak zaległości)', $output);
+    }
+
+    public function test_render_meta_box_displays_settled_with_initial_payment_subtitle(): void {
+        Functions\stubs([
+            'admin_url'       => 'http://example.com/wp-admin/admin.php',
+            'esc_attr'        => function($v) { return $v; },
+            'esc_html_e'      => function($v) { echo $v; },
+            'esc_attr_e'      => function($v) { echo $v; },
+            'wp_create_nonce' => function() { return 'test-nonce'; },
+            'get_post'        => function($id) { return (object)['ID' => $id, 'post_title' => 'Test Set']; },
+            'get_field'       => function($f, $id) { return []; },
+        ]);
+
+        $order = Mockery::mock('WC_Order');
+        $order->shouldIgnoreMissing();
+        $order->shouldReceive('get_id')->andReturn(500);
+        $order->shouldReceive('get_total')->andReturn('3000.00');
+        $order->shouldReceive('get_items')->with('line_item')->andReturn([]);
+        $order->shouldReceive('get_meta')->with('_ak_order_decomposed')->andReturn('1');
+        $order->shouldReceive('get_meta')->with('_ak_original_total')->andReturn('3000.00');
+        $order->shouldReceive('get_meta')->with('_ak_total_paid')->andReturn('3000.00');
+        $order->shouldReceive('get_meta')->with('_ak_balance_status')->andReturn(Order_Recalculator::BALANCE_SETTLED);
+        $order->shouldReceive('get_meta')->with('_ak_balance_amount')->andReturn(0.00);
+        $order->shouldReceive('get_meta')->with('_ak_pricing_breakdown')->andReturn('');
+        $order->shouldReceive('get_meta')->with('_ak_transferred_to_orders')->andReturn([]);
+        $order->shouldReceive('get_meta')->with('_ak_transferred_to_order')->andReturn(0);
+        $order->shouldReceive('get_meta')->with('_ak_transferred_from_order')->andReturn(0);
+        $order->shouldReceive('get_meta')->with('_ak_balance_history')->andReturn('');
+        $order->shouldReceive('get_meta')->with('_ak_parent_set_id')->andReturn(10);
+        $order->shouldReceive('get_meta')->with('_ak_initial_payment_recorded')->andReturn('yes');
+        $order->shouldReceive('get_meta')->with('_ak_initial_payment_method')->andReturn('BLIK');
+        $order->shouldReceive('get_meta')->with('_ak_initial_payment_amount')->andReturn('3000.00');
+        $order->shouldReceive('get_meta')->with('_ak_initial_payment_date')->andReturn('2026-10-14 14:30');
+        $order->shouldReceive('get_meta')->with('_ak_initial_payment_txn_id')->andReturn('blik_98765');
+        $order->shouldReceive('is_paid')->andReturn(true);
+
+        $manager = new Order_Participant_Manager();
+
+        ob_start();
+        $manager->render_meta_box($order);
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString('Rozliczone (brak zaległości)', $output);
+        $this->assertStringContainsString('Płatność początkowa: BLIK, kwota: 3,000.00 zł (2026-10-14 14:30)', $output);
+        $this->assertStringContainsString('ID: blik_98765', $output);
+    }
 }
+
 

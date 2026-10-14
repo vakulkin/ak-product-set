@@ -126,6 +126,7 @@ class Plugin {
         $this->services['cart_display']             = new Cart\Cart_Display_Filters();
         $this->services['order_processor']           = new Order\Order_Processor();
         $this->services['order_decomposer']          = new Order\Order_Decomposer();
+        $this->services['order_payment_tracker']     = new Order\Order_Payment_Tracker();
         $this->services['order_participant_manager'] = new Admin\Order_Participant_Manager();
 
         // Frontend & Shortcode

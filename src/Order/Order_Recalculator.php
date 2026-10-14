@@ -15,6 +15,7 @@ class Order_Recalculator {
     const BALANCE_SETTLED   = 'settled';
     const BALANCE_UNDERPAID = 'underpaid';
     const BALANCE_OVERPAID  = 'overpaid';
+    const BALANCE_UNPAID    = 'unpaid';
 
     /**
      * Default cost of a manufactured t-shirt in PLN if not customized in options.
@@ -39,6 +40,40 @@ class Order_Recalculator {
 
         $cost = get_option('ak_set_tshirt_cost', self::DEFAULT_TSHIRT_COST);
         return max(0.0, (float)$cost);
+    }
+
+    /**
+     * Safely check whether an order is marked as paid.
+     *
+     * @param \WC_Order $order
+     * @return bool
+     */
+    public static function is_order_paid(\WC_Order $order): bool {
+        try {
+            if (method_exists($order, 'is_paid') || ($order instanceof \Mockery\MockInterface)) {
+                return (bool) $order->is_paid();
+            }
+        } catch (\Throwable $e) {
+            return false;
+        }
+        return false;
+    }
+
+    /**
+     * Safely retrieve order status string.
+     *
+     * @param \WC_Order $order
+     * @return string
+     */
+    public static function get_order_status(\WC_Order $order): string {
+        try {
+            if (method_exists($order, 'get_status') || ($order instanceof \Mockery\MockInterface)) {
+                return (string) $order->get_status();
+            }
+        } catch (\Throwable $e) {
+            return '';
+        }
+        return '';
     }
 
     /**
@@ -85,8 +120,8 @@ class Order_Recalculator {
         } else {
             $total_paid = (float) $total_paid;
             if ($total_paid <= 0.009 && $original_total > 0.009) {
-                $status = (method_exists($order, 'get_status') && !($order instanceof \Mockery\MockInterface)) ? $order->get_status() : '';
-                $is_paid = (method_exists($order, 'is_paid') && !($order instanceof \Mockery\MockInterface)) && $order->is_paid();
+                $status = self::get_order_status($order);
+                $is_paid = self::is_order_paid($order);
                 if ($is_paid || in_array($status, ['processing', 'completed'], true)) {
                     $total_paid = $original_total;
                     $order->update_meta_data('_ak_total_paid', $total_paid);
@@ -323,8 +358,11 @@ class Order_Recalculator {
         $new_total = (float) $order->get_total();
         $balance = round($new_total - $total_paid, 2);
 
+        $is_paid = self::is_order_paid($order);
         if ($balance > 0.009) {
-            $balance_status = self::BALANCE_UNDERPAID;
+            $balance_status = (!$is_paid && $total_paid <= 0.009 && $order->get_meta('_ak_balance_status') === self::BALANCE_UNPAID)
+                ? self::BALANCE_UNPAID
+                : self::BALANCE_UNDERPAID;
         } elseif ($balance < -0.009) {
             $balance_status = self::BALANCE_OVERPAID;
         } else {
@@ -347,22 +385,26 @@ class Order_Recalculator {
             number_format_i18n($total_recalculated_base, 2),
             number_format_i18n($new_total, 2),
             number_format_i18n($total_paid, 2),
-            ($balance_status === self::BALANCE_UNDERPAID)
-                ? sprintf(__('BILANS: Niedopłata +%s zł (klient zalega z płatnością)', 'ak-product-set'), number_format_i18n($balance, 2))
-                : (($balance_status === self::BALANCE_OVERPAID)
-                    ? sprintf(__('BILANS: Nadpłata %s zł (do zwrotu klientowi)', 'ak-product-set'), number_format_i18n($balance, 2))
-                    : __('BILANS: Uregulowane (brak zaległości)', 'ak-product-set'))
+            ($balance_status === self::BALANCE_UNPAID)
+                ? sprintf(__('BILANS: Nieopłacone +%s zł (oczekuje na płatność)', 'ak-product-set'), number_format_i18n($balance, 2))
+                : (($balance_status === self::BALANCE_UNDERPAID)
+                    ? sprintf(__('BILANS: Niedopłata +%s zł (klient zalega z płatnością)', 'ak-product-set'), number_format_i18n($balance, 2))
+                    : (($balance_status === self::BALANCE_OVERPAID)
+                        ? sprintf(__('BILANS: Nadpłata %s zł (do zwrotu klientowi)', 'ak-product-set'), number_format_i18n($balance, 2))
+                        : __('BILANS: Uregulowane (brak zaległości)', 'ak-product-set')))
         );
 
         $order->update_meta_data('_ak_pricing_breakdown', $full_breakdown);
 
         // 12. Generate timestamped audit trail log with Before and After snapshots
         $reason = !empty($options['reason']) ? $options['reason'] : __('Modyfikacja terminów / przeliczenie', 'ak-product-set');
-        $balance_text = ($balance_status === self::BALANCE_UNDERPAID)
-            ? sprintf(__('Niedopłata: +%s zł (klient zalega)', 'ak-product-set'), number_format_i18n($balance, 2))
-            : (($balance_status === self::BALANCE_OVERPAID)
-                ? sprintf(__('Nadpłata: %s zł (do zwrotu)', 'ak-product-set'), number_format_i18n($balance, 2))
-                : __('Uregulowane', 'ak-product-set'));
+        $balance_text = ($balance_status === self::BALANCE_UNPAID)
+            ? sprintf(__('Nieopłacone: %s zł (oczekuje na płatność)', 'ak-product-set'), number_format_i18n($balance, 2))
+            : (($balance_status === self::BALANCE_UNDERPAID)
+                ? sprintf(__('Niedopłata: +%s zł (klient zalega)', 'ak-product-set'), number_format_i18n($balance, 2))
+                : (($balance_status === self::BALANCE_OVERPAID)
+                    ? sprintf(__('Nadpłata: %s zł (do zwrotu)', 'ak-product-set'), number_format_i18n($balance, 2))
+                    : __('Uregulowane', 'ak-product-set')));
 
         $after_snapshot = self::get_order_state_snapshot($order);
         $log_entry = sprintf(
@@ -407,6 +449,16 @@ class Order_Recalculator {
         $order->update_meta_data('_ak_total_paid', $current_total);
         $order->update_meta_data('_ak_balance_amount', 0.0);
         $order->update_meta_data('_ak_balance_status', self::BALANCE_SETTLED);
+
+        // Record manual initial payment info if not recorded yet
+        if ($order->get_meta('_ak_initial_payment_recorded') !== 'yes') {
+            $order->update_meta_data('_ak_initial_payment_recorded', 'yes');
+            $order->update_meta_data('_ak_initial_payment_method', __('Płatność uregulowana ręcznie przez administratora', 'ak-product-set'));
+            $order->update_meta_data('_ak_initial_payment_method_id', 'manual_admin');
+            $order->update_meta_data('_ak_initial_payment_amount', $current_total);
+            $order->update_meta_data('_ak_initial_payment_date', current_time('Y-m-d H:i'));
+            $order->update_meta_data('_ak_initial_payment_txn_id', '');
+        }
 
         // Update pricing breakdown text to reflect settled state
         $breakdown = (string) $order->get_meta('_ak_pricing_breakdown');
@@ -501,9 +553,56 @@ class Order_Recalculator {
             }
         }
         $order->update_meta_data('_ak_original_total', $total);
-        $order->update_meta_data('_ak_total_paid', $total);
-        $order->update_meta_data('_ak_balance_amount', 0.0);
-        $order->update_meta_data('_ak_balance_status', self::BALANCE_SETTLED);
+
+        $is_paid = self::is_order_paid($order);
+
+        if ($is_paid || $total <= 0.009) {
+            $order->update_meta_data('_ak_total_paid', $total);
+            $order->update_meta_data('_ak_balance_amount', 0.0);
+            $order->update_meta_data('_ak_balance_status', self::BALANCE_SETTLED);
+
+            $method_title = '';
+            try {
+                if (is_callable([$order, 'get_payment_method_title'])) {
+                    $method_title = (string) $order->get_payment_method_title();
+                }
+            } catch (\Throwable $e) {}
+
+            $method_id = '';
+            try {
+                if (is_callable([$order, 'get_payment_method'])) {
+                    $method_id = (string) $order->get_payment_method();
+                }
+            } catch (\Throwable $e) {}
+
+            $date_paid = '';
+            try {
+                if (is_callable([$order, 'get_date_paid']) && $order->get_date_paid()) {
+                    $date_paid = $order->get_date_paid()->date('Y-m-d H:i');
+                }
+            } catch (\Throwable $e) {}
+            if (!$date_paid) {
+                $date_paid = current_time('Y-m-d H:i');
+            }
+
+            $txn_id = '';
+            try {
+                if (is_callable([$order, 'get_transaction_id'])) {
+                    $txn_id = (string) $order->get_transaction_id();
+                }
+            } catch (\Throwable $e) {}
+
+            $order->update_meta_data('_ak_initial_payment_recorded', 'yes');
+            $order->update_meta_data('_ak_initial_payment_method', $method_title ?: ($method_id ?: __('Bramka płatności', 'ak-product-set')));
+            $order->update_meta_data('_ak_initial_payment_method_id', $method_id);
+            $order->update_meta_data('_ak_initial_payment_amount', $total);
+            $order->update_meta_data('_ak_initial_payment_date', $date_paid);
+            $order->update_meta_data('_ak_initial_payment_txn_id', $txn_id);
+        } else {
+            $order->update_meta_data('_ak_total_paid', 0.0);
+            $order->update_meta_data('_ak_balance_amount', $total);
+            $order->update_meta_data('_ak_balance_status', self::BALANCE_UNPAID);
+        }
 
         $breakdown_sections = [];
         $cohort_index = 1;
@@ -595,14 +694,18 @@ class Order_Recalculator {
         }
 
         $date_formatted = $date_created ? $date_created->date('Y-m-d H:i') : current_time('Y-m-d H:i');
+        $is_order_settled = ($order->get_meta('_ak_balance_status') === self::BALANCE_SETTLED);
         $full_breakdown = sprintf(
-            "==================================================\n%s\nData zamówienia: %s (zamówienie #%d)\n--------------------------------------------------\n%s\n--------------------------------------------------\nŁączna kwota zamówienia: %s zł\nWpłacono: %s zł\nBILANS: Uregulowane (brak zaległości)\n==================================================",
+            "==================================================\n%s\nData zamówienia: %s (zamówienie #%d)\n--------------------------------------------------\n%s\n--------------------------------------------------\nŁączna kwota zamówienia: %s zł\nWpłacono: %s zł\nBILANS: %s\n==================================================",
             __('SZCZEGÓŁOWA KALKULACJA CENY (NOWE ZAMÓWIENIE):', 'ak-product-set'),
             $date_formatted,
             $order->get_id(),
             !empty($breakdown_sections) ? implode("\n--------------------------------------------------\n", $breakdown_sections) : __('Standardowy pakiet z koszyka', 'ak-product-set'),
             number_format_i18n($total, 2),
-            number_format_i18n($total, 2)
+            number_format_i18n($is_order_settled ? $total : 0.0, 2),
+            $is_order_settled
+                ? __('Uregulowane (brak zaległości)', 'ak-product-set')
+                : __('Nieopłacone (oczekuje na płatność)', 'ak-product-set')
         );
 
         $order->update_meta_data('_ak_pricing_breakdown', $full_breakdown);

@@ -78,6 +78,22 @@ class Roster_Template_Test extends TestCase {
                 'tshirt_size'    => 'S',
                 'tshirt_cut'     => 'women',
             ],
+            [
+                'participant_id' => 'uuid-3',
+                'order_item_id'  => 3,
+                'order_id'       => 203,
+                'order_status'   => 'pending',
+                'balance_status' => 'unpaid',
+                'balance_amount' => 750.0,
+                'date_paid'      => '',
+                'payment_method' => 'Przelewy24',
+                'set_name'       => 'Pakiet 3',
+                'name'           => 'Piotr Zieliński',
+                'email'          => 'piotr@example.com',
+                'phone'          => '555666777',
+                'tshirt_size'    => 'L',
+                'tshirt_cut'     => 'men',
+            ],
         ];
 
         $template_path = dirname(dirname(__DIR__)) . '/templates/admin/roster-page.php';
@@ -89,5 +105,6 @@ class Roster_Template_Test extends TestCase {
         $this->assertStringContainsString('Rozliczenie', $output);
         $this->assertStringContainsString('Niedopłata', $output);
         $this->assertStringContainsString('Nadpłata', $output);
+        $this->assertStringContainsString('Nieopłacone', $output);
     }
 }

@@ -265,6 +265,10 @@ $all_csv_url = wp_nonce_url($base_url . '&ak_export=all', Roster_Admin_Page::NON
                                     <span class="ak-status-badge ak-status-on-hold" title="<?php esc_attr_e('Nadpłata do zwrotu klientowi', 'ak-product-set'); ?>">
                                         <?php printf(esc_html__('Nadpłata (%s zł)', 'ak-product-set'), number_format_i18n(abs($bal_amount), 2)); ?>
                                     </span>
+                                <?php elseif ($bal_status === \AK_Set\Order\Order_Recalculator::BALANCE_UNPAID || !$is_paid) : ?>
+                                    <span class="ak-status-badge ak-status-failed" title="<?php esc_attr_e('Zamówienie nieopłacone', 'ak-product-set'); ?>">
+                                        <?php esc_html_e('Nieopłacone', 'ak-product-set'); ?>
+                                    </span>
                                 <?php else : ?>
                                     <span class="ak-status-badge ak-status-completed">
                                         <?php esc_html_e('Rozliczone', 'ak-product-set'); ?>

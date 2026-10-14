@@ -68,6 +68,7 @@ class Order_Recalculator_Test extends TestCase {
         $order->shouldReceive('get_meta')->with('_ak_total_paid')->andReturn('2400.00');
         $order->shouldReceive('get_meta')->with('_ak_balance_history')->andReturn('');
         $order->shouldReceive('get_meta')->with('_ak_pricing_breakdown')->andReturn('');
+        $order->shouldReceive('get_meta')->with('_ak_initial_payment_recorded')->andReturn('');
         $order->shouldReceive('update_meta_data')->andReturnUsing(function($k, $v) use (&$meta) {
             $meta[$k] = $v;
         });
@@ -81,6 +82,8 @@ class Order_Recalculator_Test extends TestCase {
         $this->assertEquals('1', $meta['_ak_manually_settled']);
         $this->assertEquals(0.0, $meta['_ak_balance_amount']);
         $this->assertEquals(Order_Recalculator::BALANCE_SETTLED, $meta['_ak_balance_status']);
+        $this->assertEquals('yes', $meta['_ak_initial_payment_recorded']);
+        $this->assertEquals('manual_admin', $meta['_ak_initial_payment_method_id']);
     }
 
     public function test_mark_unsettled_restores_pre_settled_paid(): void {
@@ -109,15 +112,23 @@ class Order_Recalculator_Test extends TestCase {
         $this->assertEquals(2400.00, $meta['_ak_total_paid']);
     }
 
-    public function test_record_initial_order_state_saves_breakdown_and_balance(): void {
+    public function test_record_initial_order_state_saves_breakdown_and_balance_for_paid_order(): void {
         $meta = [];
         $order = Mockery::mock('WC_Order');
         $order->shouldReceive('get_id')->andReturn(1234);
         $order->shouldReceive('get_total')->andReturn('3600.00');
         $order->shouldReceive('get_date_created')->andReturn(null);
+        $order->shouldReceive('get_date_paid')->andReturn(null);
+        $order->shouldReceive('get_transaction_id')->andReturn('txn_123');
+        $order->shouldReceive('get_payment_method')->andReturn('p24');
+        $order->shouldReceive('get_payment_method_title')->andReturn('Przelewy24');
+        $order->shouldReceive('is_paid')->andReturn(true);
         $order->shouldReceive('get_items')->with('line_item')->andReturn([]);
         $order->shouldReceive('update_meta_data')->andReturnUsing(function($k, $v) use (&$meta) {
             $meta[$k] = $v;
+        });
+        $order->shouldReceive('get_meta')->andReturnUsing(function($k) use (&$meta) {
+            return $meta[$k] ?? null;
         });
         $order->shouldReceive('save')->once();
 
@@ -127,7 +138,38 @@ class Order_Recalculator_Test extends TestCase {
         $this->assertEquals(3600.00, $meta['_ak_total_paid']);
         $this->assertEquals(0.0, $meta['_ak_balance_amount']);
         $this->assertEquals(Order_Recalculator::BALANCE_SETTLED, $meta['_ak_balance_status']);
+        $this->assertEquals('yes', $meta['_ak_initial_payment_recorded']);
+        $this->assertEquals('Przelewy24', $meta['_ak_initial_payment_method']);
+        $this->assertEquals('p24', $meta['_ak_initial_payment_method_id']);
+        $this->assertEquals(3600.00, $meta['_ak_initial_payment_amount']);
+        $this->assertEquals('txn_123', $meta['_ak_initial_payment_txn_id']);
         $this->assertStringContainsString('SZCZEGÓŁOWA KALKULACJA CENY (NOWE ZAMÓWIENIE)', $meta['_ak_pricing_breakdown']);
+    }
+
+    public function test_record_initial_order_state_saves_unpaid_when_order_is_not_paid(): void {
+        $meta = [];
+        $order = Mockery::mock('WC_Order');
+        $order->shouldReceive('get_id')->andReturn(1235);
+        $order->shouldReceive('get_total')->andReturn('3600.00');
+        $order->shouldReceive('get_date_created')->andReturn(null);
+        $order->shouldReceive('is_paid')->andReturn(false);
+        $order->shouldReceive('get_items')->with('line_item')->andReturn([]);
+        $order->shouldReceive('update_meta_data')->andReturnUsing(function($k, $v) use (&$meta) {
+            $meta[$k] = $v;
+        });
+        $order->shouldReceive('get_meta')->andReturnUsing(function($k) use (&$meta) {
+            return $meta[$k] ?? null;
+        });
+        $order->shouldReceive('save')->once();
+
+        Order_Recalculator::record_initial_order_state($order);
+
+        $this->assertEquals(3600.00, $meta['_ak_original_total']);
+        $this->assertEquals(0.0, $meta['_ak_total_paid']);
+        $this->assertEquals(3600.00, $meta['_ak_balance_amount']);
+        $this->assertEquals(Order_Recalculator::BALANCE_UNPAID, $meta['_ak_balance_status']);
+        $this->assertFalse(isset($meta['_ak_initial_payment_recorded']));
+        $this->assertStringContainsString('Nieopłacone (oczekuje na płatność)', $meta['_ak_pricing_breakdown']);
     }
 
     public function test_recalculate_cancels_order_when_zero_participants_remain(): void {

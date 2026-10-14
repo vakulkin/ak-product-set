@@ -239,12 +239,67 @@ class Order_Participant_Manager {
         $total_paid     = $raw_total_paid !== '' && $raw_total_paid !== false ? (float) $raw_total_paid : 0.0;
 
         // Strict normalization:
-        // An order is only settled if balance amount is negligible and not explicitly underpaid
-        if (abs($balance_amount) < 0.01 && $balance_status !== Order_Recalculator::BALANCE_UNDERPAID) {
+        // An order is only settled if balance amount is negligible and not explicitly underpaid or unpaid
+        if ($balance_status === Order_Recalculator::BALANCE_UNPAID) {
+            $balance_amount = abs($balance_amount);
+        } elseif (abs($balance_amount) < 0.01 && $balance_status !== Order_Recalculator::BALANCE_UNDERPAID) {
             $balance_status = Order_Recalculator::BALANCE_SETTLED;
             $balance_amount = 0.0;
         } else {
             $balance_amount = abs($balance_amount);
+        }
+
+        $init_method = (string) $order->get_meta('_ak_initial_payment_method');
+        $init_amount = $order->get_meta('_ak_initial_payment_amount');
+        $init_date   = (string) $order->get_meta('_ak_initial_payment_date');
+        $init_txn    = (string) $order->get_meta('_ak_initial_payment_txn_id');
+        $init_recorded = $order->get_meta('_ak_initial_payment_recorded') === 'yes';
+
+        // Fallback for orders that were paid before tracker metadata was recorded
+        if (!$init_recorded && ($total_paid > 0.009 || Order_Recalculator::is_order_paid($order))) {
+            $init_method = '';
+            try {
+                if (is_callable([$order, 'get_payment_method_title'])) {
+                    $init_method = (string) $order->get_payment_method_title();
+                }
+            } catch (\Throwable $e) {}
+            if (!$init_method) {
+                try {
+                    if (is_callable([$order, 'get_payment_method'])) {
+                        $init_method = (string) $order->get_payment_method();
+                    }
+                } catch (\Throwable $e) {}
+            }
+            if (!$init_method) {
+                $init_method = __('Bramka płatności', 'ak-product-set');
+            }
+            $init_amount = $total_paid > 0.009 ? $total_paid : (float) $order->get_total();
+            if (method_exists($order, 'get_date_paid') && $order->get_date_paid()) {
+                $init_date = $order->get_date_paid()->date('Y-m-d H:i');
+            } elseif ($order->get_date_created()) {
+                $init_date = $order->get_date_created()->date('Y-m-d H:i');
+            }
+            $init_txn = '';
+            try {
+                if (is_callable([$order, 'get_transaction_id'])) {
+                    $init_txn = (string) $order->get_transaction_id();
+                }
+            } catch (\Throwable $e) {}
+            $init_recorded = true;
+        }
+
+        $initial_payment_subtitle = '';
+        if ($init_recorded && $init_method !== '') {
+            $formatted_amt = number_format_i18n((float) $init_amount, 2);
+            $initial_payment_subtitle = sprintf(
+                __('Płatność początkowa: %s, kwota: %s zł (%s)', 'ak-product-set'),
+                $init_method,
+                $formatted_amt,
+                $init_date ?: '—'
+            );
+            if ($init_txn !== '') {
+                $initial_payment_subtitle .= ' • ' . sprintf(__('ID: %s', 'ak-product-set'), $init_txn);
+            }
         }
 
         $breakdown        = (string) $order->get_meta('_ak_pricing_breakdown');
@@ -265,6 +320,8 @@ class Order_Participant_Manager {
                 .ak-tag-settled   { background: #edfaed; color: #236324; border: 1px solid #b8e2b9; }
                 .ak-tag-underpaid { background: #fdf2f2; color: #9b1c1c; border: 1px solid #f8b4b4; }
                 .ak-tag-overpaid  { background: #fef8eb; color: #8e5805; border: 1px solid #fce3a4; }
+                .ak-tag-unpaid    { background: #fdf2f2; color: #9b1c1c; border: 1px solid #f8b4b4; }
+                .ak-om-subtitle   { font-size: 11px; color: #646970; margin-top: 5px; font-weight: 400; line-height: 1.35; }
 
                 .ak-om-metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
                 .ak-om-metric-card { background: #f8f9fa; border: 1px solid #dcdcde; border-radius: 4px; padding: 10px 14px; display: flex; flex-direction: column; justify-content: space-between; }
@@ -334,19 +391,51 @@ class Order_Participant_Manager {
 
                         <div class="ak-om-metric-card" style="justify-content: center;">
                             <div class="ak-om-metric-label"><?php esc_html_e('Stan rozliczenia', 'ak-product-set'); ?></div>
-                            <div class="ak-om-metric-value">
-                                <?php if ($balance_status === Order_Recalculator::BALANCE_UNDERPAID && $balance_amount >= 0.01) : ?>
+                            <div class="ak-om-metric-value" style="display: block;">
+                                <?php if ($balance_status === Order_Recalculator::BALANCE_UNPAID) : ?>
+                                    <span class="ak-om-tag ak-tag-unpaid">
+                                        <?php esc_html_e('Nieopłacone (oczekuje na płatność)', 'ak-product-set'); ?>
+                                    </span>
+                                    <div class="ak-om-subtitle">
+                                        <?php
+                                        $method_name = '';
+                                        try {
+                                            if (is_callable([$order, 'get_payment_method_title'])) {
+                                                $method_name = (string) $order->get_payment_method_title();
+                                            }
+                                        } catch (\Throwable $e) {}
+                                        if (!$method_name) {
+                                            try {
+                                                if (is_callable([$order, 'get_payment_method'])) {
+                                                    $method_name = (string) $order->get_payment_method();
+                                                }
+                                            } catch (\Throwable $e) {}
+                                        }
+                                        $method_display = $method_name ?: __('Bramka płatności', 'ak-product-set');
+                                        printf(esc_html__('Wybrana metoda: %s (brak potwierdzenia wpłaty z bramki)', 'ak-product-set'), esc_html($method_display));
+                                        ?>
+                                    </div>
+                                <?php elseif ($balance_status === Order_Recalculator::BALANCE_UNDERPAID && $balance_amount >= 0.01) : ?>
                                     <span class="ak-om-tag ak-tag-underpaid">
                                         <?php printf(esc_html__('Niedopłata: +%s zł (klient zalega)', 'ak-product-set'), number_format_i18n($balance_amount, 2)); ?>
                                     </span>
+                                    <?php if ($initial_payment_subtitle) : ?>
+                                        <div class="ak-om-subtitle"><?php echo esc_html($initial_payment_subtitle); ?></div>
+                                    <?php endif; ?>
                                 <?php elseif ($balance_status === Order_Recalculator::BALANCE_OVERPAID && $balance_amount >= 0.01) : ?>
                                     <span class="ak-om-tag ak-tag-overpaid">
                                         <?php printf(esc_html__('Nadpłata: %s zł (do zwrotu)', 'ak-product-set'), number_format_i18n($balance_amount, 2)); ?>
                                     </span>
+                                    <?php if ($initial_payment_subtitle) : ?>
+                                        <div class="ak-om-subtitle"><?php echo esc_html($initial_payment_subtitle); ?></div>
+                                    <?php endif; ?>
                                 <?php else : ?>
                                     <span class="ak-om-tag ak-tag-settled">
                                         <?php esc_html_e('Rozliczone (brak zaległości)', 'ak-product-set'); ?>
                                     </span>
+                                    <?php if ($initial_payment_subtitle) : ?>
+                                        <div class="ak-om-subtitle"><?php echo esc_html($initial_payment_subtitle); ?></div>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         </div>
