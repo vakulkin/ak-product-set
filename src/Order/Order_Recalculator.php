@@ -505,8 +505,8 @@ class Order_Recalculator {
             $records = $raw;
         }
 
-        // Backfill from legacy participants metadata if empty but slots have retained count
-        if (empty($records)) {
+        // Backfill from legacy participants metadata only if meta key is uninitialized
+        if (empty($records) && ($raw === '' || $raw === false || $raw === null)) {
             $participants = $item->get_meta('_ak_participants');
             if (is_array($participants)) {
                 $unit_cost = self::get_tshirt_cost();

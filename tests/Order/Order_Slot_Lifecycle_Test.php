@@ -593,5 +593,118 @@ class Order_Slot_Lifecycle_Test extends TestCase {
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('anulowanego uczestnika', $result['error']);
     }
+
+    public function test_delete_produced_tshirt_allowed_when_order_is_cancelled(): void {
+        $meta_store = [];
+        $line_item = Mockery::mock('WC_Order_Item_Product');
+        $line_item->shouldIgnoreMissing();
+        $line_item->shouldReceive('get_id')->andReturn(101);
+        $line_item->shouldReceive('get_meta')->andReturnUsing(function($k) use (&$meta_store) {
+            return $meta_store[$k] ?? null;
+        });
+        $line_item->shouldReceive('update_meta_data')->andReturnUsing(function($k, $v) use (&$meta_store) {
+            $meta_store[$k] = $v;
+        });
+
+        $meta_store['_ak_participants'] = [
+            ['id' => 'u1', 'name' => 'Cancelled Guy', 'status' => 'cancelled', 'tshirt_retained_count' => 0],
+        ];
+
+        $t1 = Order_Recalculator::add_item_produced_tshirt($line_item, [
+            'uuid'             => 'tshirt-cancelled-1',
+            'participant_uuid' => 'u1',
+            'participant_name' => 'Cancelled Guy',
+            'cost'             => 60.0,
+            'size'             => 'XL',
+            'cut'              => 'men',
+        ]);
+
+        $order = Mockery::mock('WC_Order');
+        $order->shouldIgnoreMissing();
+        $order->shouldReceive('get_id')->andReturn(999);
+        $order->shouldReceive('get_status')->andReturn('cancelled');
+        $order->shouldReceive('get_items')->with('line_item')->andReturn([$line_item]);
+        $order->shouldReceive('get_items')->with('fee')->andReturn([]);
+        $order->shouldReceive('get_items')->with('coupon')->andReturn([]);
+        $order->shouldReceive('get_meta')->with('_ak_total_paid')->andReturn('60.00');
+        $order->shouldReceive('get_meta')->with('_ak_original_total')->andReturn('600.00');
+        $order->shouldReceive('get_meta')->with('_ak_original_headcount')->andReturn(1);
+        $order->shouldReceive('get_meta')->with('_ak_balance_history')->andReturn('');
+        $order->shouldReceive('get_total')->andReturn(60.0);
+        $order->shouldReceive('get_date_created')->andReturn(null);
+
+        $result = Order_Participant_Slot_Manager::delete_produced_tshirt($order, 'tshirt-cancelled-1', 101);
+        $this->assertTrue($result['success']);
+        $this->assertEmpty(Order_Recalculator::get_item_produced_tshirts($line_item));
+        $this->assertEquals(0, $meta_store['_ak_participants'][0]['tshirt_retained_count']);
+    }
+
+    public function test_restore_transferred_weekend_restores_status_and_cleans_transferred_meta(): void {
+        $item_meta = [
+            '_ak_participants' => [
+                [
+                    'id'                   => 'uuid-transferred-1',
+                    'name'                 => 'Piotr Transfer',
+                    'status'               => 'transferred',
+                    'transferred_to_order' => 202,
+                    'transferred_at'       => '2026-10-14 11:00:00',
+                ],
+            ],
+            '_ak_parent_set_id' => 10,
+        ];
+
+        $item = Mockery::mock('WC_Order_Item_Product');
+        $item->shouldIgnoreMissing();
+        $item->shouldReceive('get_id')->andReturn(101);
+        $item->shouldReceive('get_product_id')->andReturn(501);
+        $item->shouldReceive('get_name')->andReturn('Weekend 501');
+        $item->shouldReceive('get_meta')->with('_ak_participants')->andReturnUsing(function() use (&$item_meta) {
+            return $item_meta['_ak_participants'];
+        });
+        $item->shouldReceive('get_meta')->with('_ak_parent_set_id')->andReturnUsing(function() use (&$item_meta) {
+            return $item_meta['_ak_parent_set_id'];
+        });
+        $item->shouldReceive('update_meta_data')->andReturnUsing(function($k, $v) use (&$item_meta) {
+            $item_meta[$k] = $v;
+        });
+
+        $order_status = 'cancelled';
+        $order_meta = [
+            '_ak_transferred_to_orders' => [202],
+            '_ak_transferred_to_order'  => 202,
+        ];
+
+        $order = Mockery::mock('WC_Order');
+        $order->shouldIgnoreMissing();
+        $order->shouldReceive('get_id')->andReturn(889);
+        $order->shouldReceive('get_items')->with('line_item')->andReturn([$item]);
+        $order->shouldReceive('get_status')->andReturnUsing(function() use (&$order_status) {
+            return $order_status;
+        });
+        $order->shouldReceive('update_status')->andReturnUsing(function($st) use (&$order_status) {
+            $order_status = $st;
+        });
+        $order->shouldReceive('get_meta')->with('_ak_original_total')->andReturn(1000.0);
+        $order->shouldReceive('get_meta')->with('_ak_total_paid')->andReturn(1000.0);
+        $order->shouldReceive('get_meta')->with('_ak_original_headcount')->andReturn(1);
+        $order->shouldReceive('get_meta')->with('_ak_balance_history')->andReturn('');
+        $order->shouldReceive('get_total')->andReturn(0.0);
+        $order->shouldReceive('get_date_created')->andReturn(null);
+        $order->shouldReceive('update_meta_data')->andReturnUsing(function($k, $v) use (&$order_meta) {
+            $order_meta[$k] = $v;
+        });
+
+        $result = Order_Participant_Slot_Manager::restore_weekend_for_participant($order, 'uuid-transferred-1', 501);
+        $this->assertTrue($result['success']);
+        $this->assertEquals('Piotr Transfer', $result['participant_name']);
+
+        $slot = $item_meta['_ak_participants'][0];
+        $this->assertEquals('active', $slot['status']);
+        $this->assertArrayNotHasKey('transferred_to_order', $slot);
+        $this->assertArrayNotHasKey('transferred_at', $slot);
+
+        $this->assertEquals([], $order_meta['_ak_transferred_to_orders']);
+        $this->assertEquals(0, $order_meta['_ak_transferred_to_order']);
+    }
 }
 

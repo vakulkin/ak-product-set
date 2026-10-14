@@ -166,6 +166,25 @@ class Order_Participant_Slot_Manager {
                             wc_update_product_stock($weekend_id, 1, 'decrease');
                         } catch (\Throwable $e) {}
                     }
+
+                    // Keep transferred-to-orders tracking metadata in sync
+                    $remaining_transferred = [];
+                    foreach ($order->get_items('line_item') as $li) {
+                        if (!($li instanceof \WC_Order_Item_Product)) {
+                            continue;
+                        }
+                        $p_data = $li->get_meta('_ak_participants');
+                        if (is_array($p_data)) {
+                            foreach ($p_data as $p_entry) {
+                                if (($p_entry['status'] ?? '') === 'transferred' && !empty($p_entry['transferred_to_order'])) {
+                                    $remaining_transferred[] = (int) $p_entry['transferred_to_order'];
+                                }
+                            }
+                        }
+                    }
+                    $remaining_transferred = array_values(array_unique(array_filter($remaining_transferred)));
+                    $order->update_meta_data('_ak_transferred_to_orders', $remaining_transferred);
+                    $order->update_meta_data('_ak_transferred_to_order', !empty($remaining_transferred) ? end($remaining_transferred) : 0);
                 }
             }
         }
@@ -276,15 +295,6 @@ class Order_Participant_Slot_Manager {
      * Delete a specific manufactured t-shirt by its UUID and recalculate the order.
      */
     public static function delete_produced_tshirt(\WC_Order $order, string $tshirt_uuid, ?int $item_id = null): array {
-        try {
-            if (is_callable([$order, 'get_status']) && $order->get_status() === 'cancelled') {
-                return [
-                    'success' => false,
-                    'error'   => __('Nie można modyfikować koszulek w anulowanym zamówieniu.', 'ak-product-set'),
-                ];
-            }
-        } catch (\Throwable $e) {}
-
         $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
         $deleted_record = null;
         $items = $order->get_items('line_item');
