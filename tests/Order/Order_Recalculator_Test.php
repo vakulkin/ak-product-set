@@ -80,6 +80,7 @@ class Order_Recalculator_Test extends TestCase {
         $this->assertEquals(4800.00, $meta['_ak_total_paid']);
         $this->assertEquals(2400.00, $meta['_ak_pre_settled_total_paid']);
         $this->assertEquals('1', $meta['_ak_manually_settled']);
+        $this->assertEquals(4800.00, $meta['_ak_manually_settled_total']);
         $this->assertEquals(0.0, $meta['_ak_balance_amount']);
         $this->assertEquals(Order_Recalculator::BALANCE_SETTLED, $meta['_ak_balance_status']);
         $this->assertEquals('yes', $meta['_ak_initial_payment_recorded']);
@@ -102,6 +103,7 @@ class Order_Recalculator_Test extends TestCase {
             $meta[$k] = $v;
         });
         $order->shouldReceive('delete_meta_data')->with('_ak_manually_settled')->once();
+        $order->shouldReceive('delete_meta_data')->with('_ak_manually_settled_total')->once();
         $order->shouldReceive('delete_meta_data')->with('_ak_pre_settled_total_paid')->once();
         $order->shouldReceive('update_status')->once();
         $order->shouldReceive('add_order_note')->once();
@@ -390,6 +392,52 @@ class Order_Recalculator_Test extends TestCase {
         $this->assertMatchesRegularExpression('/Pakiet 1:.*Liczba weekendów: 2/s', $breakdown);
         // Pakiet 2 should have 1 weekend and Charlie
         $this->assertMatchesRegularExpression('/Pakiet 2:.*Liczba weekendów: 1/s', $breakdown);
+    }
+
+    public function test_recalculate_expires_manual_settlement_when_order_total_changes(): void {
+        $meta = [
+            '_ak_manually_settled'       => '1',
+            '_ak_manually_settled_total' => '750.00',
+            '_ak_pre_settled_total_paid' => '750.00',
+        ];
+        $order = Mockery::mock('WC_Order');
+        $order->shouldReceive('get_id')->andReturn(888);
+        $order->shouldReceive('get_status')->andReturn('completed');
+        $order->shouldReceive('get_date_created')->andReturn(null);
+        $order->shouldReceive('get_meta')->with('_ak_total_paid')->andReturn('750.00');
+        $order->shouldReceive('get_meta')->with('_ak_original_total')->andReturn('750.00');
+        $order->shouldReceive('get_meta')->with('_ak_original_headcount')->andReturn(1);
+        $order->shouldReceive('get_meta')->with('_ak_balance_history')->andReturn('');
+        $order->shouldReceive('get_meta')->with('_ak_manually_settled')->andReturn('1');
+        $order->shouldReceive('get_meta')->with('_ak_manually_settled_total')->andReturn('750.00');
+        $order->shouldReceive('get_meta')->with('_ak_pre_settled_total_paid')->andReturn('750.00');
+
+        $item = Mockery::mock('WC_Order_Item_Product');
+        $item->shouldReceive('get_id')->andReturn(99);
+        $item->shouldReceive('get_product_id')->andReturn(101);
+        $item->shouldReceive('get_name')->andReturn('Weekend 1');
+        $item->shouldReceive('get_meta')->with('_ak_parent_set_id')->andReturn(10);
+        $item->shouldReceive('get_meta')->with('_ak_participants')->andReturn([]); // 0 participants -> total becomes 0
+
+        $order->shouldReceive('get_items')->with('line_item')->andReturn([$item]);
+        $order->shouldReceive('remove_item')->with(99)->once();
+        $order->shouldReceive('update_status')->with('cancelled', Mockery::any())->once();
+        $order->shouldReceive('update_meta_data')->andReturnUsing(function($k, $v) use (&$meta) {
+            $meta[$k] = $v;
+        });
+        $order->shouldReceive('delete_meta_data')->andReturnUsing(function($k) use (&$meta) {
+            unset($meta[$k]);
+        });
+        $order->shouldReceive('add_order_note')->once();
+        $order->shouldReceive('save')->once();
+
+        $result = Order_Recalculator::recalculate($order, ['reason' => 'Anulowano uczestnika']);
+
+        // Manual settlement must expire because total changed from 750 to 0 (overpayment)
+        $this->assertArrayNotHasKey('_ak_manually_settled', $meta);
+        $this->assertArrayNotHasKey('_ak_manually_settled_total', $meta);
+        $this->assertEquals(Order_Recalculator::BALANCE_OVERPAID, $result['status']);
+        $this->assertEquals(-750.00, $result['balance_amount']);
     }
 }
 

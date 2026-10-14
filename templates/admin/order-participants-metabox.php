@@ -100,12 +100,7 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
 
             <div class="ak-om-metrics-grid">
                 <div class="ak-om-metric-card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                        <div class="ak-om-metric-label"><?php esc_html_e('Wpłacono', 'ak-product-set'); ?></div>
-                        <button type="button" class="button button-small ak-om-edit-total-paid-btn" style="font-size: 11px; padding: 0 6px; height: 20px; line-height: 18px;" data-gateway-paid="<?php echo esc_attr(number_format($gateway_paid ?? $total_paid, 2, '.', '')); ?>" data-additional-paid="<?php echo esc_attr(number_format($additional_paid ?? 0.0, 2, '.', '')); ?>" data-current-paid="<?php echo esc_attr(number_format($total_paid, 2, '.', '')); ?>" title="<?php esc_attr_e('Ręczna zmiana wpłaconej kwoty', 'ak-product-set'); ?>">
-                            <?php esc_html_e('Zmień', 'ak-product-set'); ?>
-                        </button>
-                    </div>
+                    <div class="ak-om-metric-label"><?php esc_html_e('Wpłacono', 'ak-product-set'); ?></div>
                     <div class="ak-om-metric-value"><?php echo esc_html(number_format_i18n($total_paid, 2)); ?> zł</div>
                     <?php if (($gateway_paid ?? 0.0) > 0.009 || !empty($init_method)) : ?>
                         <div class="ak-om-subtitle" style="margin-top: 4px; line-height: 1.4;">
@@ -359,22 +354,25 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
                                         <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 3px;">
                                             <?php foreach ($produced_tshirts as $produced) :
                                                 $prod_cut_label = Helper::get_tshirt_cut_label($produced['cut'] ?? '');
-                                                $prod_desc = ($produced['size'] ?: '—') . ($prod_cut_label ? ' [' . $prod_cut_label . ']' : '');
+                                                $prod_size = $produced['size'] ?: '—';
+                                                $prod_type_desc = $prod_size . ($prod_cut_label ? ' [' . $prod_cut_label . ']' : '');
                                                 $prod_cost = isset($produced['cost']) ? (float) $produced['cost'] : $tshirt_cost;
+                                                $person_name = !empty($produced['participant_name']) ? $produced['participant_name'] : (!empty($slot['name']) ? $slot['name'] : __('Uczestnik', 'ak-product-set'));
                                             ?>
-                                                <div class="ak-om-produced-badge" style="display: inline-flex; align-items: center; justify-content: space-between; gap: 6px; background: #fff8e5; color: #856404; border: 1px solid #ffeeba; border-radius: 3px; padding: 2px 6px; font-size: 11px;">
-                                                    <span>
-                                                        <?php esc_html_e('Wyprodukowana:', 'ak-product-set'); ?>
-                                                        <strong><?php echo esc_html($prod_desc); ?></strong>
-                                                        (+<?php echo esc_html(number_format_i18n($prod_cost, 0)); ?> zł)
-                                                    </span>
+                                                <div class="ak-om-produced-badge" style="display: inline-flex; align-items: center; justify-content: space-between; gap: 6px; background: #fff8e5; color: #856404; border: 1px solid #ffeeba; border-radius: 3px; padding: 3px 6px; font-size: 10px; line-height: 1.25;">
+                                                    <div style="display: flex; flex-direction: column; text-align: left;">
+                                                        <span style="font-weight: 600; color: #553c02;"><?php echo esc_html($person_name); ?></span>
+                                                        <span style="color: #6d5203;">
+                                                            <?php echo esc_html($prod_type_desc); ?> (+<?php echo esc_html(number_format_i18n($prod_cost, 0)); ?> zł)
+                                                        </span>
+                                                    </div>
                                                     <button type="button" class="ak-om-delete-produced-tshirt-btn"
                                                         data-uuid="<?php echo esc_attr($produced['uuid']); ?>"
                                                         data-item-id="<?php echo esc_attr($slot['item_id'] ?? 0); ?>"
                                                         data-order-id="<?php echo esc_attr($order->get_id()); ?>"
                                                         data-cost="<?php echo esc_attr($prod_cost); ?>"
-                                                        data-desc="<?php echo esc_attr($prod_desc); ?>"
-                                                        style="background: none; border: none; cursor: pointer; color: #b32d2e; font-weight: bold; font-size: 14px; line-height: 1; padding: 0 3px;"
+                                                        data-desc="<?php echo esc_attr($prod_type_desc); ?>"
+                                                        style="background: none; border: none; cursor: pointer; color: #b32d2e; font-weight: bold; font-size: 13px; line-height: 1; padding: 0 2px;"
                                                         title="<?php esc_attr_e('Anuluj opłatę za tę wyprodukowaną koszulkę', 'ak-product-set'); ?>">
                                                         &times;
                                                     </button>
@@ -403,31 +401,6 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
                                             title="<?php esc_attr_e('Przywróć ten termin do aktywnych', 'ak-product-set'); ?>">
                                             <?php esc_html_e('Przywróć termin', 'ak-product-set'); ?>
                                         </button>
-
-                                        <?php if (!empty($produced_tshirts)) : ?>
-                                            <?php foreach ($produced_tshirts as $produced) :
-                                                $prod_cost = isset($produced['cost']) ? (float) $produced['cost'] : $tshirt_cost;
-                                                $prod_cut_label = Helper::get_tshirt_cut_label($produced['cut'] ?? '');
-                                                $prod_desc = ($produced['size'] ?: '—') . ($prod_cut_label ? ' [' . $prod_cut_label . ']' : '');
-                                            ?>
-                                                <button type="button" class="button button-small button-link-delete ak-om-delete-produced-tshirt-btn"
-                                                    data-uuid="<?php echo esc_attr($produced['uuid']); ?>"
-                                                    data-item-id="<?php echo esc_attr($slot['item_id'] ?? 0); ?>"
-                                                    data-order-id="<?php echo esc_attr($order->get_id()); ?>"
-                                                    data-cost="<?php echo esc_attr($prod_cost); ?>"
-                                                    data-desc="<?php echo esc_attr($prod_desc); ?>"
-                                                    title="<?php esc_attr_e('Anuluj opłatę za tę wyprodukowaną koszulkę', 'ak-product-set'); ?>">
-                                                    <?php printf(esc_html__('Anuluj opłatę za koszulkę (-%s zł)', 'ak-product-set'), number_format_i18n($prod_cost, 0)); ?>
-                                                </button>
-                                            <?php endforeach; ?>
-                                        <?php elseif (!empty($slot['tshirt_retained_count'])) : ?>
-                                            <button type="button" class="button button-small button-link-delete ak-om-revert-fee-btn"
-                                                data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
-                                                data-wid="<?php echo esc_attr($slot['weekend_id']); ?>"
-                                                title="<?php esc_attr_e('Anuluj opłatę za koszulkę', 'ak-product-set'); ?>">
-                                                <?php printf(esc_html__('Anuluj opłatę za koszulkę (-%s zł)', 'ak-product-set'), number_format_i18n($tshirt_cost, 0)); ?>
-                                            </button>
-                                        <?php endif; ?>
                                     <?php elseif (!$is_order_cancelled) : ?>
                                         <button type="button" class="button button-small ak-om-reschedule-btn"
                                             data-uuid="<?php echo esc_attr($slot['uuid']); ?>"
@@ -467,21 +440,25 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
                     <span style="font-weight: 600; color: #856404; font-size: 12px;"><?php esc_html_e('Inne naliczone koszulki:', 'ak-product-set'); ?></span>
                     <?php foreach ($unassigned_produced_tshirts as $produced) :
                         $prod_cut_label = Helper::get_tshirt_cut_label($produced['cut'] ?? '');
-                        $prod_desc = ($produced['size'] ?: '—') . ($prod_cut_label ? ' [' . $prod_cut_label . ']' : '');
+                        $prod_size = $produced['size'] ?: '—';
+                        $prod_type_desc = $prod_size . ($prod_cut_label ? ' [' . $prod_cut_label . ']' : '');
                         $prod_cost = isset($produced['cost']) ? (float) $produced['cost'] : $tshirt_cost;
+                        $person_name = !empty($produced['participant_name']) ? $produced['participant_name'] : __('Uczestnik', 'ak-product-set');
                     ?>
-                        <div class="ak-om-produced-badge" style="display: inline-flex; align-items: center; gap: 6px; background: #fff; color: #856404; border: 1px solid #ffeeba; border-radius: 3px; padding: 2px 6px; font-size: 11px;">
-                            <span>
-                                <strong><?php echo esc_html($prod_desc); ?></strong>
-                                (+<?php echo esc_html(number_format_i18n($prod_cost, 0)); ?> zł)
-                            </span>
+                        <div class="ak-om-produced-badge" style="display: inline-flex; align-items: center; gap: 6px; background: #fff; color: #856404; border: 1px solid #ffeeba; border-radius: 3px; padding: 3px 6px; font-size: 10px; line-height: 1.25;">
+                            <div style="display: flex; flex-direction: column; text-align: left;">
+                                <span style="font-weight: 600; color: #553c02;"><?php echo esc_html($person_name); ?></span>
+                                <span style="color: #6d5203;">
+                                    <?php echo esc_html($prod_type_desc); ?> (+<?php echo esc_html(number_format_i18n($prod_cost, 0)); ?> zł)
+                                </span>
+                            </div>
                             <button type="button" class="ak-om-delete-produced-tshirt-btn"
                                 data-uuid="<?php echo esc_attr($produced['uuid']); ?>"
                                 data-item-id="<?php echo esc_attr($produced['item_id'] ?? 0); ?>"
                                 data-order-id="<?php echo esc_attr($order->get_id()); ?>"
                                 data-cost="<?php echo esc_attr($prod_cost); ?>"
-                                data-desc="<?php echo esc_attr($prod_desc); ?>"
-                                style="background: none; border: none; cursor: pointer; color: #b32d2e; font-weight: bold; font-size: 14px; line-height: 1; padding: 0 3px;"
+                                data-desc="<?php echo esc_attr($prod_type_desc); ?>"
+                                style="background: none; border: none; cursor: pointer; color: #b32d2e; font-weight: bold; font-size: 13px; line-height: 1; padding: 0 2px;"
                                 title="<?php esc_attr_e('Anuluj opłatę za tę wyprodukowaną koszulkę', 'ak-product-set'); ?>">
                                 &times;
                             </button>
@@ -1072,70 +1049,6 @@ jQuery(document).ready(function($) {
         }).fail(function() {
             alert('<?php echo esc_js(__('Błąd połączenia z serwerem.', 'ak-product-set')); ?>');
             btn.prop('disabled', false).css('opacity', 1);
-        });
-    });
-
-    // 8b. Revert general t-shirt fee on slot
-    $(document).on('click', '.ak-om-revert-fee-btn', function(e) {
-        e.preventDefault();
-        var uuid = $(this).data('uuid') || '';
-        var wid  = $(this).data('wid') || 0;
-
-        if (!confirm('<?php echo esc_js(__('Czy na pewno chcesz cofnąć opłatę za koszulkę? Kwota zamówienia i saldo zostaną przeliczone.', 'ak-product-set')); ?>')) {
-            return;
-        }
-
-        var btn = $(this).prop('disabled', true);
-        $.post(ajaxurl, {
-            action: 'ak_revert_tshirt_fee',
-            order_id: orderId,
-            uuid: uuid,
-            weekend_id: wid,
-            nonce: nonce
-        }, function(res) {
-            if (res.success) {
-                location.reload();
-            } else {
-                alert(res.data || 'Błąd');
-                btn.prop('disabled', false);
-            }
-        }).fail(function() {
-            alert('<?php echo esc_js(__('Błąd połączenia z serwerem.', 'ak-product-set')); ?>');
-            btn.prop('disabled', false);
-        });
-    });
-
-    // 9. Manual adjust total paid
-    $('.ak-om-edit-total-paid-btn').on('click', function(e) {
-        e.preventDefault();
-        var gatewayPaid = $(this).data('gateway-paid') || '0.00';
-        var currentPaid = $(this).data('current-paid') || gatewayPaid;
-        var promptMsg = '<?php echo esc_js(__('Płatność z bramki (zablokowana kwota bazowa):', 'ak-product-set')); ?> ' + gatewayPaid + ' zł.\n\n<?php echo esc_js(__('Wprowadź łączną wpłaconą kwotę (zł):', 'ak-product-set')); ?>';
-        var newPaid = prompt(promptMsg, currentPaid);
-        if (newPaid === null) return;
-        newPaid = newPaid.replace(',', '.').trim();
-        if (isNaN(parseFloat(newPaid)) || parseFloat(newPaid) < 0) {
-            alert('<?php echo esc_js(__('Nieprawidłowa kwota.', 'ak-product-set')); ?>');
-            return;
-        }
-        var note = prompt('<?php echo esc_js(__('Opcjonalna notatka do historii zmian (np. dopłata po BLIK/Przelewy24 / zwrot):', 'ak-product-set')); ?>', '') || '';
-        var btn = $(this).prop('disabled', true);
-        $.post(ajaxurl, {
-            action: 'ak_update_total_paid',
-            order_id: orderId,
-            total_paid: newPaid,
-            note: note,
-            nonce: nonce
-        }, function(res) {
-            if (res.success) {
-                location.reload();
-            } else {
-                alert(res.data || 'Błąd');
-                btn.prop('disabled', false);
-            }
-        }).fail(function() {
-            alert('Błąd serwera');
-            btn.prop('disabled', false);
         });
     });
 });

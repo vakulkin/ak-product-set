@@ -34,7 +34,6 @@ class Order_Participant_Manager {
         add_action('wp_ajax_ak_mark_balance_settled',          [$this, 'ajax_mark_balance_settled']);
         add_action('wp_ajax_ak_mark_balance_unsettled',        [$this, 'ajax_mark_balance_unsettled']);
         add_action('wp_ajax_ak_update_participant',            [$this, 'ajax_update_participant']);
-        add_action('wp_ajax_ak_update_total_paid',             [$this, 'ajax_update_total_paid']);
     }
 
     /**
@@ -671,73 +670,5 @@ class Order_Participant_Manager {
 
         $result = Order_Recalculator::mark_unsettled($order);
         wp_send_json_success($result);
-    }
-
-    public function ajax_update_total_paid(): void {
-        check_ajax_referer(self::NONCE_ACTION, 'nonce');
-        if (!current_user_can('manage_woocommerce')) {
-            wp_send_json_error(__('Brak uprawnień.', 'ak-product-set'));
-        }
-
-        $order_id = isset($_POST['order_id']) ? (int) $_POST['order_id'] : 0;
-        $order = wc_get_order($order_id);
-        if (!$order) {
-            wp_send_json_error(__('Nie znaleziono zamówienia.', 'ak-product-set'));
-        }
-
-        $new_paid = isset($_POST['total_paid']) ? round((float) $_POST['total_paid'], 2) : 0.0;
-        $note = isset($_POST['note']) ? sanitize_text_field($_POST['note']) : '';
-
-        $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
-
-        $gateway_paid = (float) $order->get_meta('_ak_initial_payment_amount');
-        $orig_total   = (float) $order->get_meta('_ak_original_total');
-        if ($orig_total > 0.009 && ($order->get_meta('_ak_initial_payment_recorded') === 'yes' || Order_Recalculator::is_order_paid($order))) {
-            if ($gateway_paid <= 0.009 || abs($gateway_paid - $orig_total) > 0.009) {
-                $gateway_paid = $orig_total;
-                $order->update_meta_data('_ak_initial_payment_amount', $orig_total);
-            }
-        }
-
-        $order->update_meta_data('_ak_total_paid', $new_paid);
-
-        if ($new_paid <= 0.009) {
-            $order->update_meta_data('_ak_initial_payment_recorded', 'no');
-            $order->delete_meta_data('_ak_initial_payment_amount');
-            $order->delete_meta_data('_ak_initial_payment_method');
-            $order->delete_meta_data('_ak_initial_payment_method_id');
-            $order->delete_meta_data('_ak_initial_payment_date');
-            $order->delete_meta_data('_ak_initial_payment_txn_id');
-            $order->delete_meta_data('_ak_manually_settled');
-            $order->update_meta_data('_ak_additional_paid', 0.0);
-            $order->update_meta_data('_ak_balance_status', Order_Recalculator::BALANCE_UNPAID);
-        } else {
-            if ($gateway_paid > 0.009) {
-                // Lock gateway_paid intact! Track any difference as additional paid
-                $additional = round($new_paid - $gateway_paid, 2);
-                $order->update_meta_data('_ak_additional_paid', $additional);
-            } else {
-                $order->update_meta_data('_ak_additional_paid', 0.0);
-                if ($order->get_meta('_ak_initial_payment_recorded') === 'yes') {
-                    $order->update_meta_data('_ak_initial_payment_amount', $new_paid);
-                }
-            }
-        }
-
-        $note_text = $note !== '' ? ' (' . $note . ')' : '';
-        $reason = sprintf(
-            __('Ręczna korekta wpłaconej kwoty: łącznie %s zł (bramka: %s zł, dodatkowo: %+0.2f zł)%s', 'ak-product-set'),
-            number_format_i18n($new_paid, 2),
-            number_format_i18n($gateway_paid, 2),
-            $new_paid - $gateway_paid,
-            $note_text
-        );
-
-        $recalc_result = Order_Recalculator::recalculate($order, [
-            'reason'          => $reason,
-            'before_snapshot' => $before_snapshot,
-        ]);
-
-        wp_send_json_success($recalc_result);
     }
 }

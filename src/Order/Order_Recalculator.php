@@ -96,6 +96,15 @@ class Order_Recalculator {
     }
 
     /**
+     * Safely delete order meta value without failing strict test mocks.
+     */
+    public static function delete_order_meta(\WC_Order $order, string $key): void {
+        try {
+            $order->delete_meta_data($key);
+        } catch (\Throwable $e) {}
+    }
+
+    /**
      * Recalculate decomposed order line items based on individual participant-weekend enrollments,
      * apply group pricing for common cohorts and individual pricing for disparate weekends,
      * compute financial balance delta (niedopłata / nadpłata), and generate detailed calculation breakdown.
@@ -161,12 +170,43 @@ class Order_Recalculator {
         $order->calculate_totals(false);
 
         $new_total = (float) $order->get_total();
-        $balance = round($new_total - $total_paid, 2);
 
-        $is_paid = self::is_order_paid($order);
-        $balance_info = self::resolve_balance_status($balance, $is_paid, $total_paid);
-        $balance_status = $balance_info['status'];
-        $balance = $balance_info['balance'];
+        $is_manually_settled = (self::get_order_meta($order, '_ak_manually_settled') === '1');
+        if ($is_manually_settled) {
+            $settled_at_total = (float) self::get_order_meta($order, '_ak_manually_settled_total', 0.0);
+            if (abs($new_total - $settled_at_total) > 0.009) {
+                // Order amount has changed! Invalidate manual settlement and recalculate against actual paid amount.
+                self::delete_order_meta($order, '_ak_manually_settled');
+                self::delete_order_meta($order, '_ak_manually_settled_total');
+
+                $pre_settled = self::get_order_meta($order, '_ak_pre_settled_total_paid', '');
+                if ($pre_settled !== '' && $pre_settled !== false) {
+                    $total_paid = (float) $pre_settled;
+                } else {
+                    $orig_total = (float) self::get_order_meta($order, '_ak_original_total', 0.0);
+                    $init_paid  = (float) self::get_order_meta($order, '_ak_initial_payment_amount', 0.0);
+                    $total_paid = $init_paid > 0.009 ? $init_paid : ($orig_total > 0.009 ? $orig_total : 0.0);
+                }
+                self::delete_order_meta($order, '_ak_pre_settled_total_paid');
+                self::set_order_meta($order, '_ak_total_paid', $total_paid);
+
+                $balance = round($new_total - $total_paid, 2);
+                $is_paid = self::is_order_paid($order);
+                $balance_info = self::resolve_balance_status($balance, $is_paid, $total_paid);
+                $balance_status = $balance_info['status'];
+                $balance = $balance_info['balance'];
+            } else {
+                $total_paid = $new_total;
+                $balance = 0.0;
+                $balance_status = self::BALANCE_SETTLED;
+            }
+        } else {
+            $balance = round($new_total - $total_paid, 2);
+            $is_paid = self::is_order_paid($order);
+            $balance_info = self::resolve_balance_status($balance, $is_paid, $total_paid);
+            $balance_status = $balance_info['status'];
+            $balance = $balance_info['balance'];
+        }
 
         $order->update_meta_data('_ak_recalculated_total', $new_total);
         $order->update_meta_data('_ak_balance_amount', $balance);
@@ -229,8 +269,12 @@ class Order_Recalculator {
         $previous_paid = $order->get_meta('_ak_total_paid');
         if ($previous_paid !== '' && $previous_paid !== false) {
             $order->update_meta_data('_ak_pre_settled_total_paid', (float) $previous_paid);
+        } else {
+            $payment_state = Order_Payment_Tracker::resolve_order_payment_state($order);
+            $order->update_meta_data('_ak_pre_settled_total_paid', (float) $payment_state['total_paid']);
         }
         $order->update_meta_data('_ak_manually_settled', '1');
+        $order->update_meta_data('_ak_manually_settled_total', $current_total);
         $order->update_meta_data('_ak_total_paid', $current_total);
         $order->update_meta_data('_ak_balance_amount', 0.0);
         $order->update_meta_data('_ak_balance_status', self::BALANCE_SETTLED);
@@ -287,6 +331,7 @@ class Order_Recalculator {
 
         $order->update_meta_data('_ak_total_paid', $restore_paid);
         $order->delete_meta_data('_ak_manually_settled');
+        $order->delete_meta_data('_ak_manually_settled_total');
         $order->delete_meta_data('_ak_pre_settled_total_paid');
 
         $reason = __('Cofnięcie oznaczenia jako uregulowane (przywrócenie salda)', 'ak-product-set');
@@ -1129,7 +1174,32 @@ class Order_Recalculator {
         try {
             $order->set_total($new_total);
         } catch (\Throwable $e) {}
-        $balance = round($new_total - $total_paid, 2);
+
+        $is_manually_settled = (self::get_order_meta($order, '_ak_manually_settled') === '1');
+        if ($is_manually_settled) {
+            $settled_at_total = (float) self::get_order_meta($order, '_ak_manually_settled_total', 0.0);
+            if (abs($new_total - $settled_at_total) > 0.009) {
+                // Order amount changed! Expire manual settlement.
+                self::delete_order_meta($order, '_ak_manually_settled');
+                self::delete_order_meta($order, '_ak_manually_settled_total');
+                $pre_settled = self::get_order_meta($order, '_ak_pre_settled_total_paid', '');
+                if ($pre_settled !== '' && $pre_settled !== false) {
+                    $total_paid = (float) $pre_settled;
+                } else {
+                    $orig_total = (float) self::get_order_meta($order, '_ak_original_total', 0.0);
+                    $init_paid  = (float) self::get_order_meta($order, '_ak_initial_payment_amount', 0.0);
+                    $total_paid = $init_paid > 0.009 ? $init_paid : ($orig_total > 0.009 ? $orig_total : 0.0);
+                }
+                self::delete_order_meta($order, '_ak_pre_settled_total_paid');
+                self::set_order_meta($order, '_ak_total_paid', $total_paid);
+                $balance = round($new_total - $total_paid, 2);
+            } else {
+                $total_paid = $new_total;
+                $balance = 0.0;
+            }
+        } else {
+            $balance = round($new_total - $total_paid, 2);
+        }
 
         $reason = !empty($options['reason']) ? $options['reason'] : __('Wszyscy uczestnicy zostali anulowani/usunięci z zamówienia.', 'ak-product-set');
 
