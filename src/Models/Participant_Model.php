@@ -63,7 +63,6 @@ class Participant_Model {
     /**
      * Create collection of models from array of participant data
      *
-     * @param array $items
      * @return Participant_Model[]
      */
     public static function from_collection(array $items) {

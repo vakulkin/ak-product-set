@@ -14,6 +14,9 @@
 if (!defined('ABSPATH')) {
     define('ABSPATH', dirname(__DIR__) . '/');
 }
+if (!defined('AK_SET_PATH')) {
+    define('AK_SET_PATH', dirname(__DIR__) . '/');
+}
 if (!defined('DOING_AJAX')) {
     define('DOING_AJAX', false);
 }
@@ -27,6 +30,23 @@ require_once dirname(__DIR__) . '/vendor/antecedent/patchwork/Patchwork.php';
 if (!class_exists('WP_User')) {
     class WP_User {
         public array $roles = [];
+    }
+}
+
+if (!class_exists('WC_Order_Item_Fee')) {
+    class WC_Order_Item_Fee {
+        private string $name = '';
+        private float $amount = 0.0;
+        private float $total = 0.0;
+        private array $meta = [];
+
+        public function set_name($name) { $this->name = $name; }
+        public function get_name() { return $this->name; }
+        public function set_amount($amount) { $this->amount = (float) $amount; }
+        public function set_total($total) { $this->total = (float) $total; }
+        public function get_total() { return $this->total; }
+        public function add_meta_data($key, $value, $unique = true) { $this->meta[$key] = $value; }
+        public function get_meta($key) { return $this->meta[$key] ?? ''; }
     }
 }
 

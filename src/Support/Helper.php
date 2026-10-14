@@ -86,9 +86,6 @@ class Helper
 
     /**
      * Check if a given T-Shirt size is valid
-     *
-     * @param string|null $size
-     * @return bool
      */
     public static function is_valid_tshirt_size(?string $size): bool
     {
@@ -115,9 +112,6 @@ class Helper
 
     /**
      * Check if a given T-Shirt cut is valid
-     *
-     * @param string|null $cut
-     * @return bool
      */
     public static function is_valid_tshirt_cut(?string $cut): bool
     {
@@ -130,9 +124,7 @@ class Helper
     /**
      * Get localized T-Shirt cut label
      *
-     * @param string|null $cut
      * @param bool $fallback_to_default If true and cut not found, falls back to default ('men')
-     * @return string
      */
     public static function get_tshirt_cut_label(?string $cut, bool $fallback_to_default = true): string
     {
@@ -151,9 +143,6 @@ class Helper
 
     /**
      * Format participant array for order item meta storage
-     *
-     * @param array $participants
-     * @param \WC_Order_Item_Product $item
      */
     public static function add_participant_meta_to_order_item(array $participants, \WC_Order_Item_Product $item)
     {

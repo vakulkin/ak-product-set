@@ -31,7 +31,6 @@ class Cart_Display_Filters
     // -------------------------------------------------------------------------
     // Internal helpers
     // -------------------------------------------------------------------------
-
     /**
      * Resolve the display price for a composed set cart item.
      *
@@ -40,7 +39,6 @@ class Cart_Display_Filters
      *   2. Stored _ak_applied_price meta value
      *   3. Live Pricing Engine calculation (fallback, e.g. after session expiry)
      *
-     * @param array $cart_item
      * @return float 0.0 if price cannot be determined
      */
     private function resolve_display_price(array $cart_item): float

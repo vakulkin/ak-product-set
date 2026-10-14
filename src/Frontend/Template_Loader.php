@@ -38,7 +38,6 @@ class Template_Loader {
      * Render template file with isolated arguments
      *
      * @param string $template_name
-     * @param array $args
      */
     public static function render($template_name, array $args = []) {
         $file = self::locate_template($template_name);
@@ -55,7 +54,6 @@ class Template_Loader {
      * Return rendered template HTML as string
      *
      * @param string $template_name
-     * @param array $args
      * @return string
      */
     public static function get_template_html($template_name, array $args = []) {

@@ -13,13 +13,11 @@ class Company_Lookup_Service {
     const BIALA_LISTA_URL = 'https://wl-api.mf.gov.pl/api/search/nip';
     const CEIDG_URL       = 'https://dane.biznes.gov.pl/api/ceidg/v2/firmy';
     const CACHE_EXPIRATION = DAY_IN_SECONDS; // 24 hours
-
     /**
      * Lookup company details by NIP.
      * Uses Biała Lista VAT first (no token required).
      * Falls back to CEIDG v2 if token is configured.
      *
-     * @param string $raw_nip
      * @return array [
      *     'success' => bool,
      *     'source'  => string, // 'biala_lista' | 'ceidg'
@@ -74,9 +72,6 @@ class Company_Lookup_Service {
 
     /**
      * Query Biała Lista VAT API.
-     *
-     * @param string $nip
-     * @return array
      */
     public static function query_biala_lista(string $nip): array {
         $date = gmdate('Y-m-d');
@@ -142,10 +137,6 @@ class Company_Lookup_Service {
 
     /**
      * Query CEIDG v2 API.
-     *
-     * @param string $nip
-     * @param string $token
-     * @return array
      */
     public static function query_ceidg(string $nip, string $token): array {
         $endpoint = sprintf('%s?nip=%s', self::CEIDG_URL, rawurlencode($nip));
@@ -229,12 +220,10 @@ class Company_Lookup_Service {
      * - "MARSZAŁKOWSKA 10/2, 00-001 WARSZAWA"
      * - "Lipowa 5 80-001 Gdańsk"
      *
-     * @param string $raw
      * @return array ['street' => string, 'postcode' => string, 'city' => string]
      */
     public static function parse_address(string $raw): array {
         $raw = trim($raw);
-        $street   = '';
         $postcode = '';
         $city     = '';
 
@@ -260,8 +249,6 @@ class Company_Lookup_Service {
 
     /**
      * Get CEIDG API token from constant or option.
-     *
-     * @return string
      */
     public static function get_ceidg_token(): string {
         if (defined('AK_CEIDG_API_TOKEN') && is_string(AK_CEIDG_API_TOKEN)) {

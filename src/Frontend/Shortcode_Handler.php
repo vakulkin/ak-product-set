@@ -70,9 +70,6 @@ class Shortcode_Handler
     /**
      * Look up existing composed set item from active WooCommerce cart to sync form data
      * Matches specific $set_id and uses the last added item for that set ID
-     *
-     * @param int $set_id
-     * @return array|null
      */
     private function get_cart_initial_data(int $set_id): ?array
     {

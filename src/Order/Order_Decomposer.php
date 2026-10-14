@@ -2,7 +2,6 @@
 
 namespace AK_Set\Order;
 
-use AK_Set\Models\Weekend_Model;
 use AK_Set\Support\Helper;
 use AK_Set\Order\Order_Recalculator;
 

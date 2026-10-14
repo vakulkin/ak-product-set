@@ -4,6 +4,8 @@ namespace AK_Set\Tests\Order;
 
 use AK_Set\Tests\TestCase;
 use AK_Set\Order\Participant_Transfer_Service;
+use AK_Set\Order\Order_Participant_Slot_Manager;
+use AK_Set\Order\Order_Participant_Profile_Service;
 use Mockery;
 use Brain\Monkey\Functions;
 
@@ -18,7 +20,7 @@ class Participant_Transfer_Service_Test extends TestCase {
         $order = Mockery::mock('WC_Order');
         $order->shouldReceive('get_items')->with('line_item')->andReturn([$item]);
 
-        $result = Participant_Transfer_Service::remove_participant($order, 'uuid-non-existent');
+        $result = Order_Participant_Slot_Manager::remove_participant_completely($order, 'uuid-non-existent');
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('nie został znaleziony', $result['error']);
@@ -34,7 +36,7 @@ class Participant_Transfer_Service_Test extends TestCase {
         $order = Mockery::mock('WC_Order');
         $order->shouldReceive('get_items')->with('line_item')->andReturn([$item]);
 
-        $result = Participant_Transfer_Service::remove_weekend_for_participant($order, 'uuid-1', 101);
+        $result = Order_Participant_Slot_Manager::remove_weekend_for_participant($order, 'uuid-1', 101);
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('nie został znaleziony w wybranym terminie', $result['error']);
@@ -42,7 +44,7 @@ class Participant_Transfer_Service_Test extends TestCase {
 
     public function test_reschedule_participant_rejects_same_weekend(): void {
         $order = Mockery::mock('WC_Order');
-        $result = Participant_Transfer_Service::reschedule_participant($order, 'uuid-1', 101, 101);
+        $result = Order_Participant_Slot_Manager::reschedule_weekend_for_participant($order, 'uuid-1', 101, 101);
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('musi różnić się', $result['error']);
@@ -65,7 +67,7 @@ class Participant_Transfer_Service_Test extends TestCase {
         $order = Mockery::mock('WC_Order');
         $order->shouldReceive('get_items')->with('line_item')->andReturn([$item1, $item2]);
 
-        $result = Participant_Transfer_Service::reschedule_weekend_for_participant($order, 'uuid-1', 101, 102);
+        $result = Order_Participant_Slot_Manager::reschedule_weekend_for_participant($order, 'uuid-1', 101, 102);
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('jest już zapisany na wybrany termin docelowy', $result['error']);
@@ -85,7 +87,7 @@ class Participant_Transfer_Service_Test extends TestCase {
         $order = Mockery::mock('WC_Order');
         $order->shouldReceive('get_items')->with('line_item')->andReturn([]);
 
-        $result = Participant_Transfer_Service::add_participant($order, 10, ['name' => 'John'], []);
+        $result = Order_Participant_Slot_Manager::add_participant($order, 10, ['name' => 'John'], []);
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('Nie wybrano żadnego terminu', $result['error']);
@@ -110,7 +112,7 @@ class Participant_Transfer_Service_Test extends TestCase {
         $order->shouldReceive('add_order_note')->once();
         $order->shouldReceive('save')->once();
 
-        $result = Participant_Transfer_Service::update_participant_tshirt($order, 'uuid-1', 'XL', 'women');
+        $result = Order_Participant_Profile_Service::update_participant_tshirt($order, 'uuid-1', 'XL', 'women');
 
         $this->assertTrue($result['success']);
         $this->assertEquals('XL', $result['new_size']);
@@ -146,7 +148,7 @@ class Participant_Transfer_Service_Test extends TestCase {
             'tshirt_cut'  => 'women',
         ];
 
-        $result = Participant_Transfer_Service::update_participant_data($order, 'uuid-1', $data);
+        $result = Order_Participant_Profile_Service::update_participant_data($order, 'uuid-1', $data);
 
         $this->assertTrue($result['success']);
         $this->assertEquals('Anton V', $result['participant_name']);
@@ -348,7 +350,7 @@ class Participant_Transfer_Service_Test extends TestCase {
             return [];
         });
 
-        $result = Participant_Transfer_Service::reschedule_weekend_for_participant($order, 'uuid-123', 101, 102);
+        $result = Order_Participant_Slot_Manager::reschedule_weekend_for_participant($order, 'uuid-123', 101, 102);
 
         $this->assertTrue($result['success']);
         $this->assertNotEmpty($captured_history);

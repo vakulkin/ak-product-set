@@ -4,7 +4,9 @@
   "type": "wordpress-plugin",
   "require-dev": {
     "phpunit/phpunit": "^10.5",
-    "brain/monkey": "^2.6"
+    "brain/monkey": "^2.6",
+    "rector/rector": "^2.7",
+    "vimeo/psalm": "^6.20"
   },
   "autoload": {
     "psr-4": {
@@ -19,6 +21,9 @@
   "scripts": {
     "test": "phpunit --testdox",
     "test-coverage": "php -d pcov.enabled=1 vendor/bin/phpunit --coverage-text",
-    "test-coverage-xdebug": "XDEBUG_MODE=coverage phpunit --coverage-text"
+    "test-coverage-xdebug": "XDEBUG_MODE=coverage phpunit --coverage-text",
+    "psalm": "psalm --threads=1 --no-cache",
+    "rector": "rector process --dry-run",
+    "rector:fix": "rector process"
   }
 }

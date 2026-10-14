@@ -47,9 +47,6 @@ class Checkout_NIP_Handler {
 
     /**
      * Resolve saved value from WC session or logged in user meta.
-     *
-     * @param string $key
-     * @return string
      */
     public function resolve_saved_value(string $key): string {
         // 1. Session first
@@ -76,7 +73,6 @@ class Checkout_NIP_Handler {
      * Ensure field values on checkout form are populated from session / user meta.
      *
      * @param mixed $value
-     * @param string $input
      * @return mixed
      */
     public function get_checkout_field_value($value, string $input) {
@@ -96,9 +92,6 @@ class Checkout_NIP_Handler {
 
     /**
      * Add NIP and single company data textarea to billing fields.
-     *
-     * @param array $fields
-     * @return array
      */
     public function add_billing_nip_field(array $fields): array {
         $default_nip          = $this->resolve_saved_value('billing_nip');
@@ -134,9 +127,6 @@ class Checkout_NIP_Handler {
 
     /**
      * Ensure fields are preserved in woocommerce_checkout_fields (in case other plugins override 'billing').
-     *
-     * @param array $fields
-     * @return array
      */
     public function ensure_checkout_nip_fields(array $fields): array {
         if (!isset($fields['billing']) || !is_array($fields['billing'])) {
@@ -173,9 +163,6 @@ class Checkout_NIP_Handler {
 
     /**
      * Update user account meta when checkout finishes or new account is created.
-     *
-     * @param int $customer_id
-     * @param array $posted
      */
     public function update_user_meta_on_checkout(int $customer_id, array $posted): void {
         if ($customer_id <= 0 || !function_exists('update_user_meta')) {
@@ -258,9 +245,6 @@ class Checkout_NIP_Handler {
 
     /**
      * Save NIP and company data to order metadata and billing address, and persist to user profile & session.
-     *
-     * @param \WC_Order $order
-     * @param array $data
      */
     public function save_nip_to_order(\WC_Order $order, array $data): void {
         $nip = '';
@@ -342,8 +326,6 @@ class Checkout_NIP_Handler {
 
     /**
      * Display NIP and company billing data in WooCommerce Admin Order Edit screen.
-     *
-     * @param \WC_Order $order
      */
     public function display_nip_in_admin_order(\WC_Order $order): void {
         $nip = $order->get_meta('_billing_nip');
@@ -370,9 +352,6 @@ class Checkout_NIP_Handler {
 
     /**
      * Add NIP and company data to WordPress Admin User Profile edit screen.
-     *
-     * @param array $fields
-     * @return array
      */
     public function add_customer_meta_fields(array $fields): array {
         if (!isset($fields['billing']['fields']) || !is_array($fields['billing']['fields'])) {

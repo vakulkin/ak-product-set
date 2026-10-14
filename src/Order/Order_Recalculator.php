@@ -26,9 +26,6 @@ class Order_Recalculator {
      * Get configured T-shirt manufacturing cost.
      * Checks optional set-level ACF override first, then global plugin option 'ak_set_tshirt_cost',
      * and finally defaults to DEFAULT_TSHIRT_COST (50.0).
-     *
-     * @param int|null $set_id
-     * @return float
      */
     public static function get_tshirt_cost(?int $set_id = null): float {
         if ($set_id && function_exists('get_field')) {
@@ -44,9 +41,6 @@ class Order_Recalculator {
 
     /**
      * Safely check whether an order is marked as paid.
-     *
-     * @param \WC_Order $order
-     * @return bool
      */
     public static function is_order_paid(\WC_Order $order): bool {
         try {
@@ -61,9 +55,6 @@ class Order_Recalculator {
 
     /**
      * Safely retrieve order status string.
-     *
-     * @param \WC_Order $order
-     * @return string
      */
     public static function get_order_status(\WC_Order $order): string {
         try {
@@ -81,7 +72,6 @@ class Order_Recalculator {
      * apply group pricing for common cohorts and individual pricing for disparate weekends,
      * compute financial balance delta (niedopłata / nadpłata), and generate detailed calculation breakdown.
      *
-     * @param \WC_Order $order
      * @param array $options [
      *     'reason'               => string,
      *     'retained_tshirt_cost' => float,
@@ -145,7 +135,6 @@ class Order_Recalculator {
         $items = $order->get_items('line_item');
         $participant_enrollments = []; // uuid => ['data' => ..., 'set_id' => ..., 'weekends' => [wid => item_id]]
         $weekend_items_map = [];       // wid => \WC_Order_Item_Product
-        $set_ids = [];
 
         foreach ($items as $item_id => $item) {
             if (!($item instanceof \WC_Order_Item_Product)) {
@@ -157,7 +146,6 @@ class Order_Recalculator {
 
             if ($set_id > 0 && $wid > 0) {
                 $weekend_items_map[$wid] = $item;
-                $set_ids[$set_id] = true;
 
                 $p_list = $item->get_meta('_ak_participants');
                 if (is_array($p_list)) {
@@ -181,50 +169,85 @@ class Order_Recalculator {
 
         $overall_headcount = count($participant_enrollments);
 
-        // 4. Handle cancellation of entire order if headcount is 0
+        // 4. Handle Retained T-Shirt Manufacturing Cost (if specified for this cancellation)
+        $retained_tshirt = isset($options['retained_tshirt_cost']) ? (float)$options['retained_tshirt_cost'] : 0.0;
+        if ($retained_tshirt > 0) {
+            self::add_or_update_tshirt_fee($order, $retained_tshirt);
+        }
+
+        // 5. Handle cancellation of entire order if headcount is 0
         if ($overall_headcount <= 0) {
-            // Remove empty items
+            // Remove empty line items
             foreach ($weekend_items_map as $item) {
                 $order->remove_item($item->get_id());
             }
 
+            // Remove coupons since no products remain
+            try {
+                $coupon_items = $order->get_items('coupon');
+                if (is_iterable($coupon_items)) {
+                    foreach ($coupon_items as $coupon_item) {
+                        $order->remove_item($coupon_item->get_id());
+                    }
+                }
+            } catch (\Throwable $e) {}
+
+            // Calculate remaining fees (such as retained T-shirt manufacturing costs)
+            $fee_summary = self::get_order_fees_summary($order);
+            $fees_total = $fee_summary['total'];
+            $fees_section = $fee_summary['section'];
+
+            try {
+                $order->calculate_totals(false);
+            } catch (\Throwable $e) {}
+
+            // When products are 0, order total in WooCommerce must strictly equal retained fees (or 0.0)
+            $new_total = round($fees_total, 2);
+            try {
+                $order->set_total($new_total);
+            } catch (\Throwable $e) {}
+            $balance = round($new_total - $total_paid, 2);
+
             $reason = !empty($options['reason']) ? $options['reason'] : __('Wszyscy uczestnicy zostali anulowani/usunięci z zamówienia.', 'ak-product-set');
 
             $order->update_status('cancelled', $reason);
-            if ($total_paid > 0.009) {
-                $order->update_meta_data('_ak_balance_status', self::BALANCE_OVERPAID);
-                $order->update_meta_data('_ak_balance_amount', -$total_paid);
-            } else {
-                $order->update_meta_data('_ak_balance_status', self::BALANCE_SETTLED);
-                $order->update_meta_data('_ak_balance_amount', 0.0);
-            }
-            $order->update_meta_data('_ak_recalculated_total', 0.0);
+            $is_paid = self::is_order_paid($order);
 
-            $full_breakdown = sprintf(
-                "==================================================\n%s\n%s\n--------------------------------------------------\nŁączna wartość pakietów: 0,00 zł\nNowa łączna kwota zamówienia: 0,00 zł\nPierwotnie wpłacono: %s zł\nBILANS: Nadpłata -%s zł (do zwrotu klientowi)\n==================================================",
-                __('SZCZEGÓŁOWA KALKULACJA CENY (PRZELICZENIE):', 'ak-product-set'),
+            $balance_info = self::resolve_balance_status($balance, $is_paid, $total_paid);
+            $final_status = $balance_info['status'];
+            $final_balance = $balance_info['balance'];
+
+            $balance_line = Order_Breakdown_Formatter::resolve_balance_line($final_status, $balance, $total_paid, true);
+            $log_status = Order_Breakdown_Formatter::resolve_log_status($final_status, $balance, $total_paid, true);
+
+            $order->update_meta_data('_ak_balance_status', $final_status);
+            $order->update_meta_data('_ak_balance_amount', $final_balance);
+            $order->update_meta_data('_ak_recalculated_total', $new_total);
+
+            $full_breakdown = Order_Breakdown_Formatter::format_cancellation_breakdown(
                 $reason,
-                number_format_i18n($total_paid, 2),
-                number_format_i18n($total_paid, 2)
+                $fees_section,
+                $new_total,
+                $total_paid,
+                $balance_line
             );
             $order->update_meta_data('_ak_pricing_breakdown', $full_breakdown);
 
-            $log_entry = sprintf(
-                "[%s] %s\n• PRZED ZMIANĄ (%s zł):\n  %s\n• PO ZMIANIE (0,00 zł | Nadpłata do zwrotu: %s zł):\n  %s",
-                current_time('Y-m-d H:i'),
+            $log_entry = Order_Breakdown_Formatter::format_audit_log_entry(
                 $reason,
-                number_format_i18n($before_snapshot['total'], 2),
+                $before_snapshot['total'],
                 $before_snapshot['summary'],
-                number_format_i18n($total_paid, 2),
+                $new_total,
+                $log_status,
                 __('Brak aktywnych uczestników (wszyscy anulowani lub przeniesieni)', 'ak-product-set')
             );
             self::append_audit_log($order, $log_entry);
             $order->save();
 
             return [
-                'status'             => self::BALANCE_OVERPAID,
-                'recalculated_total' => 0.0,
-                'balance_amount'     => -$total_paid,
+                'status'             => $final_status,
+                'recalculated_total' => $new_total,
+                'balance_amount'     => $final_balance,
                 'total_paid'         => $total_paid,
                 'headcount'          => 0,
                 'breakdown'          => $full_breakdown,
@@ -257,14 +280,14 @@ class Order_Recalculator {
         $total_recalculated_base = 0.0;
         $cohort_index = 1;
 
-        foreach ($cohorts as $cohort_key => $cohort) {
+        foreach ($cohorts as $cohort) {
             $set_id       = $cohort['set_id'];
             $wids         = $cohort['weekends'];
             $package_size = $cohort['package_size'];
             $participants = $cohort['participants'];
             $headcount    = count($participants);
 
-            if ($package_size <= 0 || $headcount <= 0) {
+            if ($headcount <= 0) {
                 continue;
             }
 
@@ -306,24 +329,18 @@ class Order_Recalculator {
             }
 
             $participant_names = array_map(fn($p) => $p['name'] ?: $p['id'], $participants);
-            $tier_label = ($tier === 'g10')
-                ? __('Grupa 10+ os. (g10)', 'ak-product-set')
-                : (($tier === 'g5') ? __('Grupa 5-9 os. (g5)', 'ak-product-set') : __('Indywidualny (ind, <5 os.)', 'ak-product-set'));
 
-            $breakdown_sections[] = sprintf(
-                "Pakiet %d: [%s]\n• %s: %s\n• Liczba weekendów: %d (%s)\n• Runda: %d | Próg grupy: %s\n• Stawka: %s zł / os. | Wartość: %d os. x %s zł = %s zł",
+            $breakdown_sections[] = Order_Breakdown_Formatter::format_cohort_section(
                 $cohort_index++,
                 $set_title,
-                __('Uczestnicy', 'ak-product-set'),
-                implode(', ', $participant_names),
+                $participant_names,
                 $package_size,
-                implode(', ', $weekend_titles),
+                $weekend_titles,
                 $round,
-                $tier_label,
-                number_format_i18n($per_person_price, 2),
+                $tier,
+                $per_person_price,
                 $headcount,
-                number_format_i18n($per_person_price, 2),
-                number_format_i18n($cohort_subtotal, 2)
+                $cohort_subtotal
             );
         }
 
@@ -348,74 +365,52 @@ class Order_Recalculator {
         // 8. Handle Coupons (Percentage vs Fixed proportional distribution)
         self::apply_coupons_recalculation($order, $original_headcount, $overall_headcount);
 
-        // 9. Handle Retained T-Shirt Manufacturing Cost (if specified)
-        $retained_tshirt = isset($options['retained_tshirt_cost']) ? (float)$options['retained_tshirt_cost'] : 0.0;
-        if ($retained_tshirt > 0) {
-            self::add_or_update_tshirt_fee($order, $retained_tshirt);
-        }
-
-        // 10. Calculate final order totals via native WooCommerce
+        // 9. Calculate final order totals via native WooCommerce
         $order->calculate_totals(false);
 
         $new_total = (float) $order->get_total();
         $balance = round($new_total - $total_paid, 2);
 
         $is_paid = self::is_order_paid($order);
-        if ($balance > 0.009) {
-            $balance_status = (!$is_paid && $total_paid <= 0.009 && $order->get_meta('_ak_balance_status') === self::BALANCE_UNPAID)
-                ? self::BALANCE_UNPAID
-                : self::BALANCE_UNDERPAID;
-        } elseif ($balance < -0.009) {
-            $balance_status = self::BALANCE_OVERPAID;
-        } else {
-            $balance_status = self::BALANCE_SETTLED;
-            $balance = 0.0;
-        }
+        $balance_info = self::resolve_balance_status($balance, $is_paid, $total_paid);
+        $balance_status = $balance_info['status'];
+        $balance = $balance_info['balance'];
 
         $order->update_meta_data('_ak_recalculated_total', $new_total);
         $order->update_meta_data('_ak_balance_amount', $balance);
         $order->update_meta_data('_ak_balance_status', $balance_status);
 
-        // 11. Compile full comprehensive pricing breakdown
+        // Fee section in breakdown if fees exist (e.g. retained T-shirt costs)
+        $fee_summary = self::get_order_fees_summary($order);
+        $fees_section = $fee_summary['section'];
+
+        // 10. Compile full comprehensive pricing breakdown
         $base_date_formatted = $date_created ? $date_created->date('Y-m-d H:i') : current_time('Y-m-d H:i');
-        $full_breakdown = sprintf(
-            "==================================================\n%s\nData bazowa rygoru rundy: %s (zamówienie #%d)\n--------------------------------------------------\n%s\n--------------------------------------------------\nŁączna wartość bazowa pakietów: %s zł\nNowa łączna kwota zamówienia: %s zł\nPierwotnie wpłacono: %s zł\n%s\n==================================================",
-            __('SZCZEGÓŁOWA KALKULACJA CENY (PRZELICZENIE):', 'ak-product-set'),
+        $balance_formatted = Order_Breakdown_Formatter::resolve_balance_line($balance_status, $balance, $total_paid, false);
+
+        $full_breakdown = Order_Breakdown_Formatter::format_recalculation_breakdown(
             $base_date_formatted,
-            $order->get_id(),
-            implode("\n--------------------------------------------------\n", $breakdown_sections),
-            number_format_i18n($total_recalculated_base, 2),
-            number_format_i18n($new_total, 2),
-            number_format_i18n($total_paid, 2),
-            ($balance_status === self::BALANCE_UNPAID)
-                ? sprintf(__('BILANS: Nieopłacone +%s zł (oczekuje na płatność)', 'ak-product-set'), number_format_i18n($balance, 2))
-                : (($balance_status === self::BALANCE_UNDERPAID)
-                    ? sprintf(__('BILANS: Niedopłata +%s zł (klient zalega z płatnością)', 'ak-product-set'), number_format_i18n($balance, 2))
-                    : (($balance_status === self::BALANCE_OVERPAID)
-                        ? sprintf(__('BILANS: Nadpłata %s zł (do zwrotu klientowi)', 'ak-product-set'), number_format_i18n($balance, 2))
-                        : __('BILANS: Uregulowane (brak zaległości)', 'ak-product-set')))
+            (int) $order->get_id(),
+            $breakdown_sections,
+            $total_recalculated_base,
+            $fees_section,
+            $new_total,
+            $total_paid,
+            $balance_formatted
         );
 
         $order->update_meta_data('_ak_pricing_breakdown', $full_breakdown);
 
         // 12. Generate timestamped audit trail log with Before and After snapshots
         $reason = !empty($options['reason']) ? $options['reason'] : __('Modyfikacja terminów / przeliczenie', 'ak-product-set');
-        $balance_text = ($balance_status === self::BALANCE_UNPAID)
-            ? sprintf(__('Nieopłacone: %s zł (oczekuje na płatność)', 'ak-product-set'), number_format_i18n($balance, 2))
-            : (($balance_status === self::BALANCE_UNDERPAID)
-                ? sprintf(__('Niedopłata: +%s zł (klient zalega)', 'ak-product-set'), number_format_i18n($balance, 2))
-                : (($balance_status === self::BALANCE_OVERPAID)
-                    ? sprintf(__('Nadpłata: %s zł (do zwrotu)', 'ak-product-set'), number_format_i18n($balance, 2))
-                    : __('Uregulowane', 'ak-product-set')));
+        $balance_text = Order_Breakdown_Formatter::resolve_log_status($balance_status, $balance, $total_paid, false);
 
         $after_snapshot = self::get_order_state_snapshot($order);
-        $log_entry = sprintf(
-            "[%s] %s\n• PRZED ZMIANĄ (%s zł):\n  %s\n• PO ZMIANIE (%s zł | %s):\n  %s",
-            current_time('Y-m-d H:i'),
+        $log_entry = Order_Breakdown_Formatter::format_audit_log_entry(
             $reason,
-            number_format_i18n($before_snapshot['total'], 2),
+            $before_snapshot['total'],
             $before_snapshot['summary'],
-            number_format_i18n($new_total, 2),
+            $new_total,
             $balance_text,
             $after_snapshot['summary']
         );
@@ -436,10 +431,6 @@ class Order_Recalculator {
 
     /**
      * Mark an order balance as manually settled (clears underpayment or confirms refund).
-     *
-     * @param \WC_Order $order
-     * @param string $note
-     * @return void
      */
     public static function mark_settled(\WC_Order $order, string $note = ''): void {
         $current_total = (float) $order->get_total();
@@ -491,8 +482,6 @@ class Order_Recalculator {
     /**
      * Revert a manually settled order back to its calculated balance (unsettled state).
      *
-     * @param \WC_Order $order
-     * @param string $note
      * @return array Recalculation result
      */
     public static function mark_unsettled(\WC_Order $order, string $note = ''): array {
@@ -520,9 +509,6 @@ class Order_Recalculator {
 
     /**
      * Helper to detect total unique headcount across all AK items in an order.
-     *
-     * @param \WC_Order $order
-     * @return int
      */
     public static function detect_total_headcount(\WC_Order $order): int {
         $uuids = [];
@@ -541,9 +527,6 @@ class Order_Recalculator {
 
     /**
      * Record initial pricing breakdown and financial balance on a clean, newly decomposed order.
-     *
-     * @param \WC_Order $order
-     * @return void
      */
     public static function record_initial_order_state(\WC_Order $order): void {
         $total = (float) $order->get_total();
@@ -672,42 +655,30 @@ class Order_Recalculator {
             $per_person_price = (float) $set->get_price_by_matrix($package_size, $round, $tier);
             $cohort_subtotal = round($per_person_price * $headcount, 2);
 
-            $tier_label = ($tier === 'g10')
-                ? __('Grupa 10+ os. (g10)', 'ak-product-set')
-                : (($tier === 'g5') ? __('Grupa 5-9 os. (g5)', 'ak-product-set') : __('Indywidualny (ind, <5 os.)', 'ak-product-set'));
-
             $participant_names = array_map(fn($p) => $p['name'] ?: $p['id'], $participants);
 
-            $breakdown_sections[] = sprintf(
-                "Pakiet %d: [%s]\n• %s: %s\n• Liczba weekendów: %d (%s)\n• Runda: %d | Próg grupy: %s\n• Stawka: %s zł / os. | Wartość: %d os. x %s zł = %s zł",
+            $breakdown_sections[] = Order_Breakdown_Formatter::format_cohort_section(
                 $cohort_index++,
                 $set_title,
-                __('Uczestnicy', 'ak-product-set'),
-                implode(', ', $participant_names),
+                $participant_names,
                 $package_size,
-                implode(', ', $cohort['weekend_names']),
+                $cohort['weekend_names'],
                 $round,
-                $tier_label,
-                number_format_i18n($per_person_price, 2),
+                $tier,
+                $per_person_price,
                 $headcount,
-                number_format_i18n($per_person_price, 2),
-                number_format_i18n($cohort_subtotal, 2)
+                $cohort_subtotal
             );
         }
 
         $date_formatted = $date_created ? $date_created->date('Y-m-d H:i') : current_time('Y-m-d H:i');
         $is_order_settled = ($order->get_meta('_ak_balance_status') === self::BALANCE_SETTLED);
-        $full_breakdown = sprintf(
-            "==================================================\n%s\nData zamówienia: %s (zamówienie #%d)\n--------------------------------------------------\n%s\n--------------------------------------------------\nŁączna kwota zamówienia: %s zł\nWpłacono: %s zł\nBILANS: %s\n==================================================",
-            __('SZCZEGÓŁOWA KALKULACJA CENY (NOWE ZAMÓWIENIE):', 'ak-product-set'),
+        $full_breakdown = Order_Breakdown_Formatter::format_initial_order_breakdown(
             $date_formatted,
-            $order->get_id(),
-            !empty($breakdown_sections) ? implode("\n--------------------------------------------------\n", $breakdown_sections) : __('Standardowy pakiet z koszyka', 'ak-product-set'),
-            number_format_i18n($total, 2),
-            number_format_i18n($is_order_settled ? $total : 0.0, 2),
+            (int) $order->get_id(),
+            $breakdown_sections,
+            $total,
             $is_order_settled
-                ? __('Uregulowane (brak zaległości)', 'ak-product-set')
-                : __('Nieopłacone (oczekuje na płatność)', 'ak-product-set')
         );
 
         $order->update_meta_data('_ak_pricing_breakdown', $full_breakdown);
@@ -717,9 +688,6 @@ class Order_Recalculator {
 
     /**
      * Get snapshot summary of current participants and attended weekends in an order.
-     *
-     * @param \WC_Order $order
-     * @return array
      */
     public static function get_order_state_snapshot(\WC_Order $order): array {
         $participants_map = [];
@@ -771,17 +739,7 @@ class Order_Recalculator {
             }
         }
 
-        $summary_parts = [];
-        foreach ($participants_map as $p_info) {
-            $count = count($p_info['weekends']);
-            $summary_parts[] = sprintf(
-                '%s (%d %s: %s)',
-                $p_info['name'],
-                $count,
-                ($count === 1) ? __('termin', 'ak-product-set') : (($count >= 2 && $count <= 4) ? __('terminy', 'ak-product-set') : __('terminów', 'ak-product-set')),
-                implode(', ', $p_info['weekends'])
-            );
-        }
+        $summary = Order_Breakdown_Formatter::format_order_state_summary($participants_map);
 
         $total = 0.0;
         try {
@@ -793,16 +751,12 @@ class Order_Recalculator {
         return [
             'total'        => $total,
             'participants' => $participants_map,
-            'summary'      => !empty($summary_parts) ? implode('; ', $summary_parts) : __('Brak uczestników', 'ak-product-set'),
+            'summary'      => $summary,
         ];
     }
 
     /**
      * Append an entry to the concatenated order meta history and order notes.
-     *
-     * @param \WC_Order $order
-     * @param string $entry
-     * @return void
      */
     public static function append_audit_log(\WC_Order $order, string $entry): void {
         $raw_history = $order->get_meta('_ak_balance_history');
@@ -818,15 +772,14 @@ class Order_Recalculator {
 
     /**
      * Reapply coupons with proportional allocation for fixed discounts or uniform percentage.
-     *
-     * @param \WC_Order $order
-     * @param int $orig_headcount
-     * @param int $new_headcount
-     * @return void
      */
     private static function apply_coupons_recalculation(\WC_Order $order, int $orig_headcount, int $new_headcount): void {
-        $coupon_items = $order->get_items('coupon');
-        if (empty($coupon_items)) {
+        $coupon_items = [];
+        try {
+            $coupon_items = $order->get_items('coupon');
+        } catch (\Throwable $e) {}
+
+        if (empty($coupon_items) || !is_iterable($coupon_items)) {
             return;
         }
 
@@ -849,19 +802,20 @@ class Order_Recalculator {
 
     /**
      * Add or update a retained t-shirt fee line item on the order.
-     *
-     * @param \WC_Order $order
-     * @param float $cost
-     * @return void
      */
     private static function add_or_update_tshirt_fee(\WC_Order $order, float $cost): void {
         $fee_item = null;
-        foreach ($order->get_items('fee') as $fee) {
-            if ($fee->get_name() === __('Koszt wyprodukowanej koszulki', 'ak-product-set') || $fee->get_meta('_ak_is_tshirt_fee')) {
-                $fee_item = $fee;
-                break;
+        try {
+            $fees = $order->get_items('fee');
+            if (is_iterable($fees)) {
+                foreach ($fees as $fee) {
+                    if ($fee->get_name() === __('Koszt wyprodukowanej koszulki', 'ak-product-set') || $fee->get_meta('_ak_is_tshirt_fee')) {
+                        $fee_item = $fee;
+                        break;
+                    }
+                }
             }
-        }
+        } catch (\Throwable $e) {}
 
         if (!$fee_item) {
             $fee_item = new \WC_Order_Item_Fee();
@@ -871,6 +825,66 @@ class Order_Recalculator {
         }
 
         $existing_amount = (float) $fee_item->get_total();
-        $fee_item->set_total($existing_amount + $cost);
+        $new_amount = round($existing_amount + $cost, 2);
+        if (is_callable([$fee_item, 'set_amount'])) {
+            try {
+                $fee_item->set_amount($new_amount);
+            } catch (\Throwable $e) {}
+        }
+        $fee_item->set_total($new_amount);
+    }
+
+    /**
+     * Compute total of existing fees and format lines for pricing breakdown.
+     *
+     * @return array{total: float, lines: string[], section: string}
+     */
+    private static function get_order_fees_summary(\WC_Order $order): array {
+        $fees_total = 0.0;
+        $fee_lines = [];
+        try {
+            $fee_items = $order->get_items('fee');
+            if (is_iterable($fee_items)) {
+                foreach ($fee_items as $fee) {
+                    $fee_val = (float) $fee->get_total();
+                    if ($fee_val > 0.009) {
+                        $fees_total += $fee_val;
+                        $fee_name = is_callable([$fee, 'get_name']) ? $fee->get_name() : __('Opłata', 'ak-product-set');
+                        $fee_lines[] = sprintf('• %s: %s zł', $fee_name, number_format_i18n($fee_val, 2));
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        $fees_section = !empty($fee_lines)
+            ? sprintf("--------------------------------------------------\n%s:\n%s\n", __('Naliczone opłaty (w tym potrącenia koszulek)', 'ak-product-set'), implode("\n", $fee_lines))
+            : '';
+
+        return [
+            'total'   => $fees_total,
+            'lines'   => $fee_lines,
+            'section' => $fees_section,
+        ];
+    }
+
+    /**
+     * Determines balance status and normalized balance based on balance amount, is_paid flag, and total paid.
+     *
+     * @return array{status: string, balance: float}
+     */
+    private static function resolve_balance_status(float $balance, bool $is_paid, float $total_paid): array {
+        if ($balance > 0.009) {
+            $status = (!$is_paid && $total_paid <= 0.009)
+                ? self::BALANCE_UNPAID
+                : self::BALANCE_UNDERPAID;
+            return ['status' => $status, 'balance' => $balance];
+        }
+
+        if ($balance < -0.009) {
+            return ['status' => self::BALANCE_OVERPAID, 'balance' => $balance];
+        }
+
+        return ['status' => self::BALANCE_SETTLED, 'balance' => 0.0];
     }
 }
+

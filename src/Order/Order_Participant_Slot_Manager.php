@@ -1,0 +1,410 @@
+<?php
+
+namespace AK_Set\Order;
+
+use AK_Set\Support\Helper;
+use AK_Set\Models\Participant_Model;
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+class Order_Participant_Slot_Manager {
+
+    /**
+     * Remove a specific single weekend enrollment for a participant.
+     */
+    public static function remove_weekend_for_participant(\WC_Order $order, string $participant_uuid, int $weekend_id, bool $tshirt_retained = false, bool $recalculate = true): array {
+        $before_snapshot = null;
+        $participant_name = '';
+        $found = false;
+
+        foreach ($order->get_items('line_item') as $item) {
+            if (!($item instanceof \WC_Order_Item_Product) || (int) $item->get_product_id() !== $weekend_id) {
+                continue;
+            }
+
+            $participants = $item->get_meta('_ak_participants');
+            if (!is_array($participants)) {
+                continue;
+            }
+
+            $remaining = [];
+            foreach ($participants as $p) {
+                if (!empty($p['id']) && $p['id'] === $participant_uuid) {
+                    $found = true;
+                    if ($participant_name === '' && !empty($p['name'])) {
+                        $participant_name = (string) $p['name'];
+                    }
+                } else {
+                    $remaining[] = $p;
+                }
+            }
+
+            if ($found) {
+                if ($recalculate) {
+                    $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
+                }
+                $item->update_meta_data('_ak_participants', $remaining);
+                Helper::add_participant_meta_to_order_item($remaining, $item);
+
+                // Restore stock for this single weekend
+                if (function_exists('wc_update_product_stock')) {
+                    wc_update_product_stock($weekend_id, 1, 'increase');
+                }
+                break;
+            }
+        }
+
+        if (!$found) {
+            return [
+                'success' => false,
+                'error'   => __('Uczestnik nie został znaleziony w wybranym terminie.', 'ak-product-set'),
+            ];
+        }
+
+        if (!$recalculate) {
+            return [
+                'success'          => true,
+                'participant_name' => $participant_name,
+            ];
+        }
+
+        $w_prod = wc_get_product($weekend_id);
+        $w_title = $w_prod ? $w_prod->get_name() : (string) $weekend_id;
+
+        $tshirt_cost = $tshirt_retained ? Order_Recalculator::get_tshirt_cost() : 0.0;
+        $reason = sprintf(
+            /* translators: 1: participant name, 2: weekend title */
+            __('Anulowanie terminu "%2$s" dla uczestnika: %1$s', 'ak-product-set'),
+            $participant_name ?: $participant_uuid,
+            $w_title
+        );
+
+        if ($tshirt_retained && $tshirt_cost > 0) {
+            $reason .= sprintf(' (potrącono koszt koszulki: %s zł)', number_format_i18n($tshirt_cost, 2));
+        }
+
+        $recalc_result = Order_Recalculator::recalculate($order, [
+            'reason'               => $reason,
+            'retained_tshirt_cost' => $tshirt_cost,
+            'before_snapshot'      => $before_snapshot,
+        ]);
+
+        return [
+            'success'          => true,
+            'participant_name' => $participant_name,
+            'recalculation'    => $recalc_result,
+        ];
+    }
+
+    /**
+     * Remove a participant completely from all weekends in an order.
+     */
+    public static function remove_participant_completely(\WC_Order $order, string $participant_uuid, bool $tshirt_retained = false): array {
+        $before_snapshot = null;
+        $participant_name = '';
+        $removed_count = 0;
+
+        foreach ($order->get_items('line_item') as $item) {
+            if (!($item instanceof \WC_Order_Item_Product)) {
+                continue;
+            }
+
+            $participants = $item->get_meta('_ak_participants');
+            if (!is_array($participants)) {
+                continue;
+            }
+
+            $remaining = [];
+            $found_in_item = false;
+
+            foreach ($participants as $p) {
+                if (!empty($p['id']) && $p['id'] === $participant_uuid) {
+                    $found_in_item = true;
+                    if ($participant_name === '' && !empty($p['name'])) {
+                        $participant_name = (string) $p['name'];
+                    }
+                } else {
+                    $remaining[] = $p;
+                }
+            }
+
+            if ($found_in_item) {
+                if ($before_snapshot === null) {
+                    $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
+                }
+                $removed_count++;
+                $item->update_meta_data('_ak_participants', $remaining);
+                Helper::add_participant_meta_to_order_item($remaining, $item);
+
+                $product_id = (int) $item->get_product_id();
+                if ($product_id > 0 && function_exists('wc_update_product_stock')) {
+                    wc_update_product_stock($product_id, 1, 'increase');
+                }
+            }
+        }
+
+        if ($removed_count === 0) {
+            return [
+                'success' => false,
+                'error'   => __('Uczestnik nie został znaleziony w tym zamówieniu.', 'ak-product-set'),
+            ];
+        }
+
+        $tshirt_cost = $tshirt_retained ? Order_Recalculator::get_tshirt_cost() : 0.0;
+        $reason = sprintf(
+            /* translators: %s: participant name */
+            __('Całkowite anulowanie uczestnika ze wszystkich terminów: %s', 'ak-product-set'),
+            $participant_name ?: $participant_uuid
+        );
+
+        if ($tshirt_retained && $tshirt_cost > 0) {
+            $reason .= sprintf(' (potrącono koszt koszulki: %s zł)', number_format_i18n($tshirt_cost, 2));
+        }
+
+        $recalc_result = Order_Recalculator::recalculate($order, [
+            'reason'               => $reason,
+            'retained_tshirt_cost' => $tshirt_cost,
+            'before_snapshot'      => $before_snapshot,
+        ]);
+
+        return [
+            'success'          => true,
+            'participant_name' => $participant_name,
+            'recalculation'    => $recalc_result,
+        ];
+    }
+
+    /**
+     * Add a participant with selectable weekend enrollment.
+     *
+     * @param array $selected_weekend_ids Empty array adds to all weekends of the set in order
+     */
+    public static function add_participant(\WC_Order $order, int $set_id, array $participant_data, array $selected_weekend_ids = []): array {
+        $p_model = new Participant_Model($participant_data);
+        $p_record = $p_model->to_array();
+
+        $selected_weekend_ids = array_map('intval', array_filter($selected_weekend_ids));
+        $updated_items = 0;
+
+        $existing_items_by_wid = [];
+        foreach ($order->get_items('line_item') as $item) {
+            if ($item instanceof \WC_Order_Item_Product && (int)$item->get_meta('_ak_parent_set_id') === $set_id) {
+                $existing_items_by_wid[(int)$item->get_product_id()] = $item;
+            }
+        }
+
+        // If no specific weekends selected, default to all existing weekends of this set in order
+        $target_wids = !empty($selected_weekend_ids) ? $selected_weekend_ids : array_keys($existing_items_by_wid);
+
+        if (empty($target_wids)) {
+            return [
+                'success' => false,
+                'error'   => __('Nie wybrano żadnego terminu dla nowego uczestnika.', 'ak-product-set'),
+            ];
+        }
+
+        $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
+
+        foreach ($target_wids as $wid) {
+            if (isset($existing_items_by_wid[$wid])) {
+                $item = $existing_items_by_wid[$wid];
+                $participants = (array) $item->get_meta('_ak_participants');
+                $participants[] = $p_record;
+                $item->update_meta_data('_ak_participants', $participants);
+                Helper::add_participant_meta_to_order_item($participants, $item);
+            } else {
+                $wc_product = wc_get_product($wid);
+                if (!$wc_product) {
+                    continue;
+                }
+                $new_item = new \WC_Order_Item_Product();
+                $new_item->set_product($wc_product);
+                $new_item->set_quantity(1);
+                $new_item->add_meta_data('_ak_parent_set_id', $set_id, true);
+                $new_item->add_meta_data('_ak_participants', [$p_record], true);
+                Helper::add_participant_meta_to_order_item([$p_record], $new_item);
+                $order->add_item($new_item);
+            }
+
+            if (function_exists('wc_update_product_stock')) {
+                wc_update_product_stock($wid, 1, 'decrease');
+            }
+
+            $updated_items++;
+        }
+
+        if ($updated_items === 0) {
+            return [
+                'success' => false,
+                'error'   => __('Nie udało się przypisać uczestnika do wybranych terminów.', 'ak-product-set'),
+            ];
+        }
+
+        $order->update_meta_data('_ak_parent_set_id', $set_id);
+        $order->update_meta_data('_ak_order_decomposed', '1');
+
+        if (in_array($order->get_status(), ['cancelled', 'wc-cancelled', 'trash'], true)) {
+            $order->update_status('processing', sprintf(
+                /* translators: %s: participant name */
+                __('Przywrócono zamówienie po dodaniu uczestnika %s', 'ak-product-set'),
+                $p_model->name ?: $p_model->id
+            ));
+        }
+
+        $reason = sprintf(
+            /* translators: 1: name, 2: count */
+            __('Dodanie uczestnika: %1$s (wybrane terminy: %2$d)', 'ak-product-set'),
+            $p_model->name ?: $p_model->id,
+            $updated_items
+        );
+
+        $recalc_result = Order_Recalculator::recalculate($order, [
+            'reason'          => $reason,
+            'before_snapshot' => $before_snapshot,
+        ]);
+
+        return [
+            'success'          => true,
+            'participant_id'   => $p_model->id,
+            'participant_name' => $p_model->name,
+            'recalculation'    => $recalc_result,
+        ];
+    }
+
+    /**
+     * Reschedule a specific weekend for a participant (Weekend A -> Weekend B).
+     */
+    public static function reschedule_weekend_for_participant(\WC_Order $order, string $participant_uuid, int $from_weekend_id, int $to_weekend_id): array {
+        if ($from_weekend_id === $to_weekend_id) {
+            return [
+                'success' => false,
+                'error'   => __('Nowy termin musi różnić się od dotychczasowego.', 'ak-product-set'),
+            ];
+        }
+
+        $participant_data = null;
+        $set_id = 0;
+        $from_item = null;
+        $to_item = null;
+
+        foreach ($order->get_items('line_item') as $item) {
+            if (!($item instanceof \WC_Order_Item_Product)) {
+                continue;
+            }
+
+            $pid = (int) $item->get_product_id();
+
+            if ($pid === $from_weekend_id) {
+                $from_item = $item;
+                $participants = $item->get_meta('_ak_participants');
+                if (is_array($participants)) {
+                    foreach ($participants as $p) {
+                        if (!empty($p['id']) && $p['id'] === $participant_uuid) {
+                            $participant_data = $p;
+                            $set_id = (int) $item->get_meta('_ak_parent_set_id');
+                            break;
+                        }
+                    }
+                }
+            } elseif ($pid === $to_weekend_id) {
+                $to_item = $item;
+            }
+        }
+
+        if (!$participant_data || !$from_item) {
+            return [
+                'success' => false,
+                'error'   => __('Uczestnik nie został znaleziony w wyjściowym terminie.', 'ak-product-set'),
+            ];
+        }
+
+        // Prevent moving to a weekend the participant is already enrolled in
+        if ($to_item) {
+            $to_participants = (array) $to_item->get_meta('_ak_participants');
+            foreach ($to_participants as $p) {
+                if (!empty($p['id']) && $p['id'] === $participant_uuid) {
+                    $p_name = $participant_data['name'] ?? $participant_uuid;
+                    return [
+                        'success' => false,
+                        'error'   => sprintf(
+                            __('Uczestnik "%s" jest już zapisany na wybrany termin docelowy w tym zamówieniu. Wybierz inny termin.', 'ak-product-set'),
+                            $p_name
+                        ),
+                    ];
+                }
+            }
+        }
+
+        // 1. Capture snapshot before any modification to source or destination items
+        $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
+
+        // 2. Remove from source weekend & restore stock
+        $from_participants = (array) $from_item->get_meta('_ak_participants');
+        $from_remaining = array_values(array_filter($from_participants, fn($p) => ($p['id'] ?? '') !== $participant_uuid));
+        $from_item->update_meta_data('_ak_participants', $from_remaining);
+        Helper::add_participant_meta_to_order_item($from_remaining, $from_item);
+
+        if (function_exists('wc_update_product_stock')) {
+            wc_update_product_stock($from_weekend_id, 1, 'increase');
+        }
+
+        // If source item now has 0 participants, delete it
+        if (empty($from_remaining)) {
+            $order->remove_item($from_item->get_id());
+        }
+
+        // 3. Add to destination weekend & deduct stock
+        if ($to_item) {
+            $to_participants = (array) $to_item->get_meta('_ak_participants');
+            $to_participants[] = $participant_data;
+            $to_item->update_meta_data('_ak_participants', $to_participants);
+            Helper::add_participant_meta_to_order_item($to_participants, $to_item);
+        } else {
+            $wc_product = wc_get_product($to_weekend_id);
+            if (!$wc_product) {
+                return [
+                    'success' => false,
+                    'error'   => __('Produkt docelowego terminu nie istnieje.', 'ak-product-set'),
+                ];
+            }
+            $new_item = new \WC_Order_Item_Product();
+            $new_item->set_product($wc_product);
+            $new_item->set_quantity(1);
+            $new_item->add_meta_data('_ak_parent_set_id', $set_id, true);
+            $new_item->add_meta_data('_ak_participants', [$participant_data], true);
+            Helper::add_participant_meta_to_order_item([$participant_data], $new_item);
+            $order->add_item($new_item);
+        }
+
+        if (function_exists('wc_update_product_stock')) {
+            wc_update_product_stock($to_weekend_id, 1, 'decrease');
+        }
+
+        $from_prod = wc_get_product($from_weekend_id);
+        $to_prod = wc_get_product($to_weekend_id);
+        $from_title = $from_prod ? $from_prod->get_name() : (string)$from_weekend_id;
+        $to_title = $to_prod ? $to_prod->get_name() : (string)$to_weekend_id;
+
+        $p_name = $participant_data['name'] ?? $participant_uuid;
+        $reason = sprintf(
+            /* translators: 1: name, 2: from weekend, 3: to weekend */
+            __('Zmiana terminu uczestnika %1$s: z "%2$s" na "%3$s"', 'ak-product-set'),
+            $p_name,
+            $from_title,
+            $to_title
+        );
+
+        $recalc_result = Order_Recalculator::recalculate($order, [
+            'reason'          => $reason,
+            'before_snapshot' => $before_snapshot,
+        ]);
+
+        return [
+            'success'          => true,
+            'participant_name' => $p_name,
+            'recalculation'    => $recalc_result,
+        ];
+    }
+}

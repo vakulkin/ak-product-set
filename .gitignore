@@ -3,6 +3,9 @@
 /.composer/
 /.composer-cache/
 /.phpunit.cache/
+/.psalm/
+/.phpstan.cache/
+/.rector.cache/
 
 # OS Generated Files
 .DS_Store

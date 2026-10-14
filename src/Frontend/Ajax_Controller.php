@@ -167,8 +167,6 @@ class Ajax_Controller {
     /**
      * Validate raw participant input arrays against required schema & format rules.
      *
-     * @param array $raw_participants
-     * @param bool  $has_tshirt
      * @return string|null Error message string on validation failure, or null if valid
      */
     private function validate_participants(array $raw_participants, bool $has_tshirt): ?string {
@@ -206,8 +204,6 @@ class Ajax_Controller {
 
     /**
      * Safely render and collect mini-cart HTML fragments without calling wp_send_json() or terminating execution.
-     *
-     * @return array
      */
     private function get_cart_fragments(): array {
         if (!function_exists('woocommerce_mini_cart')) {

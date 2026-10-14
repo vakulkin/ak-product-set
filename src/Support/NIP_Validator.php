@@ -11,7 +11,6 @@ class NIP_Validator {
     /**
      * Clean NIP string from spaces, hyphens, and optional country code (PL).
      *
-     * @param string $nip
      * @return string 10-digit string or empty
      */
     public static function clean(string $nip): string {
@@ -25,9 +24,6 @@ class NIP_Validator {
     /**
      * Validate Polish NIP checksum using modulo 11 algorithm.
      * Weights: 6, 5, 7, 2, 3, 4, 5, 6, 7.
-     *
-     * @param string $nip
-     * @return bool
      */
     public static function is_valid(string $nip): bool {
         $nip = self::clean($nip);

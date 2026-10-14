@@ -64,8 +64,6 @@ class Order_Payment_Tracker {
 
     /**
      * Record immutable initial payment metadata and settle order balance if previously unpaid.
-     *
-     * @param \WC_Order $order
      */
     public function record_initial_payment(\WC_Order $order): void {
         // Only track AK orders
@@ -141,11 +139,20 @@ class Order_Payment_Tracker {
             $order->update_meta_data('_ak_total_paid', $total);
         }
 
-        // If order was in unpaid state, settle it
+        // If order was in unpaid state, settle it and update breakdown text
         $balance_status = (string)$order->get_meta('_ak_balance_status');
         if ($balance_status === Order_Recalculator::BALANCE_UNPAID || $balance_status === '') {
             $order->update_meta_data('_ak_balance_status', Order_Recalculator::BALANCE_SETTLED);
             $order->update_meta_data('_ak_balance_amount', 0.0);
+
+            $breakdown = (string)$order->get_meta('_ak_pricing_breakdown');
+            if ($breakdown !== '') {
+                $formatted_total = number_format_i18n($total, 2);
+                $breakdown = preg_replace('/(Pierwotnie wpłacono:\s*)0(?:[,\.]00)?\s*zł/iu', '${1}' . $formatted_total . ' zł', $breakdown);
+                $breakdown = preg_replace('/(Wpłacono:\s*)0(?:[,\.]00)?\s*zł/iu', '${1}' . $formatted_total . ' zł', $breakdown);
+                $breakdown = preg_replace('/BILANS:\s*Nieopłacone[^\n]*/iu', 'BILANS: ' . __('Uregulowane (brak zaległości)', 'ak-product-set'), $breakdown);
+                $order->update_meta_data('_ak_pricing_breakdown', $breakdown);
+            }
         }
 
         $log_entry = sprintf(

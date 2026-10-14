@@ -61,7 +61,6 @@ class Plugin_Settings_Page {
      * Sanitize cost value
      *
      * @param mixed $value
-     * @return float
      */
     public function sanitize_cost($value): float {
         $num = (float) str_replace(',', '.', (string) $value);

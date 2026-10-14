@@ -33,7 +33,6 @@ class Round_Resolver {
      * If multiple weekends are selected, the package is priced according to the most
      * restrictive (maximum) round among all selected weekends.
      *
-     * @param array $selected_weekend_ids
      * @param int|null $current_timestamp
      * @return int (1, 2, or 3)
      */
@@ -49,6 +48,6 @@ class Round_Resolver {
         }
 
         // Variant A: Highest/most advanced round dictates package price
-        return !empty($rounds) ? max($rounds) : 1;
+        return max($rounds);
     }
 }

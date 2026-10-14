@@ -255,7 +255,6 @@ class Roster_Query {
      * Return (order_item_id, order_id) rows for all decomposed items of a
      * given weekend product.
      *
-     * @param int $product_id
      * @return object[]
      */
     private static function fetch_order_items_for_weekend(int $product_id): array {

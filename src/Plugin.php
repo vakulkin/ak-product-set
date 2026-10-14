@@ -11,7 +11,7 @@ class Plugin {
      * Singleton instance
      * @var Plugin|null
      */
-    private static $instance = null;
+    private static $instance;
 
     /**
      * Registered services
@@ -105,7 +105,7 @@ class Plugin {
 
         $roster_role = get_role('ak_roster_manager');
         if ($roster_role) {
-            foreach ($roster_caps as $cap => $grant) {
+            foreach (array_keys($roster_caps) as $cap) {
                 if (!$roster_role->has_cap($cap)) {
                     $roster_role->add_cap($cap);
                 }
@@ -145,8 +145,7 @@ class Plugin {
 
     /**
      * Get a registered service instance
-     * 
-     * @param string $key
+     *
      * @return mixed|null
      */
     public function get_service(string $key) {

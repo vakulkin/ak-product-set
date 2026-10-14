@@ -31,10 +31,11 @@ class Order_Payment_Tracker_Test extends TestCase {
         $order->shouldReceive('save')->once();
 
         // Setup initially as unpaid decomposed AK order
-        $meta['_ak_order_decomposed'] = '1';
-        $meta['_ak_balance_status']   = Order_Recalculator::BALANCE_UNPAID;
-        $meta['_ak_total_paid']       = '0.00';
-        $meta['_ak_balance_amount']   = '3000.00';
+        $meta['_ak_order_decomposed']   = '1';
+        $meta['_ak_balance_status']     = Order_Recalculator::BALANCE_UNPAID;
+        $meta['_ak_total_paid']         = '0.00';
+        $meta['_ak_balance_amount']     = '3000.00';
+        $meta['_ak_pricing_breakdown']  = "Wpłacono: 0,00 zł\nBILANS: Nieopłacone (oczekuje na płatność)";
 
         $tracker = new Order_Payment_Tracker();
         $tracker->record_initial_payment($order);
@@ -47,6 +48,8 @@ class Order_Payment_Tracker_Test extends TestCase {
         $this->assertEquals(3000.00, $meta['_ak_total_paid']);
         $this->assertEquals(Order_Recalculator::BALANCE_SETTLED, $meta['_ak_balance_status']);
         $this->assertEquals(0.0, $meta['_ak_balance_amount']);
+        $this->assertStringContainsString('Wpłacono: ' . number_format_i18n(3000.00, 2) . ' zł', $meta['_ak_pricing_breakdown']);
+        $this->assertStringContainsString('BILANS: Uregulowane (brak zaległości)', $meta['_ak_pricing_breakdown']);
     }
 
     public function test_record_initial_payment_ignores_non_ak_orders(): void {

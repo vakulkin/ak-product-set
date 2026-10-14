@@ -205,4 +205,97 @@ class Order_Recalculator_Test extends TestCase {
         $this->assertEquals(-1500.00, $result['balance_amount']);
         $this->assertEquals(0, $result['headcount']);
     }
+
+    public function test_recalculate_when_headcount_is_zero_and_unpaid_settles_without_overpayment(): void {
+        $meta = [];
+        $order = Mockery::mock('WC_Order');
+        $order->shouldReceive('get_id')->andReturn(4507);
+        $order->shouldReceive('get_status')->andReturn('pending');
+        $order->shouldReceive('get_date_created')->andReturn(null);
+        $order->shouldReceive('get_meta')->with('_ak_total_paid')->andReturn('0.00');
+        $order->shouldReceive('get_meta')->with('_ak_original_total')->andReturn('750.00');
+        $order->shouldReceive('get_meta')->with('_ak_original_headcount')->andReturn(1);
+        $order->shouldReceive('get_meta')->with('_ak_balance_history')->andReturn('');
+
+        $item = Mockery::mock('WC_Order_Item_Product');
+        $item->shouldReceive('get_id')->andReturn(99);
+        $item->shouldReceive('get_product_id')->andReturn(101);
+        $item->shouldReceive('get_name')->andReturn('Weekend 1');
+        $item->shouldReceive('get_meta')->with('_ak_parent_set_id')->andReturn(10);
+        $item->shouldReceive('get_meta')->with('_ak_participants')->andReturn([]); // 0 participants
+
+        $order->shouldReceive('get_items')->with('line_item')->andReturn([$item]);
+        $order->shouldReceive('remove_item')->with(99)->once();
+        $order->shouldReceive('update_status')->with('cancelled', Mockery::any())->once();
+        $order->shouldReceive('update_meta_data')->andReturnUsing(function($k, $v) use (&$meta) {
+            $meta[$k] = $v;
+        });
+        $order->shouldReceive('add_order_note')->once();
+        $order->shouldReceive('save')->once();
+
+        $result = Order_Recalculator::recalculate($order, ['reason' => 'Anulowano nieopłacone zamówienie']);
+
+        $this->assertEquals(Order_Recalculator::BALANCE_SETTLED, $result['status']);
+        $this->assertEquals(0.0, $result['balance_amount']);
+        $this->assertEquals(0, $result['headcount']);
+        $this->assertStringContainsString('BILANS: Uregulowane (brak zaległości i wpłat)', $meta['_ak_pricing_breakdown']);
+        $this->assertStringContainsString('Uregulowane (brak wpłat)', $meta['_ak_balance_history']);
+    }
+
+    public function test_recalculate_when_all_cancelled_with_accumulated_retained_tshirt_fees(): void {
+        $meta = [];
+        $order = Mockery::mock('WC_Order');
+        $order->shouldReceive('get_id')->andReturn(4507);
+        $order->shouldReceive('get_status')->andReturn('pending');
+        $order->shouldReceive('get_date_created')->andReturn(null);
+        $order->shouldReceive('get_meta')->with('_ak_total_paid')->andReturn('0.00');
+        $order->shouldReceive('get_meta')->with('_ak_original_total')->andReturn('750.00');
+        $order->shouldReceive('get_meta')->with('_ak_original_headcount')->andReturn(1);
+        $order->shouldReceive('get_meta')->with('_ak_balance_history')->andReturn('');
+
+        $item = Mockery::mock('WC_Order_Item_Product');
+        $item->shouldReceive('get_id')->andReturn(99);
+        $item->shouldReceive('get_product_id')->andReturn(101);
+        $item->shouldReceive('get_name')->andReturn('Weekend 1');
+        $item->shouldReceive('get_meta')->with('_ak_parent_set_id')->andReturn(10);
+        $item->shouldReceive('get_meta')->with('_ak_participants')->andReturn([]); // 0 participants left
+
+        // Pre-existing fee from 1st cancellation (60 PLN)
+        $fee = new \WC_Order_Item_Fee();
+        $fee->set_name('Koszt wyprodukowanej koszulki');
+        $fee->set_amount(60.0);
+        $fee->set_total(60.0);
+        $fee->add_meta_data('_ak_is_tshirt_fee', '1');
+
+        $order->shouldReceive('get_items')->with('line_item')->andReturn([$item]);
+        $order->shouldReceive('get_items')->with('fee')->andReturn([$fee]);
+        $order->shouldReceive('get_items')->with('coupon')->andReturn([]);
+        $order->shouldReceive('remove_item')->with(99)->once();
+        $order->shouldReceive('calculate_totals')->with(false)->once();
+        // Crucial: WooCommerce total must be updated to 120.00 (not 810.00 or 0.00)
+        $order->shouldReceive('set_total')->with(120.0)->once();
+        $order->shouldReceive('update_status')->with('cancelled', Mockery::any())->once();
+        $order->shouldReceive('update_meta_data')->andReturnUsing(function($k, $v) use (&$meta) {
+            $meta[$k] = $v;
+        });
+        $order->shouldReceive('add_order_note')->once();
+        $order->shouldReceive('save')->once();
+
+        // Cancelling last participant, retaining 2nd T-shirt (60 PLN) -> total fees = 120 PLN
+        $result = Order_Recalculator::recalculate($order, [
+            'reason' => 'Anulowanie z zatrzymaniem koszulki',
+            'retained_tshirt_cost' => 60.0,
+        ]);
+
+        $this->assertEquals(Order_Recalculator::BALANCE_UNPAID, $result['status']);
+        $this->assertEquals(120.0, $result['balance_amount']);
+        $this->assertEquals(0, $result['headcount']);
+        $this->assertEquals(120.0, $fee->get_total());
+        $this->assertEquals(120.0, $meta['_ak_recalculated_total']);
+        $this->assertStringContainsString('Naliczone opłaty', $meta['_ak_pricing_breakdown']);
+        $this->assertStringContainsString('Koszt wyprodukowanej koszulki', $meta['_ak_pricing_breakdown']);
+        $this->assertStringContainsString('120', $meta['_ak_pricing_breakdown']);
+        $this->assertStringContainsString('Nieopłacone', $meta['_ak_pricing_breakdown']);
+    }
 }
+

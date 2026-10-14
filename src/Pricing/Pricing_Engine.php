@@ -70,7 +70,6 @@ class Pricing_Engine {
      * Formula: MIN(stock(p)) across all managed stock products in selection.
      * Unmanaged products (stock null) are ignored.
      *
-     * @param array $selected_weekend_ids
      * @return int|null null if unmanaged stock (unlimited), integer if stock managed
      */
     public static function get_max_headcount_limit(array $selected_weekend_ids) {
@@ -101,7 +100,6 @@ class Pricing_Engine {
      * Calculate 3D dynamic set price purely on the server side
      *
      * @param int $set_id
-     * @param array $selected_weekend_ids
      * @param int $requested_headcount
      * @return array Calculation result payload
      */
@@ -190,8 +188,8 @@ class Pricing_Engine {
             'max_headcount'       => $max_headcount,
             'stock_clamped'       => $stock_clamped,
             'stock_warning'       => $stock_warning,
-            'per_person_price'    => (float)$per_person_price,
-            'total_price'         => (float)$total_price,
+            'per_person_price'    => $per_person_price,
+            'total_price'         => $total_price,
         ];
     }
 }

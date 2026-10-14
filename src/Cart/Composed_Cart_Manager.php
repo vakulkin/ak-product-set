@@ -23,8 +23,6 @@ class Composed_Cart_Manager {
     /**
      * Return the active WC_Cart instance, or null if not available.
      * Central guard used by all methods that interact with the cart.
-     *
-     * @return \WC_Cart|null
      */
     private static function get_cart(): ?\WC_Cart {
         if (!function_exists('WC') || !WC() || !WC()->cart) {
@@ -236,9 +234,7 @@ class Composed_Cart_Manager {
      * Add composed set line item in WooCommerce cart using Universal Product
      *
      * @param int $set_id
-     * @param array $selected_weekends
      * @param int $headcount
-     * @param array $participants_raw
      * @return string|false Cart item key on success, false on failure
      */
     public function add_set_to_cart($set_id, array $selected_weekends, $headcount, array $participants_raw) {
@@ -376,8 +372,6 @@ class Composed_Cart_Manager {
     /**
      * Override cart item price dynamically via woocommerce_before_calculate_totals.
      * Orchestrates three focused cleanup/pricing steps in order.
-     *
-     * @param \WC_Cart $cart
      */
     public function override_cart_item_prices(\WC_Cart $cart): void {
         if (is_admin() && !defined('DOING_AJAX')) {
@@ -397,8 +391,6 @@ class Composed_Cart_Manager {
      * Remove any plain (non-composed) cart items whose product_id is assigned
      * to at least one published ak_set. Silently strips items that landed in the
      * cart outside the set booking flow.
-     *
-     * @param \WC_Cart $cart
      */
     private function remove_rogue_set_products(\WC_Cart $cart): void {
         $assigned_ids = [];
@@ -440,8 +432,6 @@ class Composed_Cart_Manager {
     /**
      * If multiple composed set items share the same set_id (e.g. from session
      * replay or a double-submit), keep only the most-recently added one.
-     *
-     * @param \WC_Cart $cart
      */
     private function deduplicate_composed_set_items(\WC_Cart $cart): void {
         $set_latest_keys = [];
@@ -468,8 +458,6 @@ class Composed_Cart_Manager {
     /**
      * Recalculate and inject the live price (and set name) into every composed
      * set cart item. Items whose price cannot be determined are removed.
-     *
-     * @param \WC_Cart $cart
      */
     private function apply_composed_set_prices(\WC_Cart $cart): void {
         foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
