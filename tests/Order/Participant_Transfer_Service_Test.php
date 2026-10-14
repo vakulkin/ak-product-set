@@ -254,6 +254,110 @@ class Participant_Transfer_Service_Test extends TestCase {
         $this->assertArrayHasKey('target_recalc', $result);
     }
 
+    public function test_reschedule_weekend_records_before_and_after_snapshots_in_audit_log(): void {
+        $p_data = ['id' => 'uuid-123', 'name' => 'Jan Kowalski'];
+        $item1_participants = [$p_data];
+        $item2_participants = [];
+
+        $item1 = Mockery::mock('WC_Order_Item_Product');
+        $item1->shouldReceive('get_id')->andReturn(10);
+        $item1->shouldReceive('get_product_id')->andReturn(101);
+        $item1->shouldReceive('get_name')->andReturn('Weekend III');
+        $item1->shouldReceive('get_meta')->with('_ak_participants')->andReturnUsing(function() use (&$item1_participants) {
+            return $item1_participants;
+        });
+        $item1->shouldReceive('get_meta')->with('_ak_parent_set_id')->andReturn(50);
+        $item1->shouldReceive('update_meta_data')->with('_ak_participants', Mockery::on(function($val) use (&$item1_participants) {
+            $item1_participants = $val;
+            return true;
+        }))->once();
+        $item1->shouldReceive('update_meta_data')->with(Mockery::not('_ak_participants'), Mockery::any())->zeroOrMoreTimes();
+        $item1->shouldReceive('add_meta_data')->andReturnNull();
+        $item1->shouldReceive('set_quantity')->andReturnNull();
+        $item1->shouldReceive('set_subtotal')->andReturnNull();
+        $item1->shouldReceive('set_total')->andReturnNull();
+
+        $item2 = Mockery::mock('WC_Order_Item_Product');
+        $item2->shouldReceive('get_id')->andReturn(11);
+        $item2->shouldReceive('get_product_id')->andReturn(102);
+        $item2->shouldReceive('get_name')->andReturn('Weekend IV');
+        $item2->shouldReceive('get_meta')->with('_ak_participants')->andReturnUsing(function() use (&$item2_participants) {
+            return $item2_participants;
+        });
+        $item2->shouldReceive('get_meta')->with('_ak_parent_set_id')->andReturn(50);
+        $item2->shouldReceive('update_meta_data')->with('_ak_participants', Mockery::on(function($val) use (&$item2_participants) {
+            $item2_participants = $val;
+            return true;
+        }))->once();
+        $item2->shouldReceive('update_meta_data')->with(Mockery::not('_ak_participants'), Mockery::any())->zeroOrMoreTimes();
+        $item2->shouldReceive('add_meta_data')->andReturnNull();
+        $item2->shouldReceive('set_quantity')->andReturnNull();
+        $item2->shouldReceive('set_subtotal')->andReturnNull();
+        $item2->shouldReceive('set_total')->andReturnNull();
+
+        $order = Mockery::mock('WC_Order');
+        $order->shouldReceive('get_id')->andReturn(4507);
+        $order->shouldReceive('get_items')->with('line_item')->andReturnUsing(function() use ($item1, $item2, &$item1_participants) {
+            return empty($item1_participants) ? [$item2] : [$item1, $item2];
+        });
+        $order->shouldReceive('get_items')->with('coupon')->andReturn([]);
+        $order->shouldReceive('remove_item')->with(10)->once();
+        $order->shouldReceive('get_status')->andReturn('processing');
+        $order->shouldReceive('get_total')->andReturn(750.0);
+        $order->shouldReceive('get_meta')->with('_ak_original_total')->andReturn(750.0);
+        $order->shouldReceive('get_meta')->with('_ak_total_paid')->andReturn(750.0);
+        $order->shouldReceive('get_meta')->with('_ak_original_headcount')->andReturn(1);
+        $order->shouldReceive('get_meta')->with('_ak_balance_history')->andReturn('');
+        $order->shouldReceive('get_meta')->with('_ak_coupon_types')->andReturn('');
+        $order->shouldReceive('get_date_created')->andReturn(null);
+        $order->shouldReceive('calculate_totals')->andReturnNull();
+        $order->shouldReceive('get_coupons')->andReturn([]);
+        $order->shouldReceive('get_fees')->andReturn([]);
+        $order->shouldReceive('save')->atLeast()->once();
+
+        $order->shouldReceive('update_meta_data')->with('_ak_recalculated_total', Mockery::any())->atLeast()->once();
+        $order->shouldReceive('update_meta_data')->with('_ak_balance_amount', Mockery::any())->atLeast()->once();
+        $order->shouldReceive('update_meta_data')->with('_ak_balance_status', Mockery::any())->atLeast()->once();
+        $order->shouldReceive('update_meta_data')->with('_ak_pricing_breakdown', Mockery::any())->atLeast()->once();
+
+        $captured_history = '';
+        $order->shouldReceive('update_meta_data')->with('_ak_balance_history', Mockery::on(function($val) use (&$captured_history) {
+            $captured_history = $val;
+            return true;
+        }))->atLeast()->once();
+        $order->shouldReceive('add_order_note')->atLeast()->once();
+
+        $prod1 = Mockery::mock('WC_Product');
+        $prod1->shouldReceive('get_name')->andReturn('Weekend III');
+        $prod2 = Mockery::mock('WC_Product');
+        $prod2->shouldReceive('get_name')->andReturn('Weekend IV');
+
+        Functions\when('wc_get_product')->alias(function($id) use ($prod1, $prod2) {
+            if ($id === 101) return $prod1;
+            if ($id === 102) return $prod2;
+            return null;
+        });
+        Functions\when('get_post')->justReturn((object)['ID' => 50, 'post_title' => 'Camp']);
+        Functions\when('get_post_meta')->justReturn(null);
+        Functions\when('get_field')->alias(function($key) {
+            if ($key === 'set_pricing_matrix') {
+                return [
+                    ['package_size' => 1, 'round_1_price' => 750.0, 'round_1_price_g5' => 700.0, 'round_1_price_g10' => 650.0],
+                ];
+            }
+            return [];
+        });
+
+        $result = Participant_Transfer_Service::reschedule_weekend_for_participant($order, 'uuid-123', 101, 102);
+
+        $this->assertTrue($result['success']);
+        $this->assertNotEmpty($captured_history);
+        $this->assertStringContainsString('PRZED ZMIANĄ', $captured_history);
+        $this->assertStringContainsString('Weekend III', $captured_history);
+        $this->assertStringContainsString('PO ZMIANIE', $captured_history);
+        $this->assertStringContainsString('Weekend IV', $captured_history);
+    }
+
     public function test_transfer_type_constants_and_choices(): void {
         $this->assertEquals('new', Participant_Transfer_Service::TRANSFER_TYPE_NEW);
         $this->assertEquals('existing', Participant_Transfer_Service::TRANSFER_TYPE_EXISTING);

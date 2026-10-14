@@ -89,8 +89,10 @@ class Order_Recalculator {
      * @return array Calculation summary payload
      */
     public static function recalculate(\WC_Order $order, array $options = []): array {
-        // Snapshot order state before any changes
-        $before_snapshot = self::get_order_state_snapshot($order);
+        // Snapshot order state before any changes (use pre-change snapshot if provided by caller)
+        $before_snapshot = !empty($options['before_snapshot'])
+            ? $options['before_snapshot']
+            : self::get_order_state_snapshot($order);
 
         // 1. Initialize original baseline totals if this is the first modification
         $original_total = $order->get_meta('_ak_original_total');
@@ -721,25 +723,50 @@ class Order_Recalculator {
      */
     public static function get_order_state_snapshot(\WC_Order $order): array {
         $participants_map = [];
-        foreach ($order->get_items('line_item') as $item) {
-            if (!($item instanceof \WC_Order_Item_Product)) {
-                continue;
-            }
-            $wtitle = is_callable([$item, 'get_name']) ? $item->get_name() : (string) $item->get_product_id();
-            $p_list = $item->get_meta('_ak_participants');
-            if (is_array($p_list)) {
-                foreach ($p_list as $p) {
-                    $uuid = $p['id'] ?? '';
-                    if (!$uuid) {
-                        continue;
+        $items = [];
+        try {
+            $items = $order->get_items('line_item');
+        } catch (\Throwable $e) {
+            $items = [];
+        }
+
+        if (is_iterable($items)) {
+            foreach ($items as $item) {
+                if (!($item instanceof \WC_Order_Item_Product)) {
+                    continue;
+                }
+                $wtitle = '';
+                try {
+                    $wtitle = (string) $item->get_name();
+                } catch (\Throwable $e) {
+                    try {
+                        $wtitle = (string) $item->get_product_id();
+                    } catch (\Throwable $t) {
+                        $wtitle = '';
                     }
-                    if (!isset($participants_map[$uuid])) {
-                        $participants_map[$uuid] = [
-                            'name'     => $p['name'] ?? $uuid,
-                            'weekends' => [],
-                        ];
+                }
+
+                $p_list = [];
+                try {
+                    $p_list = $item->get_meta('_ak_participants');
+                } catch (\Throwable $e) {
+                    $p_list = [];
+                }
+
+                if (is_array($p_list)) {
+                    foreach ($p_list as $p) {
+                        $uuid = $p['id'] ?? '';
+                        if (!$uuid) {
+                            continue;
+                        }
+                        if (!isset($participants_map[$uuid])) {
+                            $participants_map[$uuid] = [
+                                'name'     => $p['name'] ?? $uuid,
+                                'weekends' => [],
+                            ];
+                        }
+                        $participants_map[$uuid]['weekends'][] = $wtitle ?: (string) ($p['id'] ?? '');
                     }
-                    $participants_map[$uuid]['weekends'][] = $wtitle;
                 }
             }
         }
@@ -756,8 +783,15 @@ class Order_Recalculator {
             );
         }
 
+        $total = 0.0;
+        try {
+            $total = (float) $order->get_total();
+        } catch (\Throwable $e) {
+            $total = 0.0;
+        }
+
         return [
-            'total'        => (float) $order->get_total(),
+            'total'        => $total,
             'participants' => $participants_map,
             'summary'      => !empty($summary_parts) ? implode('; ', $summary_parts) : __('Brak uczestników', 'ak-product-set'),
         ];

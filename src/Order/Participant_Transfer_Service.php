@@ -36,6 +36,7 @@ class Participant_Transfer_Service {
      * @return array
      */
     public static function remove_weekend_for_participant(\WC_Order $order, string $participant_uuid, int $weekend_id, bool $tshirt_retained = false): array {
+        $before_snapshot = null;
         $participant_name = '';
         $found = false;
 
@@ -62,6 +63,7 @@ class Participant_Transfer_Service {
             }
 
             if ($found) {
+                $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
                 $item->update_meta_data('_ak_participants', $remaining);
                 Helper::add_participant_meta_to_order_item($remaining, $item);
 
@@ -98,6 +100,7 @@ class Participant_Transfer_Service {
         $recalc_result = Order_Recalculator::recalculate($order, [
             'reason'               => $reason,
             'retained_tshirt_cost' => $tshirt_cost,
+            'before_snapshot'      => $before_snapshot,
         ]);
 
         return [
@@ -116,6 +119,7 @@ class Participant_Transfer_Service {
      * @return array
      */
     public static function remove_participant_completely(\WC_Order $order, string $participant_uuid, bool $tshirt_retained = false): array {
+        $before_snapshot = null;
         $participant_name = '';
         $removed_count = 0;
 
@@ -144,6 +148,9 @@ class Participant_Transfer_Service {
             }
 
             if ($found_in_item) {
+                if ($before_snapshot === null) {
+                    $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
+                }
                 $removed_count++;
                 $item->update_meta_data('_ak_participants', $remaining);
                 Helper::add_participant_meta_to_order_item($remaining, $item);
@@ -176,6 +183,7 @@ class Participant_Transfer_Service {
         $recalc_result = Order_Recalculator::recalculate($order, [
             'reason'               => $reason,
             'retained_tshirt_cost' => $tshirt_cost,
+            'before_snapshot'      => $before_snapshot,
         ]);
 
         return [
@@ -217,6 +225,8 @@ class Participant_Transfer_Service {
                 'error'   => __('Nie wybrano żadnego terminu dla nowego uczestnika.', 'ak-product-set'),
             ];
         }
+
+        $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
 
         foreach ($target_wids as $wid) {
             if (isset($existing_items_by_wid[$wid])) {
@@ -272,7 +282,8 @@ class Participant_Transfer_Service {
         );
 
         $recalc_result = Order_Recalculator::recalculate($order, [
-            'reason' => $reason,
+            'reason'          => $reason,
+            'before_snapshot' => $before_snapshot,
         ]);
 
         return [
@@ -353,7 +364,10 @@ class Participant_Transfer_Service {
             }
         }
 
-        // 1. Remove from source weekend & restore stock
+        // 1. Capture snapshot before any modification to source or destination items
+        $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
+
+        // 2. Remove from source weekend & restore stock
         $from_participants = (array) $from_item->get_meta('_ak_participants');
         $from_remaining = array_values(array_filter($from_participants, fn($p) => ($p['id'] ?? '') !== $participant_uuid));
         $from_item->update_meta_data('_ak_participants', $from_remaining);
@@ -410,7 +424,8 @@ class Participant_Transfer_Service {
         );
 
         $recalc_result = Order_Recalculator::recalculate($order, [
-            'reason' => $reason,
+            'reason'          => $reason,
+            'before_snapshot' => $before_snapshot,
         ]);
 
         return [
@@ -462,6 +477,8 @@ class Participant_Transfer_Service {
                 'error'   => __('Uczestnik / termin nie został odnaleziony w zamówieniu źródłowym.', 'ak-product-set'),
             ];
         }
+
+        $source_before_snapshot = Order_Recalculator::get_order_state_snapshot($source_order);
 
         // 1. Remove transferred weekend(s) from source order
         foreach ($weekends_to_transfer as $wid) {
@@ -541,6 +558,7 @@ class Participant_Transfer_Service {
                 $p_name,
                 $new_order->get_id()
             ),
+            'before_snapshot' => $source_before_snapshot,
         ]);
 
         $source_order->add_order_note(sprintf(
@@ -643,6 +661,8 @@ class Participant_Transfer_Service {
         }
 
         // 1. Remove from source order
+        $source_before_snapshot = Order_Recalculator::get_order_state_snapshot($source_order);
+        $target_before_snapshot = Order_Recalculator::get_order_state_snapshot($target_order);
         foreach ($weekends_to_transfer as $wid) {
             self::remove_weekend_for_participant($source_order, $participant_uuid, $wid, false);
         }
@@ -711,6 +731,7 @@ class Participant_Transfer_Service {
                 $p_name,
                 $source_order->get_id()
             ),
+            'before_snapshot' => $target_before_snapshot,
         ]);
 
         // 4. Recalculate the source order to update remaining items, balances and overpayments
@@ -721,6 +742,7 @@ class Participant_Transfer_Service {
                 $p_name,
                 $target_order->get_id()
             ),
+            'before_snapshot' => $source_before_snapshot,
         ]);
 
         $source_order->add_order_note(sprintf(
