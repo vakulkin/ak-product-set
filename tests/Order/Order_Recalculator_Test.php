@@ -91,7 +91,6 @@ class Order_Recalculator_Test extends TestCase {
         $order->shouldReceive('get_id')->andReturn(777);
         $order->shouldReceive('get_total')->andReturn('4800.00');
         $order->shouldReceive('get_date_created')->andReturn(null);
-        $order->shouldReceive('get_meta')->with('_ak_pre_settled_total_paid')->andReturn('');
         $order->shouldReceive('get_meta')->with('_ak_original_total')->andReturn('2400.00');
         $order->shouldReceive('get_meta')->with('_ak_total_paid')->andReturn('2400.00');
         $order->shouldReceive('get_meta')->with('_ak_original_headcount')->andReturn(1);
@@ -102,7 +101,6 @@ class Order_Recalculator_Test extends TestCase {
         });
         $order->shouldReceive('delete_meta_data')->with('_ak_manually_settled')->once();
         $order->shouldReceive('delete_meta_data')->with('_ak_manually_settled_total')->once();
-        $order->shouldReceive('delete_meta_data')->with('_ak_pre_settled_total_paid')->once();
         $order->shouldReceive('update_status')->once();
         $order->shouldReceive('add_order_note')->once();
         $order->shouldReceive('save')->once();
@@ -398,7 +396,6 @@ class Order_Recalculator_Test extends TestCase {
         $meta = [
             '_ak_manually_settled'       => '1',
             '_ak_manually_settled_total' => '750.00',
-            '_ak_pre_settled_total_paid' => '750.00',
         ];
         $order = Mockery::mock('WC_Order');
         $order->shouldReceive('get_id')->andReturn(888);
@@ -410,7 +407,6 @@ class Order_Recalculator_Test extends TestCase {
         $order->shouldReceive('get_meta')->with('_ak_balance_history')->andReturn('');
         $order->shouldReceive('get_meta')->with('_ak_manually_settled')->andReturn('1');
         $order->shouldReceive('get_meta')->with('_ak_manually_settled_total')->andReturn('750.00');
-        $order->shouldReceive('get_meta')->with('_ak_pre_settled_total_paid')->andReturn('750.00');
 
         $item = Mockery::mock('WC_Order_Item_Product');
         $item->shouldReceive('get_id')->andReturn(99);

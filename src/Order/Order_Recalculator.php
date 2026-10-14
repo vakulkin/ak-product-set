@@ -178,7 +178,6 @@ class Order_Recalculator {
                 // Order amount has changed! Invalidate manual settlement flag and recalculate against actual paid amount.
                 self::delete_order_meta($order, '_ak_manually_settled');
                 self::delete_order_meta($order, '_ak_manually_settled_total');
-                self::delete_order_meta($order, '_ak_pre_settled_total_paid');
 
                 $balance = round($new_total - $total_paid, 2);
                 $is_paid = self::is_order_paid($order);
@@ -303,7 +302,6 @@ class Order_Recalculator {
     public static function mark_unsettled(\WC_Order $order, string $note = ''): array {
         $order->delete_meta_data('_ak_manually_settled');
         $order->delete_meta_data('_ak_manually_settled_total');
-        $order->delete_meta_data('_ak_pre_settled_total_paid');
 
         $reason = __('Cofnięcie oznaczenia jako uregulowane (przywrócenie salda)', 'ak-product-set');
         if ($note !== '') {
@@ -578,36 +576,6 @@ class Order_Recalculator {
         return $record;
     }
 
-    /**
-     * Remove the last produced t-shirt record for a participant from a line item.
-     */
-    public static function remove_item_produced_tshirt(\WC_Order_Item_Product $item, string $participant_uuid = ''): ?array {
-        $records = self::get_item_produced_tshirts($item);
-        if (empty($records)) {
-            return null;
-        }
-
-        $removed = null;
-        $new_records = [];
-        $found = false;
-        for ($i = count($records) - 1; $i >= 0; $i--) {
-            if (!$found && ($participant_uuid === '' || ($records[$i]['participant_uuid'] ?? '') === $participant_uuid)) {
-                $removed = $records[$i];
-                $found = true;
-                continue;
-            }
-            $new_records[] = $records[$i];
-        }
-
-        if ($removed !== null) {
-            $new_records = array_reverse($new_records);
-            $json_val = function_exists('wp_json_encode') ? wp_json_encode($new_records) : json_encode($new_records);
-            $item->update_meta_data(self::PRODUCED_TSHIRTS_META_KEY, $json_val);
-            self::sync_slot_retained_count_from_records($item, $new_records);
-        }
-
-        return $removed;
-    }
 
     /**
      * Delete a specific produced t-shirt record by its unique UUID from a line item.
@@ -1153,7 +1121,6 @@ class Order_Recalculator {
                 // Order amount changed! Expire manual settlement flag.
                 self::delete_order_meta($order, '_ak_manually_settled');
                 self::delete_order_meta($order, '_ak_manually_settled_total');
-                self::delete_order_meta($order, '_ak_pre_settled_total_paid');
                 $balance = round($new_total - $total_paid, 2);
             } else {
                 $balance = 0.0;

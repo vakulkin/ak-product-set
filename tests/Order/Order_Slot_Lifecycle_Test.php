@@ -449,8 +449,8 @@ class Order_Slot_Lifecycle_Test extends TestCase {
         $fee_total = Order_Recalculator::get_order_produced_tshirts_total($order);
         $this->assertEquals(60.0, $fee_total);
 
-        // Now remove produced t-shirt
-        $removed = Order_Recalculator::remove_item_produced_tshirt($line_item, 'uuid-abc');
+        // Now delete produced t-shirt by UUID
+        $removed = Order_Recalculator::delete_item_produced_tshirt_by_uuid($line_item, $entry['uuid']);
         $this->assertNotNull($removed);
         $this->assertEquals('Michał Nowak', $removed['participant_name']);
         $this->assertEquals(60.0, $removed['cost']);

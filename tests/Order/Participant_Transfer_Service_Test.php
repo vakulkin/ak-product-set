@@ -200,7 +200,6 @@ class Participant_Transfer_Service_Test extends TestCase {
         $target_order->shouldReceive('get_meta')->with('_ak_transferred_from_orders')->andReturn([]);
         $target_order->shouldReceive('get_meta')->with('_ak_transferred_from_order')->andReturn(0);
         $target_order->shouldReceive('update_meta_data')->with('_ak_transferred_from_orders', [100])->once();
-        $target_order->shouldReceive('update_meta_data')->with('_ak_transferred_from_order', 100)->once();
         $target_order->shouldReceive('add_order_note')->atLeast()->once();
         $target_order->shouldReceive('save')->atLeast()->once();
 

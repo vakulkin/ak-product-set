@@ -34,7 +34,11 @@ if (!is_array($transferred_to_orders)) {
     $single_to = (int) $order->get_meta('_ak_transferred_to_order');
     $transferred_to_orders = $single_to > 0 ? [$single_to] : [];
 }
-$transferred_from = (int) $order->get_meta('_ak_transferred_from_order');
+$transferred_from_orders = $order->get_meta('_ak_transferred_from_orders');
+if (!is_array($transferred_from_orders)) {
+    $single_from = (int) $order->get_meta('_ak_transferred_from_order');
+    $transferred_from_orders = $single_from > 0 ? [$single_from] : [];
+}
 $is_order_cancelled = ($order->get_status() === 'cancelled');
 ?>
 
@@ -126,6 +130,14 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
             gap: 6px;
             flex-wrap: wrap;
         }
+        .ak-om-slot-produced-row {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: -2px;
+        }
 
         .ak-om-pre-box { background: transparent; border: none; padding: 0; font-size: 11px; white-space: pre-wrap; font-family: Consolas, Monaco, "Courier New", monospace; line-height: 1.5; margin: 0; color: #2c3338; }
 
@@ -139,18 +151,20 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
             <span><?php esc_html_e('Rozliczenie zamówienia', 'ak-product-set'); ?></span>
         </div>
         <div class="ak-om-panel-body">
-            <?php if (!empty($transferred_to_orders) || $transferred_from > 0) : ?>
+            <?php if (!empty($transferred_to_orders) || !empty($transferred_from_orders)) : ?>
                 <div class="ak-om-notice">
-                    <?php if ($transferred_from > 0) : ?>
+                    <?php if (!empty($transferred_from_orders)) : ?>
                         <div>
-                            <?php esc_html_e('Przeniesiono z zamówienia', 'ak-product-set'); ?>
-                            <a href="<?php echo esc_url(admin_url('admin.php?page=wc-orders&action=edit&id=' . $transferred_from)); ?>" target="_blank">
-                                #<?php echo esc_html($transferred_from); ?> ↗
-                            </a>
+                            <?php esc_html_e('Przeniesiono z zamówień:', 'ak-product-set'); ?>
+                            <?php foreach ($transferred_from_orders as $from_id) : ?>
+                                <a href="<?php echo esc_url(admin_url('admin.php?page=wc-orders&action=edit&id=' . $from_id)); ?>" target="_blank" style="margin-right: 6px;">
+                                    #<?php echo esc_html($from_id); ?> ↗
+                                </a>
+                            <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
                     <?php if (!empty($transferred_to_orders)) : ?>
-                        <div style="<?php echo $transferred_from > 0 ? 'margin-top: 4px;' : ''; ?>">
+                        <div style="<?php echo !empty($transferred_from_orders) ? 'margin-top: 4px;' : ''; ?>">
                             <?php esc_html_e('Przeniesiono do zamówień:', 'ak-product-set'); ?>
                             <?php foreach ($transferred_to_orders as $to_id) : ?>
                                 <a href="<?php echo esc_url(admin_url('admin.php?page=wc-orders&action=edit&id=' . $to_id)); ?>" target="_blank" style="margin-right: 6px;">
@@ -181,17 +195,6 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
                                 }
                                 ?>
                             </div>
-                            <?php if (isset($additional_paid) && abs($additional_paid) > 0.009) : ?>
-                                <div style="margin-top: 2px; font-weight: 600; color: <?php echo $additional_paid > 0 ? '#1e7e34' : '#b32d2e'; ?>;">
-                                    <?php
-                                    if ($additional_paid > 0) {
-                                        printf(esc_html__('+ Dodatkowo wpłacono: %s zł', 'ak-product-set'), number_format_i18n($additional_paid, 2));
-                                    } else {
-                                        printf(esc_html__('Zwrot / korekta: %s zł', 'ak-product-set'), number_format_i18n($additional_paid, 2));
-                                    }
-                                    ?>
-                                </div>
-                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -348,8 +351,16 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
                                     <?php if ($is_cancelled) : ?>
                                         <span class="ak-om-tag ak-tag-underpaid"><?php esc_html_e('Anulowany', 'ak-product-set'); ?></span>
                                     <?php elseif ($is_transferred) : ?>
+                                        <?php
+                                        $to_order_id = !empty($slot['transferred_to_order']) ? (int) $slot['transferred_to_order'] : 0;
+                                        ?>
                                         <span class="ak-om-tag" style="background:#e7f3fe; color:#185abc; border:1px solid #c2e0ff;">
-                                            <?php printf(esc_html__('Przeniesiony (%s)', 'ak-product-set'), !empty($slot['transferred_to_order']) ? '#' . esc_html($slot['transferred_to_order']) : 'zamówienie'); ?>
+                                            <?php if ($to_order_id > 0) : ?>
+                                                <?php esc_html_e('Przeniesiony', 'ak-product-set'); ?>
+                                                (<a href="<?php echo esc_url(admin_url('admin.php?page=wc-orders&action=edit&id=' . $to_order_id)); ?>" target="_blank" style="color:#185abc; font-weight:700; text-decoration:underline;">#<?php echo esc_html($to_order_id); ?> ↗</a>)
+                                            <?php else : ?>
+                                                <?php esc_html_e('Przeniesiony (zamówienie)', 'ak-product-set'); ?>
+                                            <?php endif; ?>
                                         </span>
                                     <?php endif; ?>
 
@@ -457,37 +468,39 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
                                 <?php else : ?>
                                     <span style="color: #50575e; font-size: 12px; font-weight: 500;"><?php echo $shirt_btn_label; ?></span>
                                 <?php endif; ?>
-
-                                <?php if (!empty($produced_tshirts)) : ?>
-                                    <?php foreach ($produced_tshirts as $produced) :
-                                        $prod_cut_label = Helper::get_tshirt_cut_label($produced['cut'] ?? '');
-                                        $prod_size = $produced['size'] ?: '—';
-                                        $prod_type_desc = $prod_size . ($prod_cut_label ? ' [' . $prod_cut_label . ']' : '');
-                                        $prod_cost = isset($produced['cost']) ? (float) $produced['cost'] : $tshirt_cost;
-                                        $person_name = !empty($produced['participant_name']) ? $produced['participant_name'] : (!empty($slot['name']) ? $slot['name'] : __('Uczestnik', 'ak-product-set'));
-                                    ?>
-                                        <div class="ak-om-produced-badge" style="display: inline-flex; align-items: center; justify-content: space-between; gap: 6px; background: #fff8e5; color: #856404; border: 1px solid #ffeeba; border-radius: 3px; padding: 3px 6px; font-size: 10px; line-height: 1.25;">
-                                            <div style="display: flex; flex-direction: column; text-align: left;">
-                                                <span style="font-weight: 600; color: #553c02;"><?php echo esc_html($person_name); ?></span>
-                                                <span style="color: #6d5203;">
-                                                    <?php echo esc_html($prod_type_desc); ?> (+<?php echo esc_html(number_format_i18n($prod_cost, 0)); ?> zł)
-                                                </span>
-                                            </div>
-                                            <button type="button" class="ak-om-delete-produced-tshirt-btn"
-                                                data-uuid="<?php echo esc_attr($produced['uuid']); ?>"
-                                                data-item-id="<?php echo esc_attr($slot['item_id'] ?? 0); ?>"
-                                                data-order-id="<?php echo esc_attr($order->get_id()); ?>"
-                                                data-cost="<?php echo esc_attr($prod_cost); ?>"
-                                                data-desc="<?php echo esc_attr($prod_type_desc); ?>"
-                                                style="background: none; border: none; cursor: pointer; color: #b32d2e; font-weight: bold; font-size: 13px; line-height: 1; padding: 0 2px;"
-                                                title="<?php esc_attr_e('Anuluj opłatę za tę wyprodukowaną koszulkę', 'ak-product-set'); ?>">
-                                                &times;
-                                            </button>
-                                        </div>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
                             </div>
                         </div>
+
+                        <?php if (!empty($produced_tshirts)) : ?>
+                            <div class="ak-om-slot-produced-row">
+                                <?php foreach ($produced_tshirts as $produced) :
+                                    $prod_cut_label = Helper::get_tshirt_cut_label($produced['cut'] ?? '');
+                                    $prod_size = $produced['size'] ?: '—';
+                                    $prod_type_desc = $prod_size . ($prod_cut_label ? ' [' . $prod_cut_label . ']' : '');
+                                    $prod_cost = isset($produced['cost']) ? (float) $produced['cost'] : $tshirt_cost;
+                                    $person_name = !empty($produced['participant_name']) ? $produced['participant_name'] : (!empty($slot['name']) ? $slot['name'] : __('Uczestnik', 'ak-product-set'));
+                                ?>
+                                    <div class="ak-om-produced-badge" style="display: inline-flex; align-items: center; justify-content: space-between; gap: 6px; background: #fff8e5; color: #856404; border: 1px solid #ffeeba; border-radius: 3px; padding: 2px 6px; font-size: 10px; line-height: 1.25;">
+                                        <div style="display: flex; flex-direction: column; text-align: left;">
+                                            <span style="font-weight: 600; color: #553c02; font-size: 10px;"><?php echo esc_html($person_name); ?></span>
+                                            <span style="color: #6d5203; font-size: 9.5px;">
+                                                <?php echo esc_html($prod_type_desc); ?> (+<?php echo esc_html(number_format_i18n($prod_cost, 0)); ?> zł)
+                                            </span>
+                                        </div>
+                                        <button type="button" class="ak-om-delete-produced-tshirt-btn"
+                                            data-uuid="<?php echo esc_attr($produced['uuid']); ?>"
+                                            data-item-id="<?php echo esc_attr($slot['item_id'] ?? 0); ?>"
+                                            data-order-id="<?php echo esc_attr($order->get_id()); ?>"
+                                            data-cost="<?php echo esc_attr($prod_cost); ?>"
+                                            data-desc="<?php echo esc_attr($prod_type_desc); ?>"
+                                            style="background: none; border: none; cursor: pointer; color: #b32d2e; font-weight: bold; font-size: 13px; line-height: 1; padding: 0 2px;"
+                                            title="<?php esc_attr_e('Anuluj opłatę za tę wyprodukowaną koszulkę', 'ak-product-set'); ?>">
+                                            &times;
+                                        </button>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 <?php endforeach; ?>
             </div>

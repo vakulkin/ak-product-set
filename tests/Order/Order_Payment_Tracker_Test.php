@@ -181,13 +181,12 @@ class Order_Payment_Tracker_Test extends TestCase {
         $this->assertEquals(-750.0, $result['balance_amount']);
     }
 
-    public function test_additional_paid_adds_to_gateway_baseline_without_overwriting(): void {
+    public function test_gateway_payment_stays_strictly_locked_to_gateway_paid(): void {
         $meta = [
             '_ak_original_total'           => '750.00',
             '_ak_initial_payment_recorded' => 'yes',
             '_ak_initial_payment_amount'   => '750.00',
-            '_ak_additional_paid'          => '100.00', // paid after checkout via BLIK / transfer
-            '_ak_total_paid'               => '850.00',
+            '_ak_total_paid'               => '750.00',
             '_ak_original_headcount'       => '1',
         ];
         $order = Mockery::mock('WC_Order');
@@ -206,11 +205,11 @@ class Order_Payment_Tracker_Test extends TestCase {
 
         $result = Order_Recalculator::recalculate($order);
 
-        // Gateway payment stays locked to 750, total paid is 850
+        // Gateway payment stays locked to 750, total paid is 750
         $this->assertEquals(750.00, $meta['_ak_initial_payment_amount']);
-        $this->assertEquals(100.00, $meta['_ak_additional_paid']);
-        $this->assertEquals(850.00, $meta['_ak_total_paid']);
+        $this->assertEquals(750.00, $meta['_ak_total_paid']);
+        $this->assertArrayNotHasKey('_ak_additional_paid', $meta);
         $this->assertEquals(Order_Recalculator::BALANCE_OVERPAID, $result['status']);
-        $this->assertEquals(-850.0, $result['balance_amount']);
+        $this->assertEquals(-750.0, $result['balance_amount']);
     }
 }

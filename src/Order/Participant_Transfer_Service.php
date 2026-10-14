@@ -89,8 +89,7 @@ class Participant_Transfer_Service {
         }
 
         $new_order->update_meta_data('_ak_order_decomposed', '1');
-        $new_order->update_meta_data('_ak_transferred_from_order', $source_order->get_id());
-
+        self::record_incoming_transfer_link($new_order, $source_order->get_id());
         self::record_outgoing_transfer_link($source_order, $new_order->get_id());
 
         // 4. Recalculate the new order
@@ -333,7 +332,6 @@ class Participant_Transfer_Service {
             $existing[] = $from_order_id;
         }
         $order->update_meta_data('_ak_transferred_from_orders', $existing);
-        $order->update_meta_data('_ak_transferred_from_order', $from_order_id);
     }
 }
 

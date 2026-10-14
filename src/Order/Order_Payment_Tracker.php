@@ -120,9 +120,6 @@ class Order_Payment_Tracker {
         if ($current_paid < 0.009) {
             $order->update_meta_data('_ak_total_paid', $total);
         }
-        if ($order->get_meta('_ak_additional_paid') === '' || $order->get_meta('_ak_additional_paid') === false) {
-            $order->update_meta_data('_ak_additional_paid', 0.0);
-        }
 
         // If order was in unpaid state, settle it and update breakdown text
         $balance_status = (string)$order->get_meta('_ak_balance_status');
@@ -204,15 +201,7 @@ class Order_Payment_Tracker {
             $gateway_paid = ($raw_init_amount !== null) ? (float) $raw_init_amount : 0.0;
         }
 
-        // Additional payments (e.g. after BLIK/Przelewy24) and total paid resolution
-        $raw_additional = Order_Recalculator::get_order_meta($order, '_ak_additional_paid', null);
-        if ($raw_additional !== null && abs((float) $raw_additional) > 0.009) {
-            $additional_paid = (float) $raw_additional;
-            $total_paid = round($gateway_paid + $additional_paid, 2);
-        } else {
-            $additional_paid = 0.0;
-            $total_paid = $gateway_paid;
-        }
+        $total_paid = $gateway_paid;
         Order_Recalculator::set_order_meta($order, '_ak_total_paid', $total_paid);
 
         // Fallback for payment details if not recorded
@@ -255,7 +244,6 @@ class Order_Payment_Tracker {
 
         return [
             'gateway_paid'    => $gateway_paid,
-            'additional_paid' => $additional_paid,
             'total_paid'      => $total_paid,
             'init_method'     => $init_method,
             'init_amount'     => $gateway_paid,
