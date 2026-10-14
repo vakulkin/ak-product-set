@@ -179,9 +179,7 @@ class Participant_Transfer_Service_Test extends TestCase {
         $source_order->shouldReceive('get_id')->andReturn(100);
         $source_order->shouldReceive('get_items')->with('line_item')->andReturn([$item1]);
         $source_order->shouldReceive('get_meta')->with('_ak_transferred_to_orders')->andReturn([]);
-        $source_order->shouldReceive('get_meta')->with('_ak_transferred_to_order')->andReturn(0);
         $source_order->shouldReceive('update_meta_data')->with('_ak_transferred_to_orders', [200])->once();
-        $source_order->shouldReceive('update_meta_data')->with('_ak_transferred_to_order', 200)->once();
         $source_order->shouldReceive('add_order_note')->atLeast()->once();
         $source_order->shouldReceive('save')->atLeast()->once();
 

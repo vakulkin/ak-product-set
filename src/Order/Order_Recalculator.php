@@ -175,20 +175,10 @@ class Order_Recalculator {
         if ($is_manually_settled) {
             $settled_at_total = (float) self::get_order_meta($order, '_ak_manually_settled_total', 0.0);
             if (abs($new_total - $settled_at_total) > 0.009) {
-                // Order amount has changed! Invalidate manual settlement and recalculate against actual paid amount.
+                // Order amount has changed! Invalidate manual settlement flag and recalculate against actual paid amount.
                 self::delete_order_meta($order, '_ak_manually_settled');
                 self::delete_order_meta($order, '_ak_manually_settled_total');
-
-                $pre_settled = self::get_order_meta($order, '_ak_pre_settled_total_paid', '');
-                if ($pre_settled !== '' && $pre_settled !== false) {
-                    $total_paid = (float) $pre_settled;
-                } else {
-                    $orig_total = (float) self::get_order_meta($order, '_ak_original_total', 0.0);
-                    $init_paid  = (float) self::get_order_meta($order, '_ak_initial_payment_amount', 0.0);
-                    $total_paid = $init_paid > 0.009 ? $init_paid : ($orig_total > 0.009 ? $orig_total : 0.0);
-                }
                 self::delete_order_meta($order, '_ak_pre_settled_total_paid');
-                self::set_order_meta($order, '_ak_total_paid', $total_paid);
 
                 $balance = round($new_total - $total_paid, 2);
                 $is_paid = self::is_order_paid($order);
@@ -196,7 +186,6 @@ class Order_Recalculator {
                 $balance_status = $balance_info['status'];
                 $balance = $balance_info['balance'];
             } else {
-                $total_paid = $new_total;
                 $balance = 0.0;
                 $balance_status = self::BALANCE_SETTLED;
             }
@@ -266,37 +255,28 @@ class Order_Recalculator {
      */
     public static function mark_settled(\WC_Order $order, string $note = ''): void {
         $current_total = (float) $order->get_total();
-        $previous_paid = $order->get_meta('_ak_total_paid');
-        if ($previous_paid !== '' && $previous_paid !== false) {
-            $order->update_meta_data('_ak_pre_settled_total_paid', (float) $previous_paid);
-        } else {
-            $payment_state = Order_Payment_Tracker::resolve_order_payment_state($order);
-            $order->update_meta_data('_ak_pre_settled_total_paid', (float) $payment_state['total_paid']);
-        }
         $order->update_meta_data('_ak_manually_settled', '1');
         $order->update_meta_data('_ak_manually_settled_total', $current_total);
-        $order->update_meta_data('_ak_total_paid', $current_total);
         $order->update_meta_data('_ak_balance_amount', 0.0);
         $order->update_meta_data('_ak_balance_status', self::BALANCE_SETTLED);
 
-        // Record manual initial payment info if not recorded yet
-        if ($order->get_meta('_ak_initial_payment_recorded') !== 'yes') {
+        // Record manual initial payment info only if order was completely unpaid and no payment was ever recorded
+        $current_paid = (float) $order->get_meta('_ak_total_paid');
+        if ($order->get_meta('_ak_initial_payment_recorded') !== 'yes' && $current_paid < 0.009) {
             $order->update_meta_data('_ak_initial_payment_recorded', 'yes');
             $order->update_meta_data('_ak_initial_payment_method', __('Płatność uregulowana ręcznie przez administratora', 'ak-product-set'));
             $order->update_meta_data('_ak_initial_payment_method_id', 'manual_admin');
             $order->update_meta_data('_ak_initial_payment_amount', $current_total);
+            $order->update_meta_data('_ak_total_paid', $current_total);
             $order->update_meta_data('_ak_initial_payment_date', current_time('Y-m-d H:i'));
             $order->update_meta_data('_ak_initial_payment_txn_id', '');
         }
 
-        // Update pricing breakdown text to reflect settled state
+        // Update pricing breakdown balance line without modifying "Pierwotnie wpłacono"
         $breakdown = (string) $order->get_meta('_ak_pricing_breakdown');
         if ($breakdown !== '') {
-            $pattern = '/(Pierwotnie wpłacono:.*?\n)(BILANS:.*?)(\n=|$)/s';
-            $replacement = sprintf(
-                "Uregulowano: %s zł\nBILANS: Uregulowane (brak zaległości)$3",
-                number_format_i18n($current_total, 2)
-            );
+            $pattern = '/BILANS:[^\n]*/u';
+            $replacement = 'BILANS: ' . __('Uregulowane (brak zaległości)', 'ak-product-set');
             $updated_breakdown = preg_replace($pattern, $replacement, $breakdown);
             if ($updated_breakdown) {
                 $order->update_meta_data('_ak_pricing_breakdown', $updated_breakdown);
@@ -321,15 +301,6 @@ class Order_Recalculator {
      * @return array Recalculation result
      */
     public static function mark_unsettled(\WC_Order $order, string $note = ''): array {
-        $pre_settled = $order->get_meta('_ak_pre_settled_total_paid');
-        if ($pre_settled !== '' && $pre_settled !== false) {
-            $restore_paid = (float) $pre_settled;
-        } else {
-            $original = $order->get_meta('_ak_original_total');
-            $restore_paid = ($original !== '' && $original !== false) ? (float) $original : 0.0;
-        }
-
-        $order->update_meta_data('_ak_total_paid', $restore_paid);
         $order->delete_meta_data('_ak_manually_settled');
         $order->delete_meta_data('_ak_manually_settled_total');
         $order->delete_meta_data('_ak_pre_settled_total_paid');
@@ -1179,22 +1150,12 @@ class Order_Recalculator {
         if ($is_manually_settled) {
             $settled_at_total = (float) self::get_order_meta($order, '_ak_manually_settled_total', 0.0);
             if (abs($new_total - $settled_at_total) > 0.009) {
-                // Order amount changed! Expire manual settlement.
+                // Order amount changed! Expire manual settlement flag.
                 self::delete_order_meta($order, '_ak_manually_settled');
                 self::delete_order_meta($order, '_ak_manually_settled_total');
-                $pre_settled = self::get_order_meta($order, '_ak_pre_settled_total_paid', '');
-                if ($pre_settled !== '' && $pre_settled !== false) {
-                    $total_paid = (float) $pre_settled;
-                } else {
-                    $orig_total = (float) self::get_order_meta($order, '_ak_original_total', 0.0);
-                    $init_paid  = (float) self::get_order_meta($order, '_ak_initial_payment_amount', 0.0);
-                    $total_paid = $init_paid > 0.009 ? $init_paid : ($orig_total > 0.009 ? $orig_total : 0.0);
-                }
                 self::delete_order_meta($order, '_ak_pre_settled_total_paid');
-                self::set_order_meta($order, '_ak_total_paid', $total_paid);
                 $balance = round($new_total - $total_paid, 2);
             } else {
-                $total_paid = $new_total;
                 $balance = 0.0;
             }
         } else {

@@ -57,11 +57,6 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
         .ak-om-metric-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: #646970; margin-bottom: 4px; }
         .ak-om-metric-value { font-size: 16px; font-weight: 700; color: #1d2327; line-height: 1.3; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-        .ak-om-table { width: 100%; border-collapse: collapse; }
-        .ak-om-table th { background: #f6f7f7; padding: 9px 12px; border-bottom: 1px solid #c3c4c7; font-weight: 600; color: #2c3338; text-align: left; font-size: 12px; }
-        .ak-om-table td { padding: 9px 12px; border-bottom: 1px solid #f0f0f1; vertical-align: middle; }
-        .ak-om-table tr:last-child td { border-bottom: none; }
-        .ak-om-table tr:hover td { background: #fcfcfc; }
 
         .ak-om-slots-list { display: flex; flex-direction: column; }
         .ak-om-slot-item {
@@ -257,7 +252,13 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
                             <?php endif; ?>
                         <?php else : ?>
                             <span class="ak-om-tag ak-tag-settled">
-                                <?php esc_html_e('Rozliczone (brak zaległości)', 'ak-product-set'); ?>
+                                <?php
+                                if ($order->get_meta('_ak_manually_settled') === '1') {
+                                    esc_html_e('Uregulowane ręcznie (brak zaległości)', 'ak-product-set');
+                                } else {
+                                    esc_html_e('Rozliczone (brak zaległości)', 'ak-product-set');
+                                }
+                                ?>
                             </span>
                             <?php if ($initial_payment_subtitle) : ?>
                                 <div class="ak-om-subtitle"><?php echo esc_html($initial_payment_subtitle); ?></div>
@@ -274,9 +275,7 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
                     </button>
                 <?php else : ?>
                     <?php
-                    $can_unsettle = $order->get_meta('_ak_manually_settled') === '1'
-                        || $order->get_meta('_ak_pre_settled_total_paid') !== ''
-                        || abs((float)$order->get_meta('_ak_original_total') - (float)$order->get_total()) > 0.01;
+                    $can_unsettle = ($order->get_meta('_ak_manually_settled') === '1');
                     if ($can_unsettle) :
                     ?>
                         <button type="button" class="button button-small ak-om-mark-unsettled-btn" data-order-id="<?php echo esc_attr($order->get_id()); ?>" title="<?php esc_attr_e('Przywróć wyliczone saldo niedopłaty/nadpłaty', 'ak-product-set'); ?>">

@@ -163,60 +163,6 @@ class Order_Slot_Lifecycle_Test extends TestCase {
         $this->assertEquals(1, $slot['tshirt_retained_count']);
     }
 
-    public function test_revert_tshirt_fee_deducts_fee_and_decrements_slot_retained_counter(): void {
-        update_option('ak_set_tshirt_cost', 60.0);
-
-        $fee_item = Mockery::mock('WC_Order_Item_Fee');
-        $fee_item->shouldIgnoreMissing();
-        $fee_item->shouldReceive('get_name')->andReturn('Koszt wyprodukowanej koszulki');
-        $fee_item->shouldReceive('get_meta')->with('_ak_is_tshirt_fee')->andReturn('1');
-        $fee_item->shouldReceive('get_total')->andReturn(120.0);
-        $fee_item->shouldReceive('set_total')->with(60.0)->once();
-        $fee_item->shouldReceive('set_amount')->with(60.0)->once();
-
-        $item_meta = [
-            '_ak_participants' => [
-                [
-                    'id'                    => 'uuid-1',
-                    'name'                  => 'Jan Kowalski',
-                    'status'                => 'active',
-                    'tshirt_retained_count' => 2,
-                ],
-            ],
-        ];
-
-        $line_item = Mockery::mock('WC_Order_Item_Product');
-        $line_item->shouldIgnoreMissing();
-        $line_item->shouldReceive('get_product_id')->andReturn(501);
-        $line_item->shouldReceive('get_meta')->with('_ak_participants')->andReturnUsing(function() use (&$item_meta) {
-            return $item_meta['_ak_participants'];
-        });
-        $line_item->shouldReceive('update_meta_data')->andReturnUsing(function($k, $v) use (&$item_meta) {
-            $item_meta[$k] = $v;
-        });
-
-        $order = Mockery::mock('WC_Order');
-        $order->shouldIgnoreMissing();
-        $order->shouldReceive('get_id')->andReturn(777);
-        $order->shouldReceive('get_items')->with('fee')->andReturn([$fee_item]);
-        $order->shouldReceive('get_items')->with('line_item')->andReturn([$line_item]);
-        $order->shouldReceive('get_meta')->with('_ak_parent_set_id')->andReturn(10);
-        $order->shouldReceive('get_meta')->with('_ak_original_total')->andReturn(1000.0);
-        $order->shouldReceive('get_meta')->with('_ak_total_paid')->andReturn(1000.0);
-        $order->shouldReceive('get_meta')->with('_ak_original_headcount')->andReturn(1);
-        $order->shouldReceive('get_meta')->with('_ak_balance_history')->andReturn('');
-        $order->shouldReceive('get_total')->andReturn(1000.0);
-        $order->shouldReceive('get_date_created')->andReturn(null);
-
-        $result = Order_Participant_Slot_Manager::revert_tshirt_fee($order, 'uuid-1', 501);
-
-        $this->assertTrue($result['success']);
-        // Decremented from 2 to 1
-        $this->assertEquals(1, $item_meta['_ak_participants'][0]['tshirt_retained_count']);
-
-        unset($GLOBALS['_wp_options']['ak_set_tshirt_cost']);
-    }
-
     public function test_profile_update_with_tshirt_produced_charges_fee_and_increments_slot(): void {
         update_option('ak_set_tshirt_cost', 60.0);
 
@@ -671,7 +617,6 @@ class Order_Slot_Lifecycle_Test extends TestCase {
         $order_status = 'cancelled';
         $order_meta = [
             '_ak_transferred_to_orders' => [202],
-            '_ak_transferred_to_order'  => 202,
         ];
 
         $order = Mockery::mock('WC_Order');
@@ -704,7 +649,6 @@ class Order_Slot_Lifecycle_Test extends TestCase {
         $this->assertArrayNotHasKey('transferred_at', $slot);
 
         $this->assertEquals([], $order_meta['_ak_transferred_to_orders']);
-        $this->assertEquals(0, $order_meta['_ak_transferred_to_order']);
     }
 }
 

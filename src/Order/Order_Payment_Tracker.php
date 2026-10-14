@@ -206,30 +206,14 @@ class Order_Payment_Tracker {
 
         // Additional payments (e.g. after BLIK/Przelewy24) and total paid resolution
         $raw_additional = Order_Recalculator::get_order_meta($order, '_ak_additional_paid', null);
-        if ($raw_additional !== null) {
+        if ($raw_additional !== null && abs((float) $raw_additional) > 0.009) {
             $additional_paid = (float) $raw_additional;
             $total_paid = round($gateway_paid + $additional_paid, 2);
-            Order_Recalculator::set_order_meta($order, '_ak_total_paid', $total_paid);
         } else {
-            if ($raw_total_paid !== null) {
-                $raw_total_float = (float) $raw_total_paid;
-                // Auto-heal: if total_paid was corrupted (e.g. 60 PLN when gateway was 750 PLN)
-                if ($gateway_paid > 0.009 && $raw_total_float < $gateway_paid && abs($raw_total_float - 60.0) < 0.01) {
-                    $total_paid = $gateway_paid;
-                    $additional_paid = 0.0;
-                } else {
-                    $total_paid = $raw_total_float;
-                    $additional_paid = round($total_paid - $gateway_paid, 2);
-                }
-                Order_Recalculator::set_order_meta($order, '_ak_additional_paid', $additional_paid);
-                Order_Recalculator::set_order_meta($order, '_ak_total_paid', $total_paid);
-            } else {
-                $total_paid = $gateway_paid;
-                $additional_paid = 0.0;
-                Order_Recalculator::set_order_meta($order, '_ak_additional_paid', 0.0);
-                Order_Recalculator::set_order_meta($order, '_ak_total_paid', $total_paid);
-            }
+            $additional_paid = 0.0;
+            $total_paid = $gateway_paid;
         }
+        Order_Recalculator::set_order_meta($order, '_ak_total_paid', $total_paid);
 
         // Fallback for payment details if not recorded
         if (!$init_recorded && ($total_paid > 0.009 || $has_paid_flag)) {

@@ -68,7 +68,7 @@ class Order_Recalculator_Test extends TestCase {
         $order->shouldReceive('get_meta')->with('_ak_total_paid')->andReturn('2400.00');
         $order->shouldReceive('get_meta')->with('_ak_balance_history')->andReturn('');
         $order->shouldReceive('get_meta')->with('_ak_pricing_breakdown')->andReturn('');
-        $order->shouldReceive('get_meta')->with('_ak_initial_payment_recorded')->andReturn('');
+        $order->shouldReceive('get_meta')->with('_ak_initial_payment_recorded')->andReturn('yes');
         $order->shouldReceive('update_meta_data')->andReturnUsing(function($k, $v) use (&$meta) {
             $meta[$k] = $v;
         });
@@ -77,14 +77,12 @@ class Order_Recalculator_Test extends TestCase {
 
         Order_Recalculator::mark_settled($order, 'Wpłacono przelewem');
 
-        $this->assertEquals(4800.00, $meta['_ak_total_paid']);
-        $this->assertEquals(2400.00, $meta['_ak_pre_settled_total_paid']);
+        // Settlement is only a flag: total_paid is NOT overwritten with order total!
+        $this->assertArrayNotHasKey('_ak_total_paid', $meta);
         $this->assertEquals('1', $meta['_ak_manually_settled']);
         $this->assertEquals(4800.00, $meta['_ak_manually_settled_total']);
         $this->assertEquals(0.0, $meta['_ak_balance_amount']);
         $this->assertEquals(Order_Recalculator::BALANCE_SETTLED, $meta['_ak_balance_status']);
-        $this->assertEquals('yes', $meta['_ak_initial_payment_recorded']);
-        $this->assertEquals('manual_admin', $meta['_ak_initial_payment_method_id']);
     }
 
     public function test_mark_unsettled_restores_pre_settled_paid(): void {
@@ -93,7 +91,7 @@ class Order_Recalculator_Test extends TestCase {
         $order->shouldReceive('get_id')->andReturn(777);
         $order->shouldReceive('get_total')->andReturn('4800.00');
         $order->shouldReceive('get_date_created')->andReturn(null);
-        $order->shouldReceive('get_meta')->with('_ak_pre_settled_total_paid')->andReturn('2400.00');
+        $order->shouldReceive('get_meta')->with('_ak_pre_settled_total_paid')->andReturn('');
         $order->shouldReceive('get_meta')->with('_ak_original_total')->andReturn('2400.00');
         $order->shouldReceive('get_meta')->with('_ak_total_paid')->andReturn('2400.00');
         $order->shouldReceive('get_meta')->with('_ak_original_headcount')->andReturn(1);
@@ -111,6 +109,8 @@ class Order_Recalculator_Test extends TestCase {
 
         $result = Order_Recalculator::mark_unsettled($order);
 
+        $this->assertEquals(Order_Recalculator::BALANCE_OVERPAID, $result['status']);
+        $this->assertEquals(-2400.00, $result['balance_amount']);
         $this->assertEquals(2400.00, $meta['_ak_total_paid']);
     }
 

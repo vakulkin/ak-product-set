@@ -176,7 +176,7 @@ class Order_Payment_Tracker_Test extends TestCase {
         // Gateway payment must be restored to 750, not 60!
         $this->assertEquals(750.00, $meta['_ak_initial_payment_amount']);
         $this->assertEquals(750.00, $meta['_ak_total_paid']);
-        $this->assertEquals(0.0, $meta['_ak_additional_paid']);
+        $this->assertArrayNotHasKey('_ak_additional_paid', $meta);
         $this->assertEquals(Order_Recalculator::BALANCE_OVERPAID, $result['status']);
         $this->assertEquals(-750.0, $result['balance_amount']);
     }

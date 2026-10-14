@@ -319,7 +319,6 @@ class Participant_Transfer_Service {
             $existing[] = $to_order_id;
         }
         $order->update_meta_data('_ak_transferred_to_orders', $existing);
-        $order->update_meta_data('_ak_transferred_to_order', $to_order_id);
     }
 
     /**

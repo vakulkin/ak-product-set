@@ -26,7 +26,6 @@ class Order_Participant_Manager {
         // Atomic Slot AJAX Handlers
         add_action('wp_ajax_ak_remove_weekend_participant',   [$this, 'ajax_remove_weekend_participant']);
         add_action('wp_ajax_ak_restore_weekend_participant',  [$this, 'ajax_restore_weekend_participant']);
-        add_action('wp_ajax_ak_revert_tshirt_fee',             [$this, 'ajax_revert_tshirt_fee']);
         add_action('wp_ajax_ak_delete_produced_tshirt',        [$this, 'ajax_delete_produced_tshirt']);
         add_action('wp_ajax_ak_add_participant',               [$this, 'ajax_add_participant']);
         add_action('wp_ajax_ak_reschedule_participant',        [$this, 'ajax_reschedule_participant']);
@@ -587,29 +586,6 @@ class Order_Participant_Manager {
         }
 
         $result = Order_Participant_Slot_Manager::restore_weekend_for_participant($order, $uuid, $weekend_id);
-        if ($result['success']) {
-            wp_send_json_success($result);
-        } else {
-            wp_send_json_error($result['error'] ?? 'Błąd');
-        }
-    }
-
-    public function ajax_revert_tshirt_fee(): void {
-        check_ajax_referer(self::NONCE_ACTION, 'nonce');
-        if (!current_user_can('manage_woocommerce')) {
-            wp_send_json_error(__('Brak uprawnień.', 'ak-product-set'));
-        }
-
-        $order_id   = isset($_POST['order_id']) ? (int) $_POST['order_id'] : 0;
-        $uuid       = isset($_POST['uuid']) ? sanitize_text_field($_POST['uuid']) : null;
-        $weekend_id = isset($_POST['weekend_id']) ? (int) $_POST['weekend_id'] : null;
-
-        $order = wc_get_order($order_id);
-        if (!$order) {
-            wp_send_json_error(__('Nieprawidłowe dane zamówienia.', 'ak-product-set'));
-        }
-
-        $result = Order_Participant_Slot_Manager::revert_tshirt_fee($order, $uuid, $weekend_id);
         if ($result['success']) {
             wp_send_json_success($result);
         } else {

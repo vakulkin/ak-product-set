@@ -184,7 +184,6 @@ class Order_Participant_Slot_Manager {
                     }
                     $remaining_transferred = array_values(array_unique(array_filter($remaining_transferred)));
                     $order->update_meta_data('_ak_transferred_to_orders', $remaining_transferred);
-                    $order->update_meta_data('_ak_transferred_to_order', !empty($remaining_transferred) ? end($remaining_transferred) : 0);
                 }
             }
         }
@@ -234,60 +233,6 @@ class Order_Participant_Slot_Manager {
             'success'          => true,
             'participant_name' => $participant_name,
             'recalculation'    => $recalc_result,
-        ];
-    }
-
-    /**
-     * Revert / cancel a single 60 zł (or configured unit cost) t-shirt fee on the order.
-     */
-    public static function revert_tshirt_fee(\WC_Order $order, ?string $participant_uuid = null, ?int $weekend_id = null): array {
-        $set_id = (int) $order->get_meta('_ak_parent_set_id');
-        $cost = Order_Recalculator::get_tshirt_cost($set_id);
-        $existing_fee = Order_Recalculator::get_order_tshirt_fee_total($order);
-
-        if ($existing_fee <= 0.009) {
-            return [
-                'success' => false,
-                'error'   => __('Brak naliczonej opłaty za koszulki w tym zamówieniu.', 'ak-product-set'),
-            ];
-        }
-
-        $before_snapshot = Order_Recalculator::get_order_state_snapshot($order);
-        $deduct = min($cost, $existing_fee);
-
-        // Decrement / remove produced t-shirt record
-        $removed_record = null;
-        foreach ($order->get_items('line_item') as $item) {
-            if (!($item instanceof \WC_Order_Item_Product)) {
-                continue;
-            }
-            if ($weekend_id && (int) $item->get_product_id() !== $weekend_id) {
-                continue;
-            }
-            $removed_record = Order_Recalculator::remove_item_produced_tshirt($item, $participant_uuid ?: '');
-            if ($removed_record !== null) {
-                break;
-            }
-        }
-
-        $deduct = ($removed_record !== null && isset($removed_record['cost']))
-            ? (float) $removed_record['cost']
-            : min($cost, $existing_fee);
-
-        $reason = sprintf(
-            /* translators: %s: formatted cost */
-            __('Cofnięto opłatę za wyprodukowaną koszulkę (-%s zł)', 'ak-product-set'),
-            number_format_i18n($deduct, 2)
-        );
-
-        $recalc_result = Order_Recalculator::recalculate($order, [
-            'reason'          => $reason,
-            'before_snapshot' => $before_snapshot,
-        ]);
-
-        return [
-            'success'       => true,
-            'recalculation' => $recalc_result,
         ];
     }
 
