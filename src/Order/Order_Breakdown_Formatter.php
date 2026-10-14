@@ -22,8 +22,8 @@ class Order_Breakdown_Formatter {
     /**
      * Format a single cohort pricing breakdown block.
      *
-     * @param string[] $participant_names
-     * @param string[] $weekend_titles
+     * @param string[]|array[] $participants
+     * @param string[]         $weekend_titles
      */
     public static function format_cohort_section(
         int $cohort_index,

@@ -113,78 +113,11 @@ class Order_Recalculator {
             : self::get_order_state_snapshot($order);
 
         // 1. Initialize original baseline totals if this is the first modification
-        $original_total = $order->get_meta('_ak_original_total');
-        if ($original_total === '' || $original_total === false || (float)$original_total <= 0.009) {
-            $calc_total = (float) $order->get_total();
-            if ($calc_total <= 0.009) {
-                foreach ($order->get_items('line_item') as $item) {
-                    if ($item instanceof \WC_Order_Item_Product) {
-                        $calc_total += (float) $item->get_total();
-                    }
-                }
-            }
-            if ($calc_total > 0.009) {
-                $original_total = $calc_total;
-                $order->update_meta_data('_ak_original_total', $original_total);
-            } else {
-                $original_total = 0.0;
-            }
-        } else {
-            $original_total = (float) $original_total;
-        }
+        self::resolve_original_total($order);
 
         // 1b. Determine immutable gateway payment and additional paid amounts
-        $init_recorded  = self::get_order_meta($order, '_ak_initial_payment_recorded') === 'yes';
-        $init_amount    = self::get_order_meta($order, '_ak_initial_payment_amount', null);
-        $raw_total_paid = self::get_order_meta($order, '_ak_total_paid', null);
-        $status         = self::get_order_status($order);
-        $is_paid        = self::is_order_paid($order);
-
-        $has_paid_flag = $is_paid || in_array($status, ['processing', 'completed'], true) || $init_recorded || ($raw_total_paid !== null && (float)$raw_total_paid > 0.009);
-
-        // Gateway payment baseline (must strictly be original checkout sum if order was paid through gateway)
-        if ($has_paid_flag) {
-            if ($original_total > 0.009) {
-                // Auto-heal if init_amount was corrupted (e.g. 60 zł on #4508)
-                if ($init_amount === null || abs((float)$init_amount - $original_total) > 0.009) {
-                    $gateway_paid = $original_total;
-                    self::set_order_meta($order, '_ak_initial_payment_amount', $original_total);
-                } else {
-                    $gateway_paid = (float) $init_amount;
-                }
-            } else {
-                $gateway_paid = ($init_amount !== null) ? (float) $init_amount : 0.0;
-            }
-        } else {
-            $gateway_paid = ($init_amount !== null) ? (float) $init_amount : 0.0;
-        }
-
-        // Additional payments (e.g. after BLIK/Przelewy24) and total paid resolution
-        $raw_additional = self::get_order_meta($order, '_ak_additional_paid', null);
-        if ($raw_additional !== null) {
-            $additional_paid = (float) $raw_additional;
-            $total_paid = round($gateway_paid + $additional_paid, 2);
-            self::set_order_meta($order, '_ak_total_paid', $total_paid);
-        } else {
-            if ($raw_total_paid !== null) {
-                $raw_total_float = (float) $raw_total_paid;
-                // Auto-heal: if total_paid was corrupted (e.g. 60 PLN when gateway was 750 PLN)
-                if ($gateway_paid > 0.009 && $raw_total_float < $gateway_paid && abs($raw_total_float - 60.0) < 0.01) {
-                    $total_paid = $gateway_paid;
-                    $additional_paid = 0.0;
-                } else {
-                    $total_paid = $raw_total_float;
-                    $additional_paid = round($total_paid - $gateway_paid, 2);
-                }
-                self::set_order_meta($order, '_ak_additional_paid', $additional_paid);
-                self::set_order_meta($order, '_ak_total_paid', $total_paid);
-            } else {
-                $total_paid = $gateway_paid;
-                $additional_paid = 0.0;
-                self::set_order_meta($order, '_ak_additional_paid', 0.0);
-                self::set_order_meta($order, '_ak_total_paid', $total_paid);
-            }
-        }
+        $payment_state   = Order_Payment_Tracker::resolve_order_payment_state($order);
+        $total_paid      = $payment_state['total_paid'];
 
         $original_headcount = (int) $order->get_meta('_ak_original_headcount');
         if ($original_headcount <= 0) {
@@ -197,294 +130,29 @@ class Order_Recalculator {
         $order_timestamp = $date_created ? $date_created->getTimestamp() : time();
 
         // 3. Extract all participants and map their specific attended weekends
-        $items = $order->get_items('line_item');
-        $participant_enrollments = []; // uuid => ['data' => ..., 'set_id' => ..., 'weekends' => [wid => item_id]]
-        $weekend_items_map = [];       // wid => \WC_Order_Item_Product
+        $extraction = self::extract_active_participant_enrollments($order);
+        $participant_enrollments = $extraction['enrollments'];
+        $weekend_items_map       = $extraction['items_map'];
+        $overall_headcount       = count($participant_enrollments);
 
-        foreach ($items as $item_id => $item) {
-            if (!($item instanceof \WC_Order_Item_Product)) {
-                continue;
-            }
-
-            $set_id = (int) $item->get_meta('_ak_parent_set_id');
-            $wid    = (int) $item->get_product_id();
-
-            if ($set_id > 0 && $wid > 0) {
-                $weekend_items_map[$wid] = $item;
-
-                $p_list = $item->get_meta('_ak_participants');
-                if (is_array($p_list)) {
-                    foreach ($p_list as $p) {
-                        $uuid = $p['id'] ?? '';
-                        if (!$uuid) {
-                            continue;
-                        }
-                        if (($p['status'] ?? 'active') !== 'active') {
-                            continue;
-                        }
-                        if (!isset($participant_enrollments[$uuid])) {
-                            $participant_enrollments[$uuid] = [
-                                'data'     => $p,
-                                'set_id'   => $set_id,
-                                'weekends' => [],
-                            ];
-                        }
-                        $participant_enrollments[$uuid]['weekends'][$wid] = $item_id;
-                    }
-                }
-            }
-        }
-
-        $overall_headcount = count($participant_enrollments);
-
-        // 4. Synchronize Retained T-Shirt Manufacturing Cost strictly from slot elements (single source of truth)
+        // 4. Synchronize Retained T-Shirt Manufacturing Cost strictly from slot elements
         self::sync_tshirt_fee_from_slots($order, $options);
 
         // 5. Handle cancellation of entire order if headcount is 0
         if ($overall_headcount <= 0) {
-            // Keep line items if they contain inactive participants, otherwise remove truly empty items
-            foreach ($weekend_items_map as $item) {
-                $p_list = $item->get_meta('_ak_participants');
-                if (empty($p_list)) {
-                    $order->remove_item($item->get_id());
-                } else {
-                    $item->set_quantity(0);
-                    $item->set_subtotal(0.0);
-                    $item->set_total(0.0);
-                    $item->update_meta_data('_ak_headcount', 0);
-                }
-            }
-
-            // Remove coupons since no products remain
-            try {
-                $coupon_items = $order->get_items('coupon');
-                if (is_iterable($coupon_items)) {
-                    foreach ($coupon_items as $coupon_item) {
-                        $order->remove_item($coupon_item->get_id());
-                    }
-                }
-            } catch (\Throwable $e) {}
-
-            // Calculate remaining fees (such as retained T-shirt manufacturing costs)
-            $fee_summary = self::get_order_fees_summary($order);
-            $fees_total = $fee_summary['total'];
-            $fees_section = $fee_summary['section'];
-
-            try {
-                $order->calculate_totals(false);
-            } catch (\Throwable $e) {}
-
-            // When products are 0, order total in WooCommerce must strictly equal retained fees (or 0.0)
-            $new_total = round($fees_total, 2);
-            try {
-                $order->set_total($new_total);
-            } catch (\Throwable $e) {}
-            $balance = round($new_total - $total_paid, 2);
-
-            $reason = !empty($options['reason']) ? $options['reason'] : __('Wszyscy uczestnicy zostali anulowani/usunięci z zamówienia.', 'ak-product-set');
-
-            $current_status = self::get_order_status($order);
-            if (!in_array($current_status, ['cancelled', 'wc-cancelled', 'trash'], true)) {
-                $order->update_meta_data('_ak_pre_cancelled_status', $current_status);
-            }
-            Order_Payment_Tracker::$is_internal_transition = true;
-            try {
-                $order->update_status('cancelled', $reason);
-            } finally {
-                Order_Payment_Tracker::$is_internal_transition = false;
-            }
-            $is_paid = self::is_order_paid($order);
-
-            $balance_info = self::resolve_balance_status($balance, $is_paid, $total_paid);
-            $final_status = $balance_info['status'];
-            $final_balance = $balance_info['balance'];
-
-            $balance_line = Order_Breakdown_Formatter::resolve_balance_line($final_status, $balance, $total_paid, true);
-            $log_status = Order_Breakdown_Formatter::resolve_log_status($final_status, $balance, $total_paid, true);
-
-            $order->update_meta_data('_ak_balance_status', $final_status);
-            $order->update_meta_data('_ak_balance_amount', $final_balance);
-            $order->update_meta_data('_ak_recalculated_total', $new_total);
-
-            $full_breakdown = Order_Breakdown_Formatter::format_cancellation_breakdown(
-                $reason,
-                $fees_section,
-                $new_total,
-                $total_paid,
-                $balance_line
-            );
-            $order->update_meta_data('_ak_pricing_breakdown', $full_breakdown);
-
-            $log_entry = Order_Breakdown_Formatter::format_audit_log_entry(
-                $reason,
-                $before_snapshot['total'],
-                $before_snapshot['summary'],
-                $new_total,
-                $log_status,
-                __('Brak aktywnych uczestników (wszyscy anulowani lub przeniesieni)', 'ak-product-set')
-            );
-            self::append_audit_log($order, $log_entry);
-            $order->save();
-
-            return [
-                'status'             => $final_status,
-                'recalculated_total' => $new_total,
-                'balance_amount'     => $final_balance,
-                'total_paid'         => $total_paid,
-                'headcount'          => 0,
-                'breakdown'          => $full_breakdown,
-                'log'                => $log_entry,
-            ];
+            return self::handle_zero_headcount_recalculation($order, $weekend_items_map, $total_paid, $options, $before_snapshot);
         }
 
-        // 5. Group participants into cohorts with IDENTICAL attended weekend combinations
-        // Key: set_id . '|' . sorted_weekends
-        $cohorts = [];
-        foreach ($participant_enrollments as $uuid => $info) {
-            $wids = array_keys($info['weekends']);
-            sort($wids);
-            $cohort_key = $info['set_id'] . '|' . implode(',', $wids);
+        // 6. Group participants into cohorts and calculate pricing / line item shares
+        $cohorts = self::build_participant_cohorts($participant_enrollments);
+        $pricing = self::calculate_cohort_pricing_and_shares($cohorts, $order_timestamp);
+        $breakdown_sections      = $pricing['sections'];
+        $total_recalculated_base = $pricing['total_base'];
+        $weekend_item_totals     = $pricing['item_totals'];
 
-            if (!isset($cohorts[$cohort_key])) {
-                $cohorts[$cohort_key] = [
-                    'set_id'       => $info['set_id'],
-                    'weekends'     => $wids,
-                    'package_size' => count($wids),
-                    'participants' => [],
-                ];
-            }
-            $cohorts[$cohort_key]['participants'][$uuid] = $info['data'];
-        }
-
-        // 6. Sort cohorts: largest package first (package_size DESC), then highest headcount (headcount DESC)
-        uasort($cohorts, function (array $a, array $b): int {
-            if ($b['package_size'] !== $a['package_size']) {
-                return $b['package_size'] <=> $a['package_size'];
-            }
-            return count($b['participants']) <=> count($a['participants']);
-        });
-
-        // 7. Calculate pricing per cohort and accumulate shares per weekend item
-        $weekend_item_totals = []; // wid => float
-        $breakdown_sections = [];
-        $total_recalculated_base = 0.0;
-        $cohort_index = 1;
-        $set_models = [];
-        $product_titles = [];
-
-        foreach ($cohorts as $cohort) {
-            $set_id       = $cohort['set_id'];
-            $wids         = $cohort['weekends'];
-            $package_size = $cohort['package_size'];
-            $participants = $cohort['participants'];
-            $headcount    = count($participants);
-
-            if ($package_size <= 0) {
-                continue;
-            }
-
-            if (!isset($set_models[$set_id])) {
-                $set_models[$set_id] = new Set_Model($set_id);
-            }
-            $set = $set_models[$set_id];
-            $set_title = $set->get_title() ?: sprintf(__('Zestaw #%d', 'ak-product-set'), $set_id);
-
-            // Resolve round based on parent order date
-            $round = Round_Resolver::resolve_package_round($wids, $order_timestamp);
-            $tier = Pricing_Engine::resolve_group_tier($headcount);
-
-            // Fetch per-person unit price from active 3D pricing matrix
-            $per_person_price = (float) $set->get_price_by_matrix($package_size, $round, $tier);
-            $cohort_subtotal = round($per_person_price * $headcount, 2);
-            $total_recalculated_base += $cohort_subtotal;
-
-            // Distribute per-person price across this cohort's weekends
-            // Each weekend of a participant contributes: per_person_price / package_size
-            $weekend_unit_share = round($per_person_price / $package_size, 2);
-            $weekend_accumulated_share = 0.0;
-
-            for ($w_i = 0; $w_i < $package_size; $w_i++) {
-                $wid = $wids[$w_i];
-                if ($w_i === $package_size - 1) {
-                    $this_person_share = round($per_person_price - $weekend_accumulated_share, 2);
-                } else {
-                    $this_person_share = $weekend_unit_share;
-                    $weekend_accumulated_share += $this_person_share;
-                }
-
-                $this_weekend_cohort_total = round($this_person_share * $headcount, 2);
-                $weekend_item_totals[$wid] = ($weekend_item_totals[$wid] ?? 0.0) + $this_weekend_cohort_total;
-            }
-
-            // Build breakdown text for this cohort
-            $weekend_titles = [];
-            foreach ($wids as $wid) {
-                if (!isset($product_titles[$wid])) {
-                    $p = wc_get_product($wid);
-                    $product_titles[$wid] = $p ? $p->get_name() : sprintf(__('Termin #%d', 'ak-product-set'), $wid);
-                }
-                $weekend_titles[] = $product_titles[$wid];
-            }
-
-            $participant_names = array_map(fn($p) => $p['name'] ?: $p['id'], $participants);
-
-            $breakdown_sections[] = Order_Breakdown_Formatter::format_cohort_section(
-                $cohort_index++,
-                $set_title,
-                $participant_names,
-                $package_size,
-                $weekend_titles,
-                $round,
-                $tier,
-                $per_person_price,
-                $headcount,
-                $cohort_subtotal
-            );
-        }
-
-        // 7. Update line items in order
-        foreach ($weekend_items_map as $wid => $item) {
-            $item_participants = $item->get_meta('_ak_participants');
-            $active_participants = is_array($item_participants)
-                ? array_filter($item_participants, fn($p) => ($p['status'] ?? 'active') === 'active')
-                : [];
-            $active_headcount = count($active_participants);
-
-            if ($active_headcount <= 0 || !isset($weekend_item_totals[$wid])) {
-                if (empty($item_participants)) {
-                    // No participants in this weekend: remove line item completely
-                    $order->remove_item($item->get_id());
-                } else {
-                    // Has inactive (cancelled / transferred) participants: keep item with zero total
-                    $item->set_quantity(0);
-                    $item->set_subtotal(0.0);
-                    $item->set_total(0.0);
-                    $item->update_meta_data('_ak_headcount', 0);
-                }
-                continue;
-            }
-
-            $item_total = $weekend_item_totals[$wid];
-            $item->set_quantity($active_headcount);
-            $item->set_subtotal($item_total);
-            $item->set_total($item_total);
-            $item->update_meta_data('_ak_headcount', $active_headcount);
-        }
-
-        $current_status = self::get_order_status($order);
-        if (in_array($current_status, ['cancelled', 'wc-cancelled'], true) && $overall_headcount > 0) {
-            $target_status = (string) $order->get_meta('_ak_pre_cancelled_status');
-            if (!$target_status || in_array($target_status, ['cancelled', 'wc-cancelled', 'trash'], true)) {
-                $is_paid_order = self::is_order_paid($order) || ((float) $order->get_meta('_ak_total_paid') > 0.009);
-                $target_status = $is_paid_order ? 'processing' : 'pending';
-            }
-            Order_Payment_Tracker::$is_internal_transition = true;
-            try {
-                $order->update_status($target_status, __('Przywrócono zamówienie po przywróceniu aktywnych uczestników.', 'ak-product-set'));
-            } finally {
-                Order_Payment_Tracker::$is_internal_transition = false;
-            }
-        }
+        // 7. Update line items and restore order if previously cancelled
+        self::sync_decomposed_line_items($order, $weekend_items_map, $weekend_item_totals);
+        self::restore_cancelled_order_if_active($order, $overall_headcount);
 
         // 8. Handle Coupons (Percentage vs Fixed proportional distribution)
         self::apply_coupons_recalculation($order, $original_headcount, $overall_headcount);
@@ -525,7 +193,7 @@ class Order_Recalculator {
 
         $order->update_meta_data('_ak_pricing_breakdown', $full_breakdown);
 
-        // 12. Generate timestamped audit trail log with Before and After snapshots
+        // 11. Generate timestamped audit trail log with Before and After snapshots
         $reason = !empty($options['reason']) ? $options['reason'] : __('Modyfikacja terminów / przeliczenie', 'ak-product-set');
         $balance_text = Order_Breakdown_Formatter::resolve_log_status($balance_status, $balance, $total_paid, false);
 
@@ -653,16 +321,7 @@ class Order_Recalculator {
      * Record initial pricing breakdown and financial balance on a clean, newly decomposed order.
      */
     public static function record_initial_order_state(\WC_Order $order): void {
-        $total = (float) $order->get_total();
-        if ($total <= 0.009) {
-            foreach ($order->get_items('line_item') as $item) {
-                if ($item instanceof \WC_Order_Item_Product) {
-                    $total += (float) $item->get_total();
-                }
-            }
-        }
-        $order->update_meta_data('_ak_original_total', $total);
-
+        $total = self::resolve_original_total($order);
         $is_paid = self::is_order_paid($order);
 
         if ($is_paid || $total <= 0.009) {
@@ -670,148 +329,21 @@ class Order_Recalculator {
             $order->update_meta_data('_ak_balance_amount', 0.0);
             $order->update_meta_data('_ak_balance_status', self::BALANCE_SETTLED);
 
-            $method_title = '';
-            try {
-                if (is_callable([$order, 'get_payment_method_title'])) {
-                    $method_title = (string) $order->get_payment_method_title();
-                }
-            } catch (\Throwable $e) {}
-
-            $method_id = '';
-            try {
-                if (is_callable([$order, 'get_payment_method'])) {
-                    $method_id = (string) $order->get_payment_method();
-                }
-            } catch (\Throwable $e) {}
-
-            $date_paid = '';
-            try {
-                if (is_callable([$order, 'get_date_paid']) && $order->get_date_paid()) {
-                    $date_paid = $order->get_date_paid()->date('Y-m-d H:i');
-                }
-            } catch (\Throwable $e) {}
-            if (!$date_paid) {
-                $date_paid = current_time('Y-m-d H:i');
-            }
-
-            $txn_id = '';
-            try {
-                if (is_callable([$order, 'get_transaction_id'])) {
-                    $txn_id = (string) $order->get_transaction_id();
-                }
-            } catch (\Throwable $e) {}
-
-            $order->update_meta_data('_ak_initial_payment_recorded', 'yes');
-            $order->update_meta_data('_ak_initial_payment_method', $method_title ?: ($method_id ?: __('Bramka płatności', 'ak-product-set')));
-            $order->update_meta_data('_ak_initial_payment_method_id', $method_id);
-            $order->update_meta_data('_ak_initial_payment_amount', $total);
-            $order->update_meta_data('_ak_initial_payment_date', $date_paid);
-            $order->update_meta_data('_ak_initial_payment_txn_id', $txn_id);
+            Order_Payment_Tracker::record_initial_payment_metadata($order, $total);
         } else {
             $order->update_meta_data('_ak_total_paid', 0.0);
             $order->update_meta_data('_ak_balance_amount', $total);
             $order->update_meta_data('_ak_balance_status', self::BALANCE_UNPAID);
         }
 
-        $breakdown_sections = [];
-        $cohort_index = 1;
-        $participant_enrollments = [];
-
-        foreach ($order->get_items('line_item') as $item) {
-            if ($item instanceof \WC_Order_Item_Product) {
-                $set_id = (int) $item->get_meta('_ak_parent_set_id');
-                if (!$set_id) {
-                    continue;
-                }
-                $wid = (int) $item->get_product_id();
-                $p_list = $item->get_meta('_ak_participants');
-                if (is_array($p_list)) {
-                    foreach ($p_list as $p) {
-                        $uuid = $p['id'] ?? '';
-                        if (!$uuid) {
-                            continue;
-                        }
-                        if (($p['status'] ?? 'active') !== 'active') {
-                            continue;
-                        }
-                        if (!isset($participant_enrollments[$uuid])) {
-                            $participant_enrollments[$uuid] = [
-                                'data'     => $p,
-                                'set_id'   => $set_id,
-                                'weekends' => [],
-                            ];
-                        }
-                        $participant_enrollments[$uuid]['weekends'][$wid] = $item->get_name();
-                    }
-                }
-            }
-        }
-
-        $cohorts = [];
-        foreach ($participant_enrollments as $uuid => $info) {
-            $wids = array_keys($info['weekends']);
-            sort($wids);
-            $cohort_key = $info['set_id'] . '|' . implode(',', $wids);
-            if (!isset($cohorts[$cohort_key])) {
-                $cohorts[$cohort_key] = [
-                    'set_id'        => $info['set_id'],
-                    'weekends'      => $wids,
-                    'weekend_names' => array_values($info['weekends']),
-                    'package_size'  => count($wids),
-                    'participants'  => [],
-                ];
-            }
-            $cohorts[$cohort_key]['participants'][$uuid] = $info['data'];
-        }
-
-        uasort($cohorts, function (array $a, array $b): int {
-            if ($b['package_size'] !== $a['package_size']) {
-                return $b['package_size'] <=> $a['package_size'];
-            }
-            return count($b['participants']) <=> count($a['participants']);
-        });
+        $extraction = self::extract_active_participant_enrollments($order);
+        $cohorts = self::build_participant_cohorts($extraction['enrollments']);
 
         $date_created = $order->get_date_created();
         $order_timestamp = $date_created ? $date_created->getTimestamp() : current_time('timestamp');
-        $set_models = [];
 
-        foreach ($cohorts as $cohort) {
-            $set_id       = $cohort['set_id'];
-            $wids         = $cohort['weekends'];
-            $package_size = $cohort['package_size'];
-            $participants = $cohort['participants'];
-            $headcount    = count($participants);
-
-            if ($package_size <= 0) {
-                continue;
-            }
-
-            if (!isset($set_models[$set_id])) {
-                $set_models[$set_id] = new Set_Model($set_id);
-            }
-            $set = $set_models[$set_id];
-            $set_title = $set->get_title() ?: sprintf(__('Zestaw #%d', 'ak-product-set'), $set_id);
-
-            $round = Round_Resolver::resolve_package_round($wids, $order_timestamp);
-            $tier = Pricing_Engine::resolve_group_tier($headcount);
-            $per_person_price = (float) $set->get_price_by_matrix($package_size, $round, $tier);
-            $cohort_subtotal = round($per_person_price * $headcount, 2);
-
-            $participant_names = array_map(fn($p) => $p['name'] ?: $p['id'], $participants);
-
-            $breakdown_sections[] = Order_Breakdown_Formatter::format_cohort_section(
-                $cohort_index++,
-                $set_title,
-                $participant_names,
-                $package_size,
-                $cohort['weekend_names'],
-                $round,
-                $tier,
-                $per_person_price,
-                $headcount,
-                $cohort_subtotal
-            );
-        }
+        $pricing = self::calculate_cohort_pricing_and_shares($cohorts, $order_timestamp);
+        $breakdown_sections = $pricing['sections'];
 
         $date_formatted = $date_created ? $date_created->date('Y-m-d H:i') : current_time('Y-m-d H:i');
         $is_order_settled = ($order->get_meta('_ak_balance_status') === self::BALANCE_SETTLED);
@@ -1062,6 +594,38 @@ class Order_Recalculator {
     }
 
     /**
+     * Delete a specific produced t-shirt record by its unique UUID from a line item.
+     */
+    public static function delete_item_produced_tshirt_by_uuid(\WC_Order_Item_Product $item, string $tshirt_uuid): ?array {
+        if ($tshirt_uuid === '') {
+            return null;
+        }
+
+        $records = self::get_item_produced_tshirts($item);
+        if (empty($records)) {
+            return null;
+        }
+
+        $deleted = null;
+        $new_records = [];
+        foreach ($records as $record) {
+            if ($deleted === null && ($record['uuid'] ?? '') === $tshirt_uuid) {
+                $deleted = $record;
+                continue;
+            }
+            $new_records[] = $record;
+        }
+
+        if ($deleted !== null) {
+            $json_val = function_exists('wp_json_encode') ? wp_json_encode($new_records) : json_encode($new_records);
+            $item->update_meta_data(self::PRODUCED_TSHIRTS_META_KEY, $json_val);
+            self::sync_slot_retained_count_from_records($item, $new_records);
+        }
+
+        return $deleted;
+    }
+
+    /**
      * Sync tshirt_retained_count on each participant in _ak_participants based on current records.
      */
     public static function sync_slot_retained_count_from_records(\WC_Order_Item_Product $item, array $records): void {
@@ -1268,6 +832,359 @@ class Order_Recalculator {
         }
 
         return ['status' => self::BALANCE_SETTLED, 'balance' => 0.0];
+    }
+
+    /**
+     * Resolve and ensure the original total baseline metadata for an order.
+     */
+    public static function resolve_original_total(\WC_Order $order): float {
+        $original_total = $order->get_meta('_ak_original_total');
+        if ($original_total === '' || $original_total === false || (float) $original_total <= 0.009) {
+            $calc_total = (float) $order->get_total();
+            if ($calc_total <= 0.009) {
+                foreach ($order->get_items('line_item') as $item) {
+                    if ($item instanceof \WC_Order_Item_Product) {
+                        $calc_total += (float) $item->get_total();
+                    }
+                }
+            }
+            if ($calc_total > 0.009) {
+                $original_total = $calc_total;
+                $order->update_meta_data('_ak_original_total', $original_total);
+            } else {
+                $original_total = 0.0;
+            }
+        } else {
+            $original_total = (float) $original_total;
+        }
+
+        return $original_total;
+    }
+
+    /**
+     * Extract active participant enrollments and mapped line items from order.
+     *
+     * @return array{enrollments: array, items_map: array<int, \WC_Order_Item_Product>}
+     */
+    private static function extract_active_participant_enrollments(\WC_Order $order): array {
+        $items = $order->get_items('line_item');
+        $participant_enrollments = [];
+        $weekend_items_map = [];
+
+        foreach ($items as $item_id => $item) {
+            if (!($item instanceof \WC_Order_Item_Product)) {
+                continue;
+            }
+
+            $set_id = (int) $item->get_meta('_ak_parent_set_id');
+            $wid    = (int) $item->get_product_id();
+
+            if ($set_id > 0 && $wid > 0) {
+                $weekend_items_map[$wid] = $item;
+
+                $p_list = $item->get_meta('_ak_participants');
+                if (is_array($p_list)) {
+                    foreach ($p_list as $p) {
+                        $uuid = $p['id'] ?? '';
+                        if (!$uuid || (($p['status'] ?? 'active') !== 'active')) {
+                            continue;
+                        }
+                        if (!isset($participant_enrollments[$uuid])) {
+                            $participant_enrollments[$uuid] = [
+                                'data'          => $p,
+                                'set_id'        => $set_id,
+                                'weekends'      => [],
+                                'weekend_names' => [],
+                            ];
+                        }
+                        $participant_enrollments[$uuid]['weekends'][$wid] = $item_id;
+                        $item_name = '';
+                        try {
+                            $item_name = (string) $item->get_name();
+                        } catch (\Throwable $e) {}
+                        $participant_enrollments[$uuid]['weekend_names'][$wid] = $item_name;
+                    }
+                }
+            }
+        }
+
+        return [
+            'enrollments' => $participant_enrollments,
+            'items_map'   => $weekend_items_map,
+        ];
+    }
+
+    /**
+     * Group participant enrollments into cohorts with identical attended weekend combinations.
+     */
+    private static function build_participant_cohorts(array $participant_enrollments): array {
+        $cohorts = [];
+        foreach ($participant_enrollments as $uuid => $info) {
+            $wids = array_keys($info['weekends']);
+            sort($wids);
+            $cohort_key = $info['set_id'] . '|' . implode(',', $wids);
+
+            if (!isset($cohorts[$cohort_key])) {
+                $cohorts[$cohort_key] = [
+                    'set_id'        => $info['set_id'],
+                    'weekends'      => $wids,
+                    'weekend_names' => $info['weekend_names'] ?? [],
+                    'package_size'  => count($wids),
+                    'participants'  => [],
+                ];
+            }
+            $cohorts[$cohort_key]['participants'][$uuid] = $info['data'];
+        }
+
+        uasort($cohorts, function (array $a, array $b): int {
+            if ($b['package_size'] !== $a['package_size']) {
+                return $b['package_size'] <=> $a['package_size'];
+            }
+            return count($b['participants']) <=> count($a['participants']);
+        });
+
+        return $cohorts;
+    }
+
+    /**
+     * Calculate pricing per cohort and accumulate shares per weekend item.
+     *
+     * @return array{sections: array, total_base: float, item_totals: array<int, float>}
+     */
+    private static function calculate_cohort_pricing_and_shares(array $cohorts, int $order_timestamp): array {
+        $weekend_item_totals = [];
+        $breakdown_sections = [];
+        $total_recalculated_base = 0.0;
+        $cohort_index = 1;
+        $set_models = [];
+        $product_titles = [];
+
+        foreach ($cohorts as $cohort) {
+            $set_id       = $cohort['set_id'];
+            $wids         = $cohort['weekends'];
+            $package_size = $cohort['package_size'];
+            $participants = $cohort['participants'];
+            $headcount    = count($participants);
+
+            if ($package_size <= 0) {
+                continue;
+            }
+
+            if (!isset($set_models[$set_id])) {
+                $set_models[$set_id] = new Set_Model($set_id);
+            }
+            $set = $set_models[$set_id];
+            $set_title = $set->get_title() ?: sprintf(__('Zestaw #%d', 'ak-product-set'), $set_id);
+
+            $round = Round_Resolver::resolve_package_round($wids, $order_timestamp);
+            $tier = Pricing_Engine::resolve_group_tier($headcount);
+
+            $per_person_price = (float) $set->get_price_by_matrix($package_size, $round, $tier);
+            $cohort_subtotal = round($per_person_price * $headcount, 2);
+            $total_recalculated_base += $cohort_subtotal;
+
+            $weekend_unit_share = round($per_person_price / $package_size, 2);
+            $weekend_accumulated_share = 0.0;
+
+            for ($w_i = 0; $w_i < $package_size; $w_i++) {
+                $wid = $wids[$w_i];
+                if ($w_i === $package_size - 1) {
+                    $this_person_share = round($per_person_price - $weekend_accumulated_share, 2);
+                } else {
+                    $this_person_share = $weekend_unit_share;
+                    $weekend_accumulated_share += $this_person_share;
+                }
+
+                $this_weekend_cohort_total = round($this_person_share * $headcount, 2);
+                $weekend_item_totals[$wid] = ($weekend_item_totals[$wid] ?? 0.0) + $this_weekend_cohort_total;
+            }
+
+            $weekend_titles = [];
+            foreach ($wids as $wid) {
+                if (!empty($cohort['weekend_names'][$wid])) {
+                    $weekend_titles[] = $cohort['weekend_names'][$wid];
+                } else {
+                    if (!isset($product_titles[$wid])) {
+                        $p = wc_get_product($wid);
+                        $product_titles[$wid] = $p ? $p->get_name() : sprintf(__('Termin #%d', 'ak-product-set'), $wid);
+                    }
+                    $weekend_titles[] = $product_titles[$wid];
+                }
+            }
+
+            $participant_names = array_map(fn($p) => $p['name'] ?: $p['id'], $participants);
+
+            $breakdown_sections[] = Order_Breakdown_Formatter::format_cohort_section(
+                $cohort_index++,
+                $set_title,
+                $participant_names,
+                $package_size,
+                $weekend_titles,
+                $round,
+                $tier,
+                $per_person_price,
+                $headcount,
+                $cohort_subtotal
+            );
+        }
+
+        return [
+            'sections'    => $breakdown_sections,
+            'total_base'  => $total_recalculated_base,
+            'item_totals' => $weekend_item_totals,
+        ];
+    }
+
+    /**
+     * Update decomposed line item quantities, totals, and headcount metadata.
+     */
+    private static function sync_decomposed_line_items(\WC_Order $order, array $weekend_items_map, array $weekend_item_totals): void {
+        foreach ($weekend_items_map as $wid => $item) {
+            $item_participants = $item->get_meta('_ak_participants');
+            $active_participants = is_array($item_participants)
+                ? array_filter($item_participants, fn($p) => ($p['status'] ?? 'active') === 'active')
+                : [];
+            $active_headcount = count($active_participants);
+
+            if ($active_headcount <= 0 || !isset($weekend_item_totals[$wid])) {
+                if (empty($item_participants)) {
+                    $order->remove_item($item->get_id());
+                } else {
+                    $item->set_quantity(0);
+                    $item->set_subtotal(0.0);
+                    $item->set_total(0.0);
+                    $item->update_meta_data('_ak_headcount', 0);
+                }
+                continue;
+            }
+
+            $item_total = $weekend_item_totals[$wid];
+            $item->set_quantity($active_headcount);
+            $item->set_subtotal($item_total);
+            $item->set_total($item_total);
+            $item->update_meta_data('_ak_headcount', $active_headcount);
+        }
+    }
+
+    /**
+     * Restore order status from cancelled if it now has active participants.
+     */
+    private static function restore_cancelled_order_if_active(\WC_Order $order, int $overall_headcount): void {
+        $current_status = self::get_order_status($order);
+        if (in_array($current_status, ['cancelled', 'wc-cancelled'], true) && $overall_headcount > 0) {
+            $target_status = (string) $order->get_meta('_ak_pre_cancelled_status');
+            if (!$target_status || in_array($target_status, ['cancelled', 'wc-cancelled', 'trash'], true)) {
+                $is_paid_order = self::is_order_paid($order) || ((float) $order->get_meta('_ak_total_paid') > 0.009);
+                $target_status = $is_paid_order ? 'processing' : 'pending';
+            }
+            Order_Payment_Tracker::$is_internal_transition = true;
+            try {
+                $order->update_status($target_status, __('Przywrócono zamówienie po przywróceniu aktywnych uczestników.', 'ak-product-set'));
+            } finally {
+                Order_Payment_Tracker::$is_internal_transition = false;
+            }
+        }
+    }
+
+    /**
+     * Handle recalculation and cancellation when an order has 0 active participants remaining.
+     */
+    private static function handle_zero_headcount_recalculation(
+        \WC_Order $order,
+        array $weekend_items_map,
+        float $total_paid,
+        array $options,
+        array $before_snapshot
+    ): array {
+        foreach ($weekend_items_map as $item) {
+            $p_list = $item->get_meta('_ak_participants');
+            if (empty($p_list)) {
+                $order->remove_item($item->get_id());
+            } else {
+                $item->set_quantity(0);
+                $item->set_subtotal(0.0);
+                $item->set_total(0.0);
+                $item->update_meta_data('_ak_headcount', 0);
+            }
+        }
+
+        try {
+            $coupon_items = $order->get_items('coupon');
+            if (is_iterable($coupon_items)) {
+                foreach ($coupon_items as $coupon_item) {
+                    $order->remove_item($coupon_item->get_id());
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        $fee_summary = self::get_order_fees_summary($order);
+        $fees_total = $fee_summary['total'];
+        $fees_section = $fee_summary['section'];
+
+        try {
+            $order->calculate_totals(false);
+        } catch (\Throwable $e) {}
+
+        $new_total = round($fees_total, 2);
+        try {
+            $order->set_total($new_total);
+        } catch (\Throwable $e) {}
+        $balance = round($new_total - $total_paid, 2);
+
+        $reason = !empty($options['reason']) ? $options['reason'] : __('Wszyscy uczestnicy zostali anulowani/usunięci z zamówienia.', 'ak-product-set');
+
+        $current_status = self::get_order_status($order);
+        if (!in_array($current_status, ['cancelled', 'wc-cancelled', 'trash'], true)) {
+            $order->update_meta_data('_ak_pre_cancelled_status', $current_status);
+        }
+        Order_Payment_Tracker::$is_internal_transition = true;
+        try {
+            $order->update_status('cancelled', $reason);
+        } finally {
+            Order_Payment_Tracker::$is_internal_transition = false;
+        }
+        $is_paid = self::is_order_paid($order);
+
+        $balance_info = self::resolve_balance_status($balance, $is_paid, $total_paid);
+        $final_status = $balance_info['status'];
+        $final_balance = $balance_info['balance'];
+
+        $balance_line = Order_Breakdown_Formatter::resolve_balance_line($final_status, $balance, $total_paid, true);
+        $log_status = Order_Breakdown_Formatter::resolve_log_status($final_status, $balance, $total_paid, true);
+
+        $order->update_meta_data('_ak_balance_status', $final_status);
+        $order->update_meta_data('_ak_balance_amount', $final_balance);
+        $order->update_meta_data('_ak_recalculated_total', $new_total);
+
+        $full_breakdown = Order_Breakdown_Formatter::format_cancellation_breakdown(
+            $reason,
+            $fees_section,
+            $new_total,
+            $total_paid,
+            $balance_line
+        );
+        $order->update_meta_data('_ak_pricing_breakdown', $full_breakdown);
+
+        $log_entry = Order_Breakdown_Formatter::format_audit_log_entry(
+            $reason,
+            $before_snapshot['total'],
+            $before_snapshot['summary'],
+            $new_total,
+            $log_status,
+            __('Brak aktywnych uczestników (wszyscy anulowani lub przeniesieni)', 'ak-product-set')
+        );
+        self::append_audit_log($order, $log_entry);
+        $order->save();
+
+        return [
+            'status'             => $final_status,
+            'recalculated_total' => $new_total,
+            'balance_amount'     => $final_balance,
+            'total_paid'         => $total_paid,
+            'headcount'          => 0,
+            'breakdown'          => $full_breakdown,
+            'log'                => $log_entry,
+        ];
     }
 }
 

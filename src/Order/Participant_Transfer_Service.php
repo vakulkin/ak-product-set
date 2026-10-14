@@ -78,19 +78,10 @@ class Participant_Transfer_Service {
 
         // 3. Add decomposed line items for transferred weekend(s)
         foreach ($weekends_to_transfer as $wid) {
-            $wc_product = wc_get_product($wid);
-            if (!$wc_product) {
+            $attached = Order_Participant_Slot_Manager::attach_participant_to_order($new_order, $wid, $set_id, $dest_participant_data);
+            if (!$attached) {
                 continue;
             }
-
-            $new_item = new \WC_Order_Item_Product();
-            $new_item->set_product($wc_product);
-            $new_item->set_quantity(1);
-            $new_item->add_meta_data('_ak_parent_set_id', $set_id, true);
-            $new_item->add_meta_data('_ak_headcount', 1, true);
-            $new_item->add_meta_data('_ak_participants', [$dest_participant_data], true);
-            Helper::add_participant_meta_to_order_item([$dest_participant_data], $new_item);
-            $new_order->add_item($new_item);
 
             if (function_exists('wc_update_product_stock')) {
                 wc_update_product_stock($wid, 1, 'decrease');
@@ -210,30 +201,9 @@ class Participant_Transfer_Service {
 
         // 2. Add to target order
         foreach ($weekends_to_transfer as $wid) {
-            $target_item = null;
-            foreach ($target_order->get_items('line_item') as $item) {
-                if ((int)$item->get_product_id() === $wid) {
-                    $target_item = $item;
-                    break;
-                }
-            }
-
-            if ($target_item) {
-                $target_participants = (array) $target_item->get_meta('_ak_participants');
-                $target_participants[] = $dest_participant_data;
-                $target_item->update_meta_data('_ak_participants', $target_participants);
-                Helper::add_participant_meta_to_order_item($target_participants, $target_item);
-            } else {
-                $wc_product = wc_get_product($wid);
-                if ($wc_product) {
-                    $new_item = new \WC_Order_Item_Product();
-                    $new_item->set_product($wc_product);
-                    $new_item->set_quantity(1);
-                    $new_item->add_meta_data('_ak_parent_set_id', $set_id, true);
-                    $new_item->add_meta_data('_ak_participants', [$dest_participant_data], true);
-                    Helper::add_participant_meta_to_order_item([$dest_participant_data], $new_item);
-                    $target_order->add_item($new_item);
-                }
+            $attached = Order_Participant_Slot_Manager::attach_participant_to_order($target_order, $wid, $set_id, $dest_participant_data);
+            if (!$attached) {
+                continue;
             }
 
             if (function_exists('wc_update_product_stock')) {

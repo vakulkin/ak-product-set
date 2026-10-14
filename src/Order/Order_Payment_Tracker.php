@@ -105,27 +105,6 @@ class Order_Payment_Tracker {
             return;
         }
 
-        $method_title = '';
-        try {
-            if (is_callable([$order, 'get_payment_method_title'])) {
-                $method_title = (string)$order->get_payment_method_title();
-            }
-        } catch (\Throwable $e) {}
-
-        $method_id = '';
-        try {
-            if (is_callable([$order, 'get_payment_method'])) {
-                $method_id = (string)$order->get_payment_method();
-            }
-        } catch (\Throwable $e) {}
-
-        if ($method_title === '' && $method_id !== '') {
-            $method_title = $method_id;
-        }
-        if ($method_title === '') {
-            $method_title = __('Bramka płatności', 'ak-product-set');
-        }
-
         $orig = $order->get_meta('_ak_original_total');
         if ($orig !== '' && $orig !== false && (float)$orig > 0.009) {
             $total = (float)$orig;
@@ -133,29 +112,9 @@ class Order_Payment_Tracker {
             $total = (float)$order->get_total();
         }
 
-        $date_paid = '';
-        try {
-            if (is_callable([$order, 'get_date_paid']) && $order->get_date_paid()) {
-                $date_paid = $order->get_date_paid()->date('Y-m-d H:i');
-            }
-        } catch (\Throwable $e) {}
-        if (!$date_paid) {
-            $date_paid = current_time('Y-m-d H:i');
-        }
-
-        $txn_id = '';
-        try {
-            if (is_callable([$order, 'get_transaction_id'])) {
-                $txn_id = (string)$order->get_transaction_id();
-            }
-        } catch (\Throwable $e) {}
-
-        $order->update_meta_data('_ak_initial_payment_recorded', 'yes');
-        $order->update_meta_data('_ak_initial_payment_method', $method_title);
-        $order->update_meta_data('_ak_initial_payment_method_id', $method_id);
-        $order->update_meta_data('_ak_initial_payment_amount', $total);
-        $order->update_meta_data('_ak_initial_payment_date', $date_paid);
-        $order->update_meta_data('_ak_initial_payment_txn_id', $txn_id);
+        $payment_info = self::record_initial_payment_metadata($order, $total);
+        $method_title = $payment_info['method'];
+        $txn_id       = $payment_info['txn_id'];
 
         $current_paid = (float)$order->get_meta('_ak_total_paid');
         if ($current_paid < 0.009) {
@@ -192,4 +151,193 @@ class Order_Payment_Tracker {
         Order_Recalculator::append_audit_log($order, $log_entry);
         $order->save();
     }
+
+    /**
+     * Resolve payment state (immutable gateway payment baseline, additional payments, and total paid).
+     * Automatically heals corrupted total_paid metadata (e.g. if set to 60 PLN fee) and resolves initial gateway payment.
+     *
+     * @return array{
+     *     gateway_paid: float,
+     *     additional_paid: float,
+     *     total_paid: float,
+     *     init_method: string,
+     *     init_amount: float,
+     *     init_date: string,
+     *     init_txn: string,
+     *     init_recorded: bool
+     * }
+     */
+    public static function resolve_order_payment_state(\WC_Order $order): array {
+        $init_method = (string) Order_Recalculator::get_order_meta($order, '_ak_initial_payment_method', '');
+        $raw_init_amount = Order_Recalculator::get_order_meta($order, '_ak_initial_payment_amount', null);
+        $init_date = (string) Order_Recalculator::get_order_meta($order, '_ak_initial_payment_date', '');
+        $init_txn = (string) Order_Recalculator::get_order_meta($order, '_ak_initial_payment_txn_id', '');
+        $init_recorded = Order_Recalculator::get_order_meta($order, '_ak_initial_payment_recorded') === 'yes';
+
+        $raw_total_paid = Order_Recalculator::get_order_meta($order, '_ak_total_paid', null);
+        $status = Order_Recalculator::get_order_status($order);
+        $is_paid = Order_Recalculator::is_order_paid($order);
+
+        $original_total = (float) Order_Recalculator::get_order_meta($order, '_ak_original_total', 0.0);
+
+        $has_paid_flag = $is_paid
+            || in_array($status, ['processing', 'completed'], true)
+            || $init_recorded
+            || ($raw_total_paid !== null && (float) $raw_total_paid > 0.009);
+
+        // Gateway payment baseline (must strictly be original checkout sum if order was paid through gateway)
+        if ($has_paid_flag) {
+            if ($original_total > 0.009) {
+                // Auto-heal if init_amount was corrupted (e.g. 60 zł on #4508)
+                if ($raw_init_amount === null || abs((float) $raw_init_amount - $original_total) > 0.009) {
+                    $gateway_paid = $original_total;
+                    Order_Recalculator::set_order_meta($order, '_ak_initial_payment_amount', $original_total);
+                    Order_Recalculator::set_order_meta($order, '_ak_initial_payment_recorded', 'yes');
+                    $init_recorded = true;
+                } else {
+                    $gateway_paid = (float) $raw_init_amount;
+                }
+            } else {
+                $gateway_paid = ($raw_init_amount !== null) ? (float) $raw_init_amount : 0.0;
+            }
+        } else {
+            $gateway_paid = ($raw_init_amount !== null) ? (float) $raw_init_amount : 0.0;
+        }
+
+        // Additional payments (e.g. after BLIK/Przelewy24) and total paid resolution
+        $raw_additional = Order_Recalculator::get_order_meta($order, '_ak_additional_paid', null);
+        if ($raw_additional !== null) {
+            $additional_paid = (float) $raw_additional;
+            $total_paid = round($gateway_paid + $additional_paid, 2);
+            Order_Recalculator::set_order_meta($order, '_ak_total_paid', $total_paid);
+        } else {
+            if ($raw_total_paid !== null) {
+                $raw_total_float = (float) $raw_total_paid;
+                // Auto-heal: if total_paid was corrupted (e.g. 60 PLN when gateway was 750 PLN)
+                if ($gateway_paid > 0.009 && $raw_total_float < $gateway_paid && abs($raw_total_float - 60.0) < 0.01) {
+                    $total_paid = $gateway_paid;
+                    $additional_paid = 0.0;
+                } else {
+                    $total_paid = $raw_total_float;
+                    $additional_paid = round($total_paid - $gateway_paid, 2);
+                }
+                Order_Recalculator::set_order_meta($order, '_ak_additional_paid', $additional_paid);
+                Order_Recalculator::set_order_meta($order, '_ak_total_paid', $total_paid);
+            } else {
+                $total_paid = $gateway_paid;
+                $additional_paid = 0.0;
+                Order_Recalculator::set_order_meta($order, '_ak_additional_paid', 0.0);
+                Order_Recalculator::set_order_meta($order, '_ak_total_paid', $total_paid);
+            }
+        }
+
+        // Fallback for payment details if not recorded
+        if (!$init_recorded && ($total_paid > 0.009 || $has_paid_flag)) {
+            if (!$init_method) {
+                try {
+                    if (is_callable([$order, 'get_payment_method_title'])) {
+                        $init_method = (string) $order->get_payment_method_title();
+                    }
+                } catch (\Throwable $e) {}
+            }
+            if (!$init_method) {
+                try {
+                    if (is_callable([$order, 'get_payment_method'])) {
+                        $init_method = (string) $order->get_payment_method();
+                    }
+                } catch (\Throwable $e) {}
+            }
+            if (!$init_method) {
+                $init_method = __('Bramka płatności', 'ak-product-set');
+            }
+            if (!$init_date) {
+                try {
+                    if (is_callable([$order, 'get_date_paid']) && $order->get_date_paid()) {
+                        $init_date = $order->get_date_paid()->date('Y-m-d H:i');
+                    } elseif ($order->get_date_created()) {
+                        $init_date = $order->get_date_created()->date('Y-m-d H:i');
+                    }
+                } catch (\Throwable $e) {}
+            }
+            if (!$init_txn) {
+                try {
+                    if (is_callable([$order, 'get_transaction_id'])) {
+                        $init_txn = (string) $order->get_transaction_id();
+                    }
+                } catch (\Throwable $e) {}
+            }
+            $init_recorded = true;
+        }
+
+        return [
+            'gateway_paid'    => $gateway_paid,
+            'additional_paid' => $additional_paid,
+            'total_paid'      => $total_paid,
+            'init_method'     => $init_method,
+            'init_amount'     => $gateway_paid,
+            'init_date'       => $init_date,
+            'init_txn'        => $init_txn,
+            'init_recorded'   => $init_recorded,
+        ];
+    }
+
+    /**
+     * Safely resolve gateway payment details and record the initial payment metadata fields on the order.
+     *
+     * @return array{method: string, method_id: string, date_paid: string, txn_id: string}
+     */
+    public static function record_initial_payment_metadata(\WC_Order $order, float $total): array {
+        $method_title = '';
+        try {
+            if (is_callable([$order, 'get_payment_method_title'])) {
+                $method_title = (string) $order->get_payment_method_title();
+            }
+        } catch (\Throwable $e) {}
+
+        $method_id = '';
+        try {
+            if (is_callable([$order, 'get_payment_method'])) {
+                $method_id = (string) $order->get_payment_method();
+            }
+        } catch (\Throwable $e) {}
+
+        if ($method_title === '' && $method_id !== '') {
+            $method_title = $method_id;
+        }
+        if ($method_title === '') {
+            $method_title = __('Bramka płatności', 'ak-product-set');
+        }
+
+        $date_paid = '';
+        try {
+            if (is_callable([$order, 'get_date_paid']) && $order->get_date_paid()) {
+                $date_paid = $order->get_date_paid()->date('Y-m-d H:i');
+            }
+        } catch (\Throwable $e) {}
+        if (!$date_paid) {
+            $date_paid = current_time('Y-m-d H:i');
+        }
+
+        $txn_id = '';
+        try {
+            if (is_callable([$order, 'get_transaction_id'])) {
+                $txn_id = (string) $order->get_transaction_id();
+            }
+        } catch (\Throwable $e) {}
+
+        $order->update_meta_data('_ak_initial_payment_recorded', 'yes');
+        $order->update_meta_data('_ak_initial_payment_method', $method_title);
+        $order->update_meta_data('_ak_initial_payment_method_id', $method_id);
+        $order->update_meta_data('_ak_initial_payment_amount', $total);
+        $order->update_meta_data('_ak_initial_payment_date', $date_paid);
+        $order->update_meta_data('_ak_initial_payment_txn_id', $txn_id);
+
+        return [
+            'method'    => $method_title,
+            'method_id' => $method_id,
+            'date_paid' => $date_paid,
+            'txn_id'    => $txn_id,
+        ];
+    }
 }
+

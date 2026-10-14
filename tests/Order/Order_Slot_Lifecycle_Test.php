@@ -514,5 +514,84 @@ class Order_Slot_Lifecycle_Test extends TestCase {
 
         unset($GLOBALS['_wp_options']['ak_set_tshirt_cost']);
     }
+
+    public function test_delete_produced_tshirt_by_uuid_deletes_exact_tshirt(): void {
+        $meta_store = [];
+        $line_item = Mockery::mock('WC_Order_Item_Product');
+        $line_item->shouldIgnoreMissing();
+        $line_item->shouldReceive('get_id')->andReturn(101);
+        $line_item->shouldReceive('get_meta')->with(Order_Recalculator::PRODUCED_TSHIRTS_META_KEY)->andReturnUsing(function() use (&$meta_store) {
+            return $meta_store[Order_Recalculator::PRODUCED_TSHIRTS_META_KEY] ?? [];
+        });
+        $line_item->shouldReceive('get_meta')->with('_ak_participants')->andReturnUsing(function() use (&$meta_store) {
+            return $meta_store['_ak_participants'] ?? [];
+        });
+        $line_item->shouldReceive('update_meta_data')->andReturnUsing(function($k, $v) use (&$meta_store) {
+            $meta_store[$k] = $v;
+        });
+
+        $meta_store['_ak_participants'] = [
+            ['id' => 'u1', 'name' => 'User 1', 'status' => 'active', 'tshirt_retained_count' => 0],
+        ];
+
+        // Add 2 produced t-shirts with different UUIDs
+        $t1 = Order_Recalculator::add_item_produced_tshirt($line_item, [
+            'uuid'             => 'tshirt-uuid-1',
+            'participant_uuid' => 'u1',
+            'participant_name' => 'User 1',
+            'cost'             => 60.0,
+            'size'             => 'M',
+            'cut'              => 'men',
+        ]);
+        $t2 = Order_Recalculator::add_item_produced_tshirt($line_item, [
+            'uuid'             => 'tshirt-uuid-2',
+            'participant_uuid' => 'u1',
+            'participant_name' => 'User 1',
+            'cost'             => 60.0,
+            'size'             => 'L',
+            'cut'              => 'men',
+        ]);
+
+        $this->assertCount(2, Order_Recalculator::get_item_produced_tshirts($line_item));
+
+        // Delete specifically tshirt-uuid-1
+        $deleted = Order_Recalculator::delete_item_produced_tshirt_by_uuid($line_item, 'tshirt-uuid-1');
+        $this->assertNotNull($deleted);
+        $this->assertEquals('tshirt-uuid-1', $deleted['uuid']);
+
+        // Only tshirt-uuid-2 remains
+        $remaining = Order_Recalculator::get_item_produced_tshirts($line_item);
+        $this->assertCount(1, $remaining);
+        $this->assertEquals('tshirt-uuid-2', $remaining[0]['uuid']);
+        $this->assertEquals('L', $remaining[0]['size']);
+        $this->assertEquals(1, $meta_store['_ak_participants'][0]['tshirt_retained_count']);
+    }
+
+    public function test_update_participant_data_rejected_when_order_cancelled(): void {
+        $order = Mockery::mock('WC_Order');
+        $order->shouldIgnoreMissing();
+        $order->shouldReceive('get_status')->andReturn('cancelled');
+
+        $result = Order_Participant_Profile_Service::update_participant_data($order, 'u1', ['name' => 'New Name']);
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('anulowanym zamówieniu', $result['error']);
+    }
+
+    public function test_update_participant_data_rejected_when_participant_cancelled(): void {
+        $line_item = Mockery::mock('WC_Order_Item_Product');
+        $line_item->shouldIgnoreMissing();
+        $line_item->shouldReceive('get_meta')->with('_ak_participants')->andReturn([
+            ['id' => 'u-cancelled', 'name' => 'Inactive Guy', 'status' => 'cancelled'],
+        ]);
+
+        $order = Mockery::mock('WC_Order');
+        $order->shouldIgnoreMissing();
+        $order->shouldReceive('get_status')->andReturn('processing');
+        $order->shouldReceive('get_items')->with('line_item')->andReturn([$line_item]);
+
+        $result = Order_Participant_Profile_Service::update_participant_data($order, 'u-cancelled', ['name' => 'Attempt Edit']);
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('anulowanego uczestnika', $result['error']);
+    }
 }
 
