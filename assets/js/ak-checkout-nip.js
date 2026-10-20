@@ -51,7 +51,7 @@
         // Build toolbar under NIP field
         var toolbarHtml = '<div id="ak-nip-toolbar" class="ak-nip-toolbar">' +
             '<button type="button" id="ak-nip-fetch-btn" class="ak-nip-btn">' +
-                '<span class="dashicons dashicons-update ak-nip-icon" style="font-size:14px;width:14px;height:14px;line-height:14px;"></span>' +
+                '<svg class="ak-nip-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>' +
                 '<span class="ak-nip-btn-text">' + (i18n.fetchBtn || 'Pobierz dane firmy') + '</span>' +
             '</button>' +
             '<span id="ak-nip-status" class="ak-nip-status"></span>' +

@@ -35,7 +35,7 @@
 .ak-nip-btn {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
     padding: 6px 12px;
     font-size: 12px;
     font-weight: 600;
@@ -46,6 +46,14 @@
     color: #2271b1;
     cursor: pointer;
     transition: all 0.2s ease;
+}
+
+.ak-nip-icon {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    vertical-align: middle;
 }
 
 .ak-nip-btn:hover {

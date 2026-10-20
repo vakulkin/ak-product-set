@@ -189,19 +189,24 @@ class Checkout_NIP_Handler {
         }
 
         $plugin_url = plugins_url('', dirname(__DIR__, 1));
+        $css_file   = dirname(__DIR__, 2) . '/assets/css/ak-checkout-nip.css';
+        $js_file    = dirname(__DIR__, 2) . '/assets/js/ak-checkout-nip.js';
+        $css_ver    = file_exists($css_file) ? '1.0.1.' . filemtime($css_file) : '1.0.1';
+        $js_ver     = file_exists($js_file) ? '1.0.1.' . filemtime($js_file) : '1.0.1';
 
+        wp_enqueue_style('dashicons');
         wp_enqueue_style(
             'ak-checkout-nip-css',
             $plugin_url . '/assets/css/ak-checkout-nip.css',
             [],
-            '1.0.0'
+            $css_ver
         );
 
         wp_enqueue_script(
             'ak-checkout-nip-js',
             $plugin_url . '/assets/js/ak-checkout-nip.js',
             ['jquery'],
-            '1.0.0',
+            $js_ver,
             true
         );
 
