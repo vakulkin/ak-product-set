@@ -25,9 +25,9 @@
   --ak-zinc-900: #18181b;
 
   /* Accent */
-  --ak-primary: #18181b;
-  --ak-primary-hover: #27272a;
-  --ak-ring: rgba(24, 24, 27, 0.10);
+  --ak-primary: #1A23B0;
+  --ak-primary-hover: #121980;
+  --ak-ring: rgba(26, 35, 176, 0.18);
 
   /* Status Colors */
   --ak-success-bg: #f0fdf4;
@@ -1112,5 +1112,208 @@
     font-size: 13px !important;
     margin-bottom: 10px !important;
     padding-right: 40px;
+  }
+}
+
+/* ============================================================
+   NADPISANIA STYLÓW WTYCZKI (#1A23B0)
+   ============================================================ */
+
+/* 1. Wszystkie nagłówki (h1-h6) we wtyczce */
+.ak-set-wizard-container h1,
+.ak-set-wizard-container h2,
+.ak-set-wizard-container h3,
+.ak-set-wizard-container h4,
+.ak-set-wizard-container h5,
+.ak-set-wizard-container h6,
+.ak-step-header h2,
+.ak-set-wizard-container h3.ak-weekend-title {
+    color: #1A23B0 !important;
+}
+
+/* 2. Pasek postępu - etykieta i numer kroku */
+.ak-wizard-progress .ak-step-label,
+.ak-wizard-progress .ak-step-num,
+.ak-step-item.active .ak-step-label {
+    color: #1A23B0 !important;
+}
+
+/* Aktywne / Ukończone kółko z numerem kroku */
+.ak-step-item.active .ak-step-num,
+.ak-step-item.completed .ak-step-num {
+    background: #1A23B0 !important;
+    background-color: #1A23B0 !important;
+    color: #ffffff !important;
+}
+
+/* 3. Guziki (Główny Przycisk / Primary Button) */
+.ak-set-wizard-container .ak-btn-primary,
+.ak-set-wizard-container button.ak-btn-primary,
+.ak-set-wizard-container a.ak-btn-primary,
+.ak-set-wizard-container .ak-btn-success,
+.ak-set-wizard-container button.ak-btn-success {
+    background: #1A23B0 !important;
+    background-color: #1A23B0 !important;
+    border-color: #1A23B0 !important;
+    color: #ffffff !important;
+}
+
+/* Stan :hover (po najechaniu) dla głównych przycisków */
+.ak-set-wizard-container .ak-btn-primary:hover:not(:disabled),
+.ak-set-wizard-container button.ak-btn-primary:hover:not(:disabled),
+.ak-set-wizard-container a.ak-btn-primary:hover:not(:disabled),
+.ak-set-wizard-container .ak-btn-success:hover:not(:disabled),
+.ak-set-wizard-container button.ak-btn-success:hover:not(:disabled) {
+    background: #121980 !important; /* Ciemniejszy odcień przy najechaniu */
+    background-color: #121980 !important;
+    border-color: #121980 !important;
+    color: #ffffff !important;
+}
+
+/* 4. Wyróżnienia (Zaznaczona karta terminu & checkbox) */
+.ak-weekend-card.selected {
+    border-color: #1A23B0 !important;
+    box-shadow: 0 0 0 1px #1A23B0 !important;
+}
+
+.ak-weekend-card.selected .ak-card-checkbox-indicator {
+    background: #1A23B0 !important;
+    background-color: #1A23B0 !important;
+    border-color: #1A23B0 !important;
+}
+
+/* Łączna cena / podsumowanie */
+.price-total {
+    color: #1A23B0 !important;
+}
+
+/* ============================================================
+   5. Rygorystyczne style pól wprowadzania danych (Anti-Theme Clashing)
+   ============================================================ */
+
+/* Etykiety pól - wysoki kontrast, głęboka czerń, pełna czytelność */
+.ak-set-wizard-container .ak-form-group label {
+    display: block !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #18181b !important;
+    margin-bottom: 6px !important;
+    line-height: 1.3 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+    opacity: 1 !important;
+}
+
+/* Pola tekstowe, numeryczne, e-mail, telefon oraz listy wyboru */
+.ak-set-wizard-container .ak-form-group input,
+.ak-set-wizard-container .ak-form-group select,
+.ak-set-wizard-container input[type="text"].ak-input-p-name,
+.ak-set-wizard-container input[type="email"].ak-input-p-email,
+.ak-set-wizard-container input[type="tel"].ak-input-p-phone,
+.ak-set-wizard-container select.ak-input-p-size,
+.ak-set-wizard-container select.ak-input-p-cut {
+    display: block !important;
+    width: 100% !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    padding: 0 14px !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #09090b !important; /* Maksymalny kontrast i brak wyblakłości */
+    border: 1.5px solid #cbd5e1 !important; /* Wyraźna, solidna ramka */
+    border-radius: 6px !important;
+    font-size: 14px !important;
+    line-height: 42px !important;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+    box-sizing: border-box !important;
+    outline: none !important;
+    opacity: 1 !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out, background-color 0.15s ease-in-out !important;
+}
+
+/* Stan :hover dla pól */
+.ak-set-wizard-container .ak-form-group input:hover,
+.ak-set-wizard-container .ak-form-group select:hover {
+    border-color: #94a3b8 !important;
+    background-color: #ffffff !important;
+}
+
+/* Stan :focus (aktywne pole) - precyzyjne podświetlenie kolorem marki #1A23B0 */
+.ak-set-wizard-container .ak-form-group input:focus,
+.ak-set-wizard-container .ak-form-group select:focus {
+    border-color: #1A23B0 !important;
+    background-color: #ffffff !important;
+    color: #09090b !important;
+    box-shadow: 0 0 0 3px rgba(26, 35, 176, 0.18) !important;
+    outline: none !important;
+}
+
+/* Wyraźny, nieblaknący placeholder */
+.ak-set-wizard-container .ak-form-group input::placeholder {
+    color: #94a3b8 !important;
+    opacity: 1 !important;
+    font-weight: 400 !important;
+}
+
+.ak-set-wizard-container .ak-form-group input::-webkit-input-placeholder {
+    color: #94a3b8 !important;
+    opacity: 1 !important;
+    font-weight: 400 !important;
+}
+
+.ak-set-wizard-container .ak-form-group input::-moz-placeholder {
+    color: #94a3b8 !important;
+    opacity: 1 !important;
+    font-weight: 400 !important;
+}
+
+.ak-set-wizard-container .ak-form-group input:-ms-input-placeholder {
+    color: #94a3b8 !important;
+    opacity: 1 !important;
+    font-weight: 400 !important;
+}
+
+/* Stylizowana strzałka dla selectów z kolorem marki */
+.ak-set-wizard-container .ak-form-group select {
+    padding-right: 36px !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231A23B0' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 12px center !important;
+    background-size: 16px 16px !important;
+    cursor: pointer !important;
+}
+
+.ak-set-wizard-container .ak-form-group select option {
+    background: #ffffff !important;
+    color: #09090b !important;
+    padding: 8px 12px !important;
+}
+
+/* Karty uczestników - solidne obramowanie i nagłówki */
+.ak-participant-card-item {
+    border: 1.5px solid #e2e8f0 !important;
+    background: #ffffff !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+.ak-participant-card-header {
+    background: #f8fafc !important;
+    border-bottom: 1.5px solid #e2e8f0 !important;
+}
+
+.ak-participant-card-header h4 {
+    color: #1A23B0 !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
+}
+
+/* Ochrona przed auto-zoomem Safari na urządzeniach mobilnych */
+@media (max-width: 640px) {
+  .ak-set-wizard-container .ak-form-group input,
+  .ak-set-wizard-container .ak-form-group select {
+    font-size: 16px !important;
   }
 }

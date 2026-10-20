@@ -1008,7 +1008,8 @@ class Order_Recalculator {
                 $tier,
                 $per_person_price,
                 $headcount,
-                $cohort_subtotal
+                $cohort_subtotal,
+                $set->get_unit_name_plural_many()
             );
         }
 

@@ -108,6 +108,13 @@ class Order_Participant_Manager {
         $tshirt_cost      = Order_Recalculator::get_tshirt_cost($set_id > 0 ? $set_id : null);
         $tshirt_fee_total = Order_Recalculator::get_order_tshirt_fee_total($order);
         $all_weekends     = Roster_Query::get_weekends_for_selector();
+        $unit_plural_few  = __('weekendy', 'ak-product-set');
+        if ($set_id > 0) {
+            $set_model = new Set_Model($set_id);
+            if ($set_model->exists()) {
+                $unit_plural_few = $set_model->get_unit_name_plural_few();
+            }
+        }
         $nonce            = wp_create_nonce(self::NONCE_ACTION);
 
         $template = defined('AK_SET_PATH')

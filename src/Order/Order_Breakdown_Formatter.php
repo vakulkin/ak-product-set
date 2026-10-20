@@ -35,7 +35,8 @@ class Order_Breakdown_Formatter {
         string $tier,
         float $per_person_price,
         int $headcount,
-        float $cohort_subtotal
+        float $cohort_subtotal,
+        string $unit_label = 'weekendów'
     ): string {
         $tier_label = self::resolve_tier_label($tier);
         $participant_names = array_map(function ($p) {
@@ -46,11 +47,12 @@ class Order_Breakdown_Formatter {
         }, $participants);
 
         return sprintf(
-            "Pakiet %d: [%s]\n• %s: %s\n• Liczba weekendów: %d (%s)\n• Runda: %d | Próg grupy: %s\n• Stawka: %s zł / os. | Wartość: %d os. x %s zł = %s zł",
+            "Pakiet %d: [%s]\n• %s: %s\n• Liczba %s: %d (%s)\n• Runda: %d | Próg grupy: %s\n• Stawka: %s zł / os. | Wartość: %d os. x %s zł = %s zł",
             $cohort_index,
             $set_title,
             __('Uczestnicy', 'ak-product-set'),
             implode(', ', $participant_names),
+            $unit_label,
             $package_size,
             implode(', ', $weekend_titles),
             $round,

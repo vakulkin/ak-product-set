@@ -484,9 +484,9 @@ msgstr "Proszę wybrać rozmiar koszulki dla Uczestnika %d."
 msgid "Brak zestawu o podanym identyfikatorze."
 msgstr "Brak zestawu o podanym identyfikatorze."
 
-#: src/Frontend/Shortcode_Handler.php:132
-msgid "Ten zestaw nie posiada jeszcze przypisanych terminów/weekendów."
-msgstr "Ten zestaw nie posiada jeszcze przypisanych terminów/weekendów."
+#: src/Frontend/Shortcode_Handler.php:129
+msgid "Ten zestaw nie posiada jeszcze przypisanych terminów."
+msgstr "Ten zestaw nie posiada jeszcze przypisanych terminów."
 
 #. translators: %1$d: max limit, %2$d: declared persons, %3$d: persons to remove
 #: src/Frontend/Shortcode_Handler.php:184
@@ -553,9 +553,10 @@ msgstr "Błąd połączenia z serwerem. Spróbuj ponownie."
 msgid "Dostępny limit: %d os."
 msgstr "Dostępny limit: %d os."
 
-#: src/Pricing/Pricing_Engine.php:90
-msgid "Liczba wybranych weekendów musi wynosić od 1 do 10. Nieprawidłowe weekendy mogły zostać odrzucone."
-msgstr "Liczba wybranych weekendów musi wynosić od 1 do 10. Nieprawidłowe weekendy mogły zostać odrzucone."
+#: src/Pricing/Pricing_Engine.php:124
+#, php-format
+msgid "Liczba wybranych pozycji (%s) musi wynosić od 1 do 10. Nieprawidłowe pozycje mogły zostać odrzucone."
+msgstr "Liczba wybranych pozycji (%s) musi wynosić od 1 do 10. Nieprawidłowe pozycje mogły zostać odrzucone."
 
 #: src/Pricing/Pricing_Engine.php:128
 msgid "Cena dla wybranego pakietu i liczby osób nie została ustalona lub wynosi 0 zł. Zestaw nie może zostać dodany do koszyka."
@@ -761,4 +762,95 @@ msgstr "Wybór terminów"
 #: templates/frontend/wizard.php:52
 msgid "Przetwarzanie..."
 msgstr "Przetwarzanie..."
+
+#: ak-product-set.php
+#: src/Plugin.php
+msgid "Czytelnik rejestru"
+msgstr "Czytelnik rejestru"
+
+#: src/Admin/Roster_Access_Guard.php
+msgid "Czytelnik rejestru posiada uprawnienia tylko do podglądu zamówień. Modyfikacja danych jest zablokowana."
+msgstr "Czytelnik rejestru posiada uprawnienia tylko do podglądu zamówień. Modyfikacja danych jest zablokowana."
+
+#: src/Admin/Roster_Access_Guard.php
+msgid "Czytelnik rejestru posiada uprawnienia tylko do podglądu produktów. Modyfikacja danych jest zablokowana."
+msgstr "Czytelnik rejestru posiada uprawnienia tylko do podglądu produktów. Modyfikacja danych jest zablokowana."
+
+#: src/Admin/Roster_Access_Guard.php
+msgid "Masz dostęp do podglądu produktów. Modyfikacja danych i zapisywanie zmian są wyłączone."
+msgstr "Masz dostęp do podglądu produktów. Modyfikacja danych i zapisywanie zmian są wyłączone."
+
+#: src/Admin/ACF_Registrar.php
+msgid "Typ jednostki (np. weekend, zajęcia, warsztat)"
+msgstr "Typ jednostki (np. weekend, zajęcia, warsztat)"
+
+#: src/Admin/ACF_Registrar.php
+msgid "Wybierz czym są pojedyncze elementy tego zestawu. Wpływa to na teksty w podsumowaniu i koszyku."
+msgstr "Wybierz czym są pojedyncze elementy tego zestawu. Wpływa to na teksty w podsumowaniu i koszyku."
+
+#: src/Admin/ACF_Registrar.php
+msgid "weekend (1 weekend, 2 weekendy, 5 weekendów)"
+msgstr "weekend (1 weekend, 2 weekendy, 5 weekendów)"
+
+#: src/Admin/ACF_Registrar.php
+msgid "zajęcia (1 zajęcia, 2 zajęcia, 5 zajęć)"
+msgstr "zajęcia (1 zajęcia, 2 zajęcia, 5 zajęć)"
+
+#: src/Admin/ACF_Registrar.php
+msgid "moduł (1 moduł, 2 moduły, 5 modułów)"
+msgstr "moduł (1 moduł, 2 moduły, 5 modułów)"
+
+#: src/Admin/ACF_Registrar.php
+msgid "warsztat (1 warsztat, 2 warsztaty, 5 warsztatów)"
+msgstr "warsztat (1 warsztat, 2 warsztaty, 5 warsztatów)"
+
+#: src/Admin/ACF_Registrar.php
+msgid "zjazd (1 zjazd, 2 zjazdy, 5 zjazdów)"
+msgstr "zjazd (1 zjazd, 2 zjazdy, 5 zjazdów)"
+
+#: src/Admin/ACF_Registrar.php
+msgid "trening (1 trening, 2 treningi, 5 treningów)"
+msgstr "trening (1 trening, 2 treningi, 5 treningów)"
+
+#: src/Admin/ACF_Registrar.php
+msgid "dzień (1 dzień, 2 dni, 5 dni)"
+msgstr "dzień (1 dzień, 2 dni, 5 dni)"
+
+#: src/Admin/ACF_Registrar.php
+msgid "termin (1 termin, 2 terminy, 5 terminów)"
+msgstr "termin (1 termin, 2 terminy, 5 terminów)"
+
+#: src/Admin/ACF_Registrar.php
+msgid "Własna nazwa (zdefiniuj poniżej)"
+msgstr "Własna nazwa (zdefiniuj poniżej)"
+
+#: src/Admin/ACF_Registrar.php
+msgid "Jednostka – mianownik l. pojedynczej (1...)"
+msgstr "Jednostka – mianownik l. pojedynczej (1...)"
+
+#: src/Admin/ACF_Registrar.php
+msgid "np. weekend, lekcja, spotkanie"
+msgstr "np. weekend, lekcja, spotkanie"
+
+#: src/Admin/ACF_Registrar.php
+msgid "Jednostka – mianownik l. mnogiej (2, 3, 4...)"
+msgstr "Jednostka – mianownik l. mnogiej (2, 3, 4...)"
+
+#: src/Admin/ACF_Registrar.php
+msgid "np. weekendy, lekcje, spotkania"
+msgstr "np. weekendy, lekcje, spotkania"
+
+#: src/Admin/ACF_Registrar.php
+msgid "Jednostka – dopełniacz l. mnogiej (5, 6... i 0)"
+msgstr "Jednostka – dopełniacz l. mnogiej (5, 6... i 0)"
+
+#: src/Admin/ACF_Registrar.php
+msgid "np. weekendów, lekcji, spotkań"
+msgstr "np. weekendów, lekcji, spotkań"
+
+#: templates/admin/order-participants-metabox.php
+#, php-format
+msgid "Wybierz %s:"
+msgstr "Wybierz %s:"
+
 

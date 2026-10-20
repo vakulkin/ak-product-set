@@ -69,13 +69,86 @@ class ACF_Registrar {
             'fields' => [
                 [
                     'key' => 'field_ak_set_products',
-                    'label' => __('Wybrane Weekendy [Produkty]', 'ak-product-set'),
+                    'label' => __('Wybrane Terminy / Składowe Zestawu [Produkty]', 'ak-product-set'),
                     'name' => 'set_products',
                     'type' => 'relationship',
-                    'instructions' => __('Wybierz produkty WooCommerce poszczególnych weekendów należących do tego zestawu.', 'ak-product-set'),
+                    'instructions' => __('Wybierz produkty WooCommerce poszczególnych terminów (weekendów, zajęć, modułów) należących do tego zestawu.', 'ak-product-set'),
                     'post_type' => ['product'],
                     'filters' => ['search'],
                     'return_format' => 'id',
+                ],
+                [
+                    'key' => 'field_ak_set_unit_type',
+                    'label' => __('Typ / nazwa jednostki terminu', 'ak-product-set'),
+                    'name' => 'set_unit_type',
+                    'type' => 'select',
+                    'instructions' => __('Określ, czym są pojedyncze terminy w tym zestawie (np. weekendy, zajęcia, moduły, warsztaty). Wpływa to na odmianę gramatyczną w podsumowaniu pakietu i kalkulacji ceny.', 'ak-product-set'),
+                    'choices' => [
+                        'weekend'  => __('Weekend (1 weekend, 2 weekendy, 5 weekendów)', 'ak-product-set'),
+                        'zajecia'  => __('Zajęcia (1 zajęcia, 2 zajęcia, 5 zajęć)', 'ak-product-set'),
+                        'modul'    => __('Moduł (1 moduł, 2 moduły, 5 modułów)', 'ak-product-set'),
+                        'warsztat' => __('Warsztat (1 warsztat, 2 warsztaty, 5 warsztatów)', 'ak-product-set'),
+                        'zjazd'    => __('Zjazd (1 zjazd, 2 zjazdy, 5 zjazdów)', 'ak-product-set'),
+                        'trening'  => __('Trening (1 trening, 2 treningi, 5 treningów)', 'ak-product-set'),
+                        'dzien'    => __('Dzień (1 dzień, 2 dni, 5 dni)', 'ak-product-set'),
+                        'termin'   => __('Termin (1 termin, 2 terminy, 5 terminów)', 'ak-product-set'),
+                        'custom'   => __('Własna nazwa jednostki (zdefiniuj poniżej)', 'ak-product-set'),
+                    ],
+                    'default_value' => 'weekend',
+                    'allow_null' => 0,
+                    'multiple' => 0,
+                    'ui' => 1,
+                ],
+                [
+                    'key' => 'field_ak_set_unit_singular',
+                    'label' => __('Własna nazwa dla 1 (l. pojedyncza, mianownik)', 'ak-product-set'),
+                    'name' => 'set_unit_singular',
+                    'type' => 'text',
+                    'instructions' => __('np. weekend, zajęcia, moduł, warsztat (używane w: "1 ...")', 'ak-product-set'),
+                    'placeholder' => 'weekend',
+                    'conditional_logic' => [
+                        [
+                            [
+                                'field' => 'field_ak_set_unit_type',
+                                'operator' => '==',
+                                'value' => 'custom',
+                            ],
+                        ],
+                    ],
+                ],
+                [
+                    'key' => 'field_ak_set_unit_plural_few',
+                    'label' => __('Własna nazwa dla 2–4 (l. mnoga, mianownik)', 'ak-product-set'),
+                    'name' => 'set_unit_plural_few',
+                    'type' => 'text',
+                    'instructions' => __('np. weekendy, zajęcia, moduły, warsztaty (używane w: "2 ...")', 'ak-product-set'),
+                    'placeholder' => 'weekendy',
+                    'conditional_logic' => [
+                        [
+                            [
+                                'field' => 'field_ak_set_unit_type',
+                                'operator' => '==',
+                                'value' => 'custom',
+                            ],
+                        ],
+                    ],
+                ],
+                [
+                    'key' => 'field_ak_set_unit_plural_many',
+                    'label' => __('Własna nazwa dla 5+ (l. mnoga, dopełniacz)', 'ak-product-set'),
+                    'name' => 'set_unit_plural_many',
+                    'type' => 'text',
+                    'instructions' => __('np. weekendów, zajęć, modułów, warsztatów (używane w: "5 ...", "Liczba ...")', 'ak-product-set'),
+                    'placeholder' => 'weekendów',
+                    'conditional_logic' => [
+                        [
+                            [
+                                'field' => 'field_ak_set_unit_type',
+                                'operator' => '==',
+                                'value' => 'custom',
+                            ],
+                        ],
+                    ],
                 ],
                 [
                     'key' => 'field_ak_set_has_tshirt',

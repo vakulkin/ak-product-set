@@ -126,7 +126,7 @@ class Shortcode_Handler
 
         $weekends = $set->get_weekend_products();
         if (empty($weekends)) {
-            return '<div class="ak-set-error">' . esc_html__('Ten zestaw nie posiada jeszcze przypisanych terminów/weekendów.', 'ak-product-set') . '</div>';
+            return '<div class="ak-set-error">' . esc_html__('Ten zestaw nie posiada jeszcze przypisanych terminów.', 'ak-product-set') . '</div>';
         }
 
         // Check if there is an existing booking in cart to pre-load for editing
@@ -165,18 +165,20 @@ class Shortcode_Handler
         }
 
         $js_config = [
-            'ajax_url'     => admin_url('admin-ajax.php'),
-            'nonce'        => wp_create_nonce('ak_set_nonce'),
-            'set_id'       => $set_id,
-            'has_tshirt'   => $set->has_tshirt(),
-            'matrix'       => $set_matrix,
-            'tshirt_sizes' => Helper::get_tshirt_sizes(),
-            'tshirt_cuts'  => Helper::get_tshirt_cuts(),
-            'weekends'     => $weekends_data,
-            'initial_data' => $initial_data,
-            'cart_url'     => wc_get_cart_url(),
-            'checkout_url' => wc_get_checkout_url(),
-            'i18n'         => [
+            'ajax_url'      => admin_url('admin-ajax.php'),
+            'nonce'         => wp_create_nonce('ak_set_nonce'),
+            'set_id'        => $set_id,
+            'unit'          => $set->get_unit_names(),
+            'has_tshirt'    => $set->has_tshirt(),
+            'matrix'        => $set_matrix,
+            'tshirt_sizes'  => Helper::get_tshirt_sizes(),
+            'tshirt_cuts'   => Helper::get_tshirt_cuts(),
+            'weekends'      => $weekends_data,
+            'initial_data'  => $initial_data,
+            'cart_url'      => wc_get_cart_url(),
+            'checkout_url'  => wc_get_checkout_url(),
+            'i18n'          => [
+                'item_fallback'           => ucfirst($set->get_unit_name_singular()),
                 /* translators: %1$d: max limit, %2$d: declared persons, %3$d: persons to remove */
                 'stock_limit_changed'     => __('Dostępność miejsc uległa zmianie. Dostępny limit wynosi %1$d miejsc [zadeklarowano %2$d os.]. Proszę usunąć %3$d uczestników, aby kontynuować.', 'ak-product-set'),
                 /* translators: %d: participant number */

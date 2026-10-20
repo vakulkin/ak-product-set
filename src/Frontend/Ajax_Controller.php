@@ -5,6 +5,7 @@ namespace AK_Set\Frontend;
 use AK_Set\Cart\Composed_Cart_Manager;
 use AK_Set\Pricing\Pricing_Engine;
 use AK_Set\Models\Participant_Model;
+use AK_Set\Models\Set_Model;
 use AK_Set\Support\Helper;
 
 if (!defined('ABSPATH')) {
@@ -52,14 +53,14 @@ class Ajax_Controller {
         }
 
         $tier_labels = Pricing_Engine::get_tier_display_labels();
+        $set = new Set_Model($set_id);
 
         $calc['formatted'] = [
             'per_person_price'  => function_exists('wc_price') ? wc_price($calc['per_person_price']) : number_format_i18n($calc['per_person_price'], 2) . ' zł',
             'total_price'       => function_exists('wc_price') ? wc_price($calc['total_price']) : number_format_i18n($calc['total_price'], 2) . ' zł',
             'per_person_raw'    => number_format_i18n($calc['per_person_price'], 2) . ' zł',
             'total_raw'         => number_format_i18n($calc['total_price'], 2) . ' zł',
-            /* translators: %d: number of weekends */
-            'package_size_text' => sprintf(_n('%d weekend', '%d weekendy', $calc['package_size'], 'ak-product-set'), $calc['package_size']),
+            'package_size_text' => $set->format_package_size($calc['package_size']),
             /* translators: %d: round number */
             'round_text'        => sprintf(__('Runda %d', 'ak-product-set'), $calc['round']),
             'tier_text'         => isset($tier_labels[$calc['tier']]) ? $tier_labels[$calc['tier']] : $calc['tier'],

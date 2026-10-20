@@ -616,7 +616,10 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
             <!-- Weekend selection checkboxes -->
             <div style="background: #f0f0f1; padding: 10px 12px; border-radius: 4px; margin-bottom: 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                    <strong><?php esc_html_e('Wybierz weekendy:', 'ak-product-set'); ?></strong>
+                    <?php
+                        $unit_few = !empty($unit_plural_few) ? $unit_plural_few : __('weekendy', 'ak-product-set');
+                    ?>
+                    <strong><?php echo esc_html(sprintf(__('Wybierz %s:', 'ak-product-set'), $unit_few)); ?></strong>
                     <label style="cursor: pointer; font-size: 11px;">
                         <input type="checkbox" id="ak-om-add-select-all" checked> <?php esc_html_e('Zaznacz wszystkie', 'ak-product-set'); ?>
                     </label>

@@ -303,7 +303,8 @@
           for (var w = 0; w < state.selectedWeekends.length; w++) {
             var wid = state.selectedWeekends[w];
             var card = app.querySelector('.ak-weekend-card[data-weekend-id="' + wid + '"]');
-            var name = card ? card.querySelector('.ak-weekend-title').textContent : 'Weekend #' + wid;
+            var fallbackLabel = (config.i18n && config.i18n.item_fallback) ? config.i18n.item_fallback : 'Termin';
+            var name = card ? card.querySelector('.ak-weekend-title').textContent : fallbackLabel + ' #' + wid;
             var li = document.createElement('li');
             li.textContent = name;
             li.style.marginBottom = '4px';

@@ -38,7 +38,7 @@ class Set_Model {
      * @return bool
      */
     public function exists() {
-        return $this->post !== null && $this->post->post_type === 'ak_set';
+        return $this->post !== null && !empty($this->post->post_type) && $this->post->post_type === 'ak_set';
     }
 
     /**
@@ -129,6 +129,120 @@ class Set_Model {
         return array_map(function($w) {
             return $w->get_id();
         }, $products);
+    }
+
+    /**
+     * Get unit naming configuration for this set (presets or custom).
+     *
+     * @return array{singular: string, plural_few: string, plural_many: string}
+     */
+    public function get_unit_names(): array {
+        $presets = [
+            'weekend'  => ['singular' => 'weekend',  'plural_few' => 'weekendy',  'plural_many' => 'weekendów'],
+            'zajecia'  => ['singular' => 'zajęcia',  'plural_few' => 'zajęcia',  'plural_many' => 'zajęć'],
+            'modul'    => ['singular' => 'moduł',    'plural_few' => 'moduły',    'plural_many' => 'modułów'],
+            'warsztat' => ['singular' => 'warsztat', 'plural_few' => 'warsztaty', 'plural_many' => 'warsztatów'],
+            'zjazd'    => ['singular' => 'zjazd',    'plural_few' => 'zjazdy',    'plural_many' => 'zjazdów'],
+            'trening'  => ['singular' => 'trening',  'plural_few' => 'treningi',  'plural_many' => 'treningów'],
+            'dzien'    => ['singular' => 'dzień',    'plural_few' => 'dni',       'plural_many' => 'dni'],
+            'termin'   => ['singular' => 'termin',   'plural_few' => 'terminy',   'plural_many' => 'terminów'],
+        ];
+
+        $unit_type = '';
+        if (function_exists('get_field')) {
+            try {
+                $raw_type = get_field('set_unit_type', $this->set_id);
+                $unit_type = is_scalar($raw_type) ? (string) $raw_type : '';
+            } catch (\Throwable) {}
+        }
+        if (!$unit_type && function_exists('get_post_meta')) {
+            try {
+                $raw_type = get_post_meta($this->set_id, 'set_unit_type', true);
+                $unit_type = is_scalar($raw_type) ? (string) $raw_type : '';
+            } catch (\Throwable) {}
+        }
+        $clean_type = function_exists('sanitize_key') ? sanitize_key($unit_type ?: 'weekend') : strtolower(trim($unit_type ?: 'weekend'));
+
+        if ($clean_type === 'custom') {
+            $sing = '';
+            $few  = '';
+            $many = '';
+            if (function_exists('get_field')) {
+                try {
+                    $raw_s = get_field('set_unit_singular', $this->set_id);
+                    $raw_f = get_field('set_unit_plural_few', $this->set_id);
+                    $raw_m = get_field('set_unit_plural_many', $this->set_id);
+                    $sing = is_scalar($raw_s) ? trim((string) $raw_s) : '';
+                    $few  = is_scalar($raw_f) ? trim((string) $raw_f) : '';
+                    $many = is_scalar($raw_m) ? trim((string) $raw_m) : '';
+                } catch (\Throwable) {}
+            }
+            if (!$sing && function_exists('get_post_meta')) {
+                try {
+                    $raw_s = get_post_meta($this->set_id, 'set_unit_singular', true);
+                    $raw_f = get_post_meta($this->set_id, 'set_unit_plural_few', true);
+                    $raw_m = get_post_meta($this->set_id, 'set_unit_plural_many', true);
+                    $sing = is_scalar($raw_s) ? trim((string) $raw_s) : '';
+                    $few  = is_scalar($raw_f) ? trim((string) $raw_f) : '';
+                    $many = is_scalar($raw_m) ? trim((string) $raw_m) : '';
+                } catch (\Throwable) {}
+            }
+
+            if ($sing !== '' || $few !== '' || $many !== '') {
+                $default_sing = $sing ?: ($few ?: ($many ?: 'weekend'));
+                return [
+                    'singular'    => $sing ?: $default_sing,
+                    'plural_few'  => $few  ?: $default_sing,
+                    'plural_many' => $many ?: $default_sing,
+                ];
+            }
+        }
+
+        if (isset($presets[$clean_type])) {
+            return $presets[$clean_type];
+        }
+
+        return $presets['weekend'];
+    }
+
+    /**
+     * Get singular unit name (e.g. "weekend", "zajęcia", "moduł")
+     */
+    public function get_unit_name_singular(): string {
+        return $this->get_unit_names()['singular'];
+    }
+
+    /**
+     * Get plural-few unit name for 2-4 (e.g. "weekendy", "zajęcia", "moduły")
+     */
+    public function get_unit_name_plural_few(): string {
+        return $this->get_unit_names()['plural_few'];
+    }
+
+    /**
+     * Get plural-many unit name for 5+ / genitive (e.g. "weekendów", "zajęć", "modułów")
+     */
+    public function get_unit_name_plural_many(): string {
+        return $this->get_unit_names()['plural_many'];
+    }
+
+    /**
+     * Format package size count with proper grammatical unit declension.
+     *
+     * @param int $count Number of units (1..10)
+     * @return string e.g. "1 weekend", "2 weekendy", "5 weekendów" OR "1 zajęcia", "2 zajęcia", "5 zajęć"
+     */
+    public function format_package_size(int $count): string {
+        $units = $this->get_unit_names();
+        if ($count === 1) {
+            return sprintf('%d %s', $count, $units['singular']);
+        }
+        $rem10 = $count % 10;
+        $rem100 = $count % 100;
+        if ($rem10 >= 2 && $rem10 <= 4 && ($rem100 < 12 || $rem100 > 14)) {
+            return sprintf('%d %s', $count, $units['plural_few']);
+        }
+        return sprintf('%d %s', $count, $units['plural_many']);
     }
 }
 

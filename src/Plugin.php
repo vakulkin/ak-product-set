@@ -114,6 +114,39 @@ class Plugin {
             add_role('ak_roster_manager', __('Menadżer rejestru', 'ak-product-set'), $roster_caps);
         }
 
+        // Ensure roster reader role and capabilities are synced
+        $reader_caps = [
+            'read'                          => true,
+            'ak_view_roster'                => true,
+
+            // Read-only Shop Orders
+            'edit_shop_orders'              => true,
+            'read_shop_order'               => true,
+            'read_private_shop_orders'      => true,
+            'edit_others_shop_orders'       => true,
+            'edit_published_shop_orders'    => true,
+            'publish_shop_orders'           => true,
+
+            // Read-only Products
+            'read_product'                  => true,
+            'read_private_products'         => true,
+            'edit_product'                  => true,
+            'edit_products'                 => true,
+            'edit_others_products'          => true,
+            'edit_published_products'       => true,
+        ];
+
+        $reader_role = get_role('ak_roster_reader');
+        if ($reader_role) {
+            foreach (array_keys($reader_caps) as $cap) {
+                if (!$reader_role->has_cap($cap)) {
+                    $reader_role->add_cap($cap);
+                }
+            }
+        } else {
+            add_role('ak_roster_reader', __('Czytelnik rejestru', 'ak-product-set'), $reader_caps);
+        }
+
         foreach (['administrator', 'shop_manager'] as $role_name) {
             $role = get_role($role_name);
             if ($role && !$role->has_cap('ak_view_roster')) {

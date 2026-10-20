@@ -112,6 +112,27 @@ register_activation_hook(AK_SET_FILE, function () {
         'edit_published_shop_coupons'   => true,
     ]);
 
+    add_role('ak_roster_reader', __('Czytelnik rejestru', 'ak-product-set'), [
+        'read'                          => true,
+        'ak_view_roster'                => true,
+
+        // Read-only Shop Orders
+        'edit_shop_orders'              => true,
+        'read_shop_order'               => true,
+        'read_private_shop_orders'      => true,
+        'edit_others_shop_orders'       => true,
+        'edit_published_shop_orders'    => true,
+        'publish_shop_orders'           => true,
+
+        // Read-only Products
+        'read_product'                  => true,
+        'read_private_products'         => true,
+        'edit_product'                  => true,
+        'edit_products'                 => true,
+        'edit_others_products'          => true,
+        'edit_published_products'       => true,
+    ]);
+
     foreach (['administrator', 'shop_manager'] as $role_name) {
         $role = get_role($role_name);
         if ($role) {
@@ -125,6 +146,7 @@ register_activation_hook(AK_SET_FILE, function () {
  */
 register_deactivation_hook(AK_SET_FILE, function () {
     remove_role('ak_roster_manager');
+    remove_role('ak_roster_reader');
 
     $admin_role = get_role('administrator');
     if ($admin_role) {

@@ -119,9 +119,14 @@ class Pricing_Engine {
 
         $package_size = count($selected_weekend_ids);
         if ($package_size < 1 || $package_size > 10) {
+            $unit_label = method_exists($set, 'get_unit_name_plural_many') ? $set->get_unit_name_plural_many() : __('terminów', 'ak-product-set');
             return [
                 'valid' => false,
-                'error' => __('Liczba wybranych weekendów musi wynosić od 1 do 10. Nieprawidłowe weekendy mogły zostać odrzucone.', 'ak-product-set'),
+                'error' => sprintf(
+                    /* translators: %s: plural unit name */
+                    __('Liczba wybranych pozycji (%s) musi wynosić od 1 do 10. Nieprawidłowe pozycje mogły zostać odrzucone.', 'ak-product-set'),
+                    $unit_label
+                ),
             ];
         }
 
