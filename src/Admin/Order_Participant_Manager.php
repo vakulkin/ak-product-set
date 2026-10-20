@@ -57,7 +57,51 @@ class Order_Participant_Manager {
      * Enqueue admin styles / scripts for the order participant manager.
      */
     public function enqueue_admin_assets($hook): void {
-        // Handled inline within the metabox
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+        $screen_id = $screen->id ?? (string) $hook;
+
+        $is_order_screen = in_array($screen_id, ['woocommerce_page_wc-orders', 'edit-shop_order', 'shop_order'], true)
+            || str_contains($screen_id, 'wc-orders')
+            || (is_string($hook) && str_contains($hook, 'wc-orders'));
+
+        if ($is_order_screen) {
+            add_action('admin_footer', [$this, 'print_order_list_checkbox_fix']);
+        }
+    }
+
+    /**
+     * Fix WooCommerce HPOS / order table bug: clicking the checkbox row triggers onRowClick and opens the order.
+     */
+    public function print_order_list_checkbox_fix(): void {
+        ?>
+        <script>
+        (function() {
+            // Intercept clicks on checkboxes and check-column in capture phase to stop WooCommerce row-click navigation
+            document.addEventListener('click', function(e) {
+                if (e.target && (e.target.closest('.check-column') || e.target.closest('th.column-cb, td.column-cb') || (e.target.tagName === 'INPUT' && e.target.type === 'checkbox'))) {
+                    e.stopPropagation();
+                }
+            }, true);
+
+            function markCheckboxesNoLink() {
+                var items = document.querySelectorAll('.wp-list-table .check-column, .wp-list-table th.column-cb, .wp-list-table td.column-cb, .wp-list-table tbody input[type="checkbox"]');
+                for (var i = 0; i < items.length; i++) {
+                    items[i].classList.add('no-link');
+                }
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', markCheckboxesNoLink);
+            } else {
+                markCheckboxesNoLink();
+            }
+
+            if (window.jQuery) {
+                window.jQuery(document).ajaxComplete(markCheckboxesNoLink);
+            }
+        })();
+        </script>
+        <?php
     }
 
     /**

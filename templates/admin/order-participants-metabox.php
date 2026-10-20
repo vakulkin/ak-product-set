@@ -583,7 +583,7 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
             </p>
             <div style="margin-bottom: 8px;">
                 <label><strong><?php esc_html_e('Imię i nazwisko:', 'ak-product-set'); ?></strong> *</label><br>
-                <input type="text" id="ak-om-new-name" class="widefat" required>
+                <input type="text" id="ak-om-new-name" class="widefat">
             </div>
             <div style="margin-bottom: 8px;">
                 <label><?php esc_html_e('Adres e-mail:', 'ak-product-set'); ?></label><br>
@@ -649,7 +649,7 @@ $is_order_cancelled = ($order->get_status() === 'cancelled');
 
             <div style="margin-bottom: 10px;">
                 <label><strong><?php esc_html_e('Imię i nazwisko:', 'ak-product-set'); ?></strong> *</label><br>
-                <input type="text" id="ak-om-edit-name" class="widefat" required>
+                <input type="text" id="ak-om-edit-name" class="widefat">
             </div>
 
             <div style="margin-bottom: 10px;">
